@@ -15,11 +15,10 @@ import { makeHistoryId } from '../../utils/explorer';
 
 import { ConnectModal } from '@mysten/dapp-kit-react/ui';
 
-const HISTORY_KEY = 'adidahood:swap-history';
-const LEGACY_HISTORY_KEY = 'robinhood:swap-history'; // old prompt-string entries
+const HISTORY_KEY = 'soka:swap-history';
+const LEGACY_HISTORY_KEY = 'adidahood:swap-history';
 const MAX_HISTORY = 12;
 
-/** Top weekly PNL leaders for the header ticker (demo feed). */
 const pnlLeaders = [
   { addr: '0x8f3a…c007', pnl: '+184.2%' },
   { addr: '0x2b91…4d11', pnl: '+127.8%' },
@@ -28,7 +27,6 @@ const pnlLeaders = [
   { addr: '0x9e55…f8ab', pnl: '+61.9%' },
 ];
 
-/** Small inline stat chip for the result key-figures row. */
 const MiniStat: React.FC<{
   label: string;
   value: string;
@@ -36,11 +34,11 @@ const MiniStat: React.FC<{
   warn?: boolean;
   danger?: boolean;
 }> = ({ label, value, accent, warn, danger }) => (
-  <div className="rounded-xl border-2 border-[#141414]/80 bg-white px-2.5 py-1.5 text-left min-w-0">
-    <div className="truncate font-mono text-[7px] font-bold uppercase tracking-[0.14em] text-[#141414]/40">{label}</div>
+  <div className="rounded-lg border border-[#00f0ff]/30 bg-[#0d0d14]/80 px-3 py-2 text-left min-w-0">
+    <div className="truncate font-mono text-[8px] font-bold uppercase tracking-[0.14em] text-[#00f0ff]/40">{label}</div>
     <div
-      className={`mt-0.5 truncate font-mono text-[11px] font-black ${
-        danger ? 'text-[#d33]' : warn ? 'text-[#d33]' : accent ? 'text-[#1c7a36]' : 'text-[#141414]'
+      className={`mt-0.5 truncate font-mono text-[12px] font-black ${
+        danger ? 'text-[#ff2d7b]' : warn ? 'text-[#ffb800]' : accent ? 'text-[#39ff14]' : 'text-white'
       }`}
       title={value}
     >
@@ -71,8 +69,6 @@ function migrateLegacyHistory(): SwapSnapshot[] {
   }
 }
 
-/** Sample history so a full transaction history can be previewed immediately.
- * Only used when there is no real history yet. */
 function buildDemoHistory(): SwapSnapshot[] {
   const now = Date.now();
   const checks = (impact: 'SAFE' | 'WARNING' | 'DANGER'): RiskCheck[] => [
@@ -157,24 +153,18 @@ function loadHistory(): SwapSnapshot[] {
     const arr = raw ? JSON.parse(raw) : [];
     const seen = new Set<string>();
     const valid = Array.isArray(arr) ? arr : [];
-    // Normalize: ensure every entry has a unique id (mock/copy-paste data can
-    // carry duplicate or missing ids, which breaks React list keys and expand).
     const normalized: SwapSnapshot[] = [];
     for (const x of valid) {
       if (!x || typeof x !== 'object' || typeof x.prompt !== 'string' ||
           !Array.isArray(x.routeNodes) || !Array.isArray(x.checks) || !Array.isArray(x.ptbSteps)) continue;
       const id = typeof x.id === 'string' && x.id ? x.id : makeHistoryId();
-      if (seen.has(id)) continue; // drop duplicates, keep first
+      if (seen.has(id)) continue;
       seen.add(id);
       normalized.push({ ...x, id });
     }
-    // One-time carry-over of the old prompt-string history.
     if (normalized.length === 0 && localStorage.getItem(LEGACY_HISTORY_KEY)) {
       return migrateLegacyHistory().slice(0, MAX_HISTORY);
     }
-    // No real history yet → seed sample tasks so a full history with all
-    // sub-panels can be previewed. They behave like normal entries until the
-    // user clears them or performs real swaps.
     if (normalized.length === 0) {
       const seeded = buildDemoHistory();
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(seeded)); } catch { /* ignore */ }
@@ -203,7 +193,6 @@ export const ProSwapper: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [txDigest, setTxDigest] = useState<string | null>(null);
 
-  // History of sent intents (localStorage) — full swap snapshots
   const [history, setHistory] = useState<SwapSnapshot[]>(loadHistory);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
@@ -226,7 +215,6 @@ export const ProSwapper: React.FC = () => {
     try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
   };
 
-  /** Cancel the current order: clears the shown results so the user can retry. */
   const handleCancelSwap = () => {
     setRouteNodes([]);
     setGuardianChecks([]);
@@ -251,7 +239,6 @@ export const ProSwapper: React.FC = () => {
     if (activeSwapRef.current && activeSwapRef.current.id === id) activeSwapRef.current = null;
   };
 
-  // Resolved Pipeline State
   const [sourceSymbol, setSourceSymbol] = useState<string>("SUI");
   const [destSymbol, setDestSymbol] = useState<string>("USDC");
   const [tradeAmount, setTradeAmount] = useState<string>("100");
@@ -263,20 +250,17 @@ export const ProSwapper: React.FC = () => {
   const [routeNodes, setRouteNodes] = useState<RouteNode[]>([]);
   const [ptbData, setPtbData] = useState<any | null>(null);
 
-  // Guardian State
   const [guardianScore, setGuardianScore] = useState<number>(95);
   const [guardianRiskLevel, setGuardianRiskLevel] = useState<string>("LOW");
   const [guardianSafe, setGuardianSafe] = useState<boolean>(true);
   const [guardianChecks, setGuardianChecks] = useState<RiskCheck[]>([]);
   const [hasConfirmedSettings, setHasConfirmedSettings] = useState<boolean>(false);
 
-  // Token suggestions & Alternative sources
   const [tokenSuggestion, setTokenSuggestion] = useState<any | null>(null);
   const [alternativeSource, setAlternativeSource] = useState<any | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
 
-  // Run initial intent if passed via search param
   useEffect(() => {
     const initialIntent = searchParams.get('intent');
     if (initialIntent) {
@@ -288,7 +272,6 @@ export const ProSwapper: React.FC = () => {
     const prompt = promptToRun || intentPrompt;
     if (!prompt.trim() || isProcessing) return;
 
-    // Create a pending history snapshot immediately; fill details as they arrive.
     const swapId = makeHistoryId();
     const snapshot: SwapSnapshot = {
       id: swapId,
@@ -300,8 +283,6 @@ export const ProSwapper: React.FC = () => {
       ptbSteps: [],
     };
     activeSwapRef.current = snapshot;
-    // StrictMode / double-click guard: if this exact prompt is already at the
-    // top of history as a pending snapshot, reuse it instead of duplicating.
     setHistory(prev => {
       const already = prev[0];
       const isDup = !!already && already.prompt === prompt && already.status === 'SIMULATED'
@@ -339,20 +320,17 @@ export const ProSwapper: React.FC = () => {
         throw new Error(data.error || 'Failed to process swap intent');
       }
 
-      // If token is ambiguous
       if (data.tokenSuggestion) {
         setTokenSuggestion(data.tokenSuggestion);
         setIsProcessing(false);
-        upsertHistory(swapId, { status: 'FAILED' }); // no swap produced — needs user pick
+        upsertHistory(swapId, { status: 'FAILED' });
         return;
       }
 
-      // If alternative source available
       if (data.alternativeSource) {
         setAlternativeSource(data.alternativeSource);
       }
 
-      // Set pipeline data
       if (data.intent) {
         setSourceSymbol(data.intent.source_token_symbol || 'SUI');
         setDestSymbol(data.intent.destination_token_symbol || 'USDC');
@@ -405,7 +383,7 @@ export const ProSwapper: React.FC = () => {
 
       upsertHistory(swapId, patch);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error communicating with Adidahood Engine');
+      setErrorMessage(err.message || 'Error communicating with SOKA Engine');
       upsertHistory(swapId, { status: 'FAILED' });
     } finally {
       setIsProcessing(false);
@@ -444,7 +422,6 @@ export const ProSwapper: React.FC = () => {
         const { Transaction } = await import('@mysten/sui/transactions');
         const tx = Transaction.from(data.transactionBytes);
 
-        // Sign and execute via Sui Wallet Adapter
         const result = await dAppKit.signAndExecuteTransaction({
           transaction: tx,
         });
@@ -486,18 +463,22 @@ export const ProSwapper: React.FC = () => {
   };
 
   return (
-    <div className="h-[100dvh] w-full pro3-bg text-[#141414] flex flex-col font-sans selection:bg-[#141414] selection:text-[#CCFF00] overflow-hidden">
+    <div className="h-[100dvh] w-full mesh-bg text-[#e0e0e8] flex flex-col font-sans selection:bg-[#ff00ff] selection:text-white overflow-hidden">
+      {/* Ambient glow */}
+      <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] rounded-full bg-[#7b2fff] opacity-10 blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[10%] right-[20%] w-[250px] h-[250px] rounded-full bg-[#00f0ff] opacity-10 blur-[80px] pointer-events-none" />
+
       <ProHeader onOpenWalletModal={() => setIsWalletModalOpen(true)} />
 
-      {/* top PNL marquee — mimics the landing ticker */}
-      <div className="pro3-marquee-bg shrink-0">
-        <div className="pro3-marquee-inner">
+      {/* PNL marquee */}
+      <div className="border-y border-[#00f0ff]/20 bg-gradient-to-r from-[#00f0ff]/5 to-[#7b2fff]/5 overflow-hidden shrink-0">
+        <div className="cyber-marquee inline-flex whitespace-nowrap py-2">
           {Array.from({ length: 2 }).map((_, dup) => (
             <span key={dup} className="flex items-center">
               {pnlLeaders.map((l, i) => (
                 <span key={i} className="flex items-center">
-                  <span className="px-3">{l.addr} just hit the weekly Top PNL with {l.pnl}</span>
-                  <span className="text-[#7DDCFF]">★</span>
+                  <span className="px-3 font-mono text-xs text-[#a8f0ff]/60">{l.addr} hit weekly Top PNL {l.pnl}</span>
+                  <span className="text-[#00f0ff]">◆</span>
                 </span>
               ))}
             </span>
@@ -505,56 +486,57 @@ export const ProSwapper: React.FC = () => {
         </div>
       </div>
 
-      <main className="flex-1 min-h-0 w-full mx-auto flex justify-center px-3 sm:px-6 py-4 gap-4">
+      <main className="flex-1 min-h-0 w-full mx-auto flex justify-center px-3 sm:px-6 py-4 gap-4 relative z-10">
         {/* left sidebar — market widgets */}
         <aside className="hidden lg:block w-[300px] shrink-0 pr-1">
           <MarketSidebar onPick={onPickMarket} />
         </aside>
 
         {/* center chat window */}
-        <div className="flex-1 min-h-0 max-w-[1080px] pro3-card overflow-hidden flex flex-col shadow-[10px_10px_0_#141414]">
+        <div className="flex-1 min-h-0 max-w-[1080px] cyber-card overflow-hidden flex flex-col neon-cyan">
+          <div className="corner-br" />
           {/* window titlebar */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b-[3px] border-[#141414] bg-[#FFC900] shrink-0">
-            <span className="w-3 h-3 rounded-full bg-[#ff6b6b] border-2 border-[#141414]" />
-            <span className="w-3 h-3 rounded-full bg-[#fffaf0] border-2 border-[#141414]" />
-            <span className="w-3 h-3 rounded-full bg-[#2fbf4f] border-2 border-[#141414]" />
-            <span className="ml-2 font-mono text-[10px] font-bold tracking-[0.2em] text-[#141414]/80 truncate">
-              ADIDAHOOD.EXE ★ BUDDY IS TYPING…
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#00f0ff]/20 bg-gradient-to-r from-[#7b2fff]/20 to-[#00f0ff]/10 shrink-0">
+            <span className="w-3 h-3 rounded-full bg-[#ff2d7b] border border-[#ff2d7b]/50" />
+            <span className="w-3 h-3 rounded-full bg-[#ffb800] border border-[#ffb800]/50" />
+            <span className="w-3 h-3 rounded-full bg-[#39ff14] border border-[#39ff14]/50" />
+            <span className="ml-2 font-mono text-[10px] font-bold tracking-[0.2em] text-[#00f0ff]/80 truncate">
+              SOKA.EXE ★ AI IS PROCESSING…
             </span>
-            <span className="ml-auto hidden sm:inline font-mono text-[10px] font-bold text-[#141414]/60">ADIDAHOOD ★ SAFE ★ FUN</span>
+            <span className="ml-auto hidden sm:inline font-mono text-[10px] font-bold text-[#00f0ff]/40">SOKA ★ SECURE ★ FAST</span>
           </div>
 
-          {/* workspace: single chat column — results render inline under the message */}
+          {/* workspace */}
           <div className="flex-1 min-h-0 flex">
-            {/* chat / command panel */}
             <div className="flex flex-col min-h-0 w-full">
               {/* panel header */}
-              <div className="flex items-center gap-2.5 px-4 py-2.5 border-b-[3px] border-[#141414] bg-[#FFFDF4] shrink-0">
+              <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[#00f0ff]/20 bg-[#0d0d14]/50 shrink-0">
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-[#CCFF00] border-2 border-[#141414] flex items-center justify-center overflow-hidden shadow-[2px_2px_0_#141414]">
-                    <SkullBuddy size={40} mood="happy" className="!animate-none !drop-shadow-none" />
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00f0ff]/30 to-[#7b2fff]/30 border border-[#00f0ff]/50 flex items-center justify-center overflow-hidden neon-cyan">
+                    <SkullBuddy size={40} mood="happy" className="!animate-none !drop-shadow-none skull-glow" />
                   </div>
                   <div className="leading-none">
-                    <div className="font-black text-[15px] text-[#141414]" style={{ fontFamily: '"Bungee", sans-serif' }}>Skull Buddy</div>
-                    <div className="text-[10px] font-mono font-bold text-[#1c7a36] mt-0.5 flex items-center gap-1">
-                      <span className="pro3-dot pro3-dot-green" /> Online
+                    <div className="font-black text-[15px] text-white" style={{ fontFamily: 'var(--font-display)' }}>SOKA AI</div>
+                    <div className="text-[10px] font-mono font-bold text-[#39ff14] mt-0.5 flex items-center gap-1">
+                      <span className="cyber-dot cyber-dot-green" /> Online
                     </div>
                   </div>
                 </div>
                 <div className="ml-auto flex items-center gap-2 shrink-0">
-                  {/* History button — opens centered modal */}
                   <div className="relative">
                     <button
                       onClick={() => setHistoryOpen(v => !v)}
-                      className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-[#141414] font-mono text-[10px] font-bold transition-colors shadow-[2px_2px_0_#141414] ${
-                        historyOpen ? 'bg-[#CCFF00] text-[#141414]' : 'bg-white text-[#141414]/70 hover:bg-[#CCFF00]/50'
+                      className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-mono text-[10px] font-bold transition-all ${
+                        historyOpen
+                          ? 'bg-[#00f0ff]/20 text-[#00f0ff] border-[#00f0ff]/50'
+                          : 'bg-[#0d0d14] text-[#a8f0ff]/70 border-[#00f0ff]/30 hover:bg-[#00f0ff]/10'
                       }`}
                       title="Swap history"
                     >
                       <HistoryIcon className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">History</span>
                       {history.length > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-[#141414] text-[#CCFF00] text-[8px] font-mono font-bold flex items-center justify-center">
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-[#ff00ff] text-white text-[8px] font-mono font-bold flex items-center justify-center">
                           {history.length > 9 ? '9+' : history.length}
                         </span>
                       )}
@@ -563,121 +545,120 @@ export const ProSwapper: React.FC = () => {
 
                   <button
                     onClick={() => { setIntentPrompt(''); setRouteNodes([]); setGuardianChecks([]); setErrorMessage(null); setTxDigest(null); activeSwapRef.current = null; }}
-                    className="w-8 h-8 rounded-full bg-white border-2 border-[#141414] flex items-center justify-center hover:bg-[#CCFF00] transition-colors shadow-[2px_2px_0_#141414]"
+                    className="w-8 h-8 rounded-lg bg-[#0d0d14] border border-[#00f0ff]/30 flex items-center justify-center hover:bg-[#00f0ff]/20 hover:border-[#00f0ff]/50 transition-all"
                     title="New chat"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add_comment</span>
+                    <span className="text-[#00f0ff] text-sm">+</span>
                   </button>
                 </div>
               </div>
 
-              {/* messages area — gradient applied to the scroller itself so it
-                  always fills the visible region (no white gap when scrolling) */}
+              {/* messages area */}
               <div
                 className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 relative"
                 style={{
-                  backgroundImage:
-                    'linear-gradient(160deg, #EAF7D9 0%, #D9F0C2 38%, #BCE69A 72%, #9FD87E 100%)',
-                  backgroundAttachment: 'local',
+                  background: 'linear-gradient(160deg, #0a0a0f 0%, #0d0d14 40%, #12121c 100%)',
                 }}
               >
-
-                {/* conversation bubbles — anchored close to the panel edges */}
                 <div className="relative flex flex-col gap-2.5 w-full">
                   {/* buddy intro */}
                   <div className="flex items-end gap-2">
-                    <SkullBuddy size={40} mood="happy" className="shrink-0 !animate-none" />
-                    <div className="relative chat-bubble-bot !rounded-[6px_18px_18px_18px] px-3.5 py-2 max-w-[78%]">
-                      <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#141414]/50 mb-0.5">ADIDAHOOD ★</div>
-                      <div className="text-[14px] font-bold leading-snug">
+                    <SkullBuddy size={40} mood="happy" className="shrink-0 !animate-none skull-glow" />
+                    <div className="relative cyber-card cyber-card-magenta p-3.5 max-w-[78%]">
+                      <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#ff00ff] mb-0.5">SOKA ★</div>
+                      <div className="text-[14px] font-semibold leading-snug text-white">
                         Tell me your dream swap. I sniff the route &amp; run 7 checks — no jargon, just vibes ⚡
                       </div>
+                      <div className="corner-br" />
                     </div>
                   </div>
 
                   {/* last user message */}
                   {intentPrompt.trim() !== '' && (
                     <div className="flex justify-end">
-                      <div className="relative chat-bubble-user !rounded-[18px_18px_6px_18px] px-3.5 py-2 max-w-[78%]">
-                        <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#141414]/50 mb-0.5 text-right">YOU ★</div>
-                        <div className="text-[14px] font-bold leading-snug break-words">{intentPrompt}</div>
+                      <div className="relative cyber-card p-3.5 max-w-[78%]" style={{ borderColor: 'rgba(0, 240, 255, 0.4)' }}>
+                        <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#00f0ff] mb-0.5 text-right">YOU ★</div>
+                        <div className="text-[14px] font-semibold leading-snug text-white break-words">{intentPrompt}</div>
+                        <div className="corner-br" />
                       </div>
                     </div>
                   )}
 
-                  {/* token picker / alternative-source (inline, when no route yet) */}
+                  {/* token picker / alternative-source */}
                   {!hasResult && !isProcessing && (tokenSuggestion || alternativeSource) && (
-                    <div className="flex flex-col gap-2.5 w-full pop-in">
+                    <div className="flex flex-col gap-2.5 w-full">
                       {tokenSuggestion && (
-                        <div className="rounded-2xl border-[3px] border-[#141414] bg-[#FFC900]/20 p-3">
+                        <div className="cyber-card cyber-card-magenta p-3">
                           <div className="flex items-center gap-2 mb-1.5">
-                            <Info className="w-4 h-4 text-[#8a5a00]" />
-                            <span className="font-mono text-[11px] font-bold text-[#141414]">Pick the exact token</span>
+                            <Info className="w-4 h-4 text-[#ff00ff]" />
+                            <span className="font-mono text-[11px] font-bold text-white">Pick the exact token</span>
                           </div>
-                          <p className="text-[11px] font-mono text-[#141414]/70 mb-2">{tokenSuggestion.message}</p>
+                          <p className="text-[11px] font-mono text-[#a8f0ff]/70 mb-2">{tokenSuggestion.message}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {tokenSuggestion.candidates?.map((c: any, i: number) => (
                               <button key={i} onClick={() => { if (c.retryPrompt) { setIntentPrompt(c.retryPrompt); handleProcessIntent(c.retryPrompt); } }}
-                                className="p-2.5 rounded-xl bg-white hover:bg-[#CCFF00]/60 border-2 border-[#141414] text-left font-mono text-[11px] shadow-[2px_2px_0_rgba(20,20,20,0.15)]">
-                                <span className="block font-bold text-[#141414]">{c.symbol} ({c.name})</span>
-                                <span className="text-[10px] text-[#141414]/50 break-all">{c.coinType.slice(0, 34)}…</span>
+                                className="p-2.5 rounded-lg bg-[#0d0d14] hover:bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:border-[#00f0ff]/50 text-left font-mono text-[11px] transition-all">
+                                <span className="block font-bold text-white">{c.symbol} ({c.name})</span>
+                                <span className="text-[10px] text-[#a8f0ff]/50 break-all">{c.coinType.slice(0, 34)}…</span>
                               </button>
                             ))}
                           </div>
+                          <div className="corner-br" />
                         </div>
                       )}
                       {alternativeSource && (
-                        <div className="rounded-2xl border-[3px] border-[#141414] bg-[#7DDCFF]/20 p-3 flex flex-col gap-2">
-                          <div className="flex items-center gap-2 text-[11px] font-mono font-bold text-[#141414]/80">
-                            <Sparkles className="w-4 h-4 shrink-0" /> {alternativeSource.message}
+                        <div className="cyber-card p-3 flex flex-col gap-2" style={{ borderColor: 'rgba(123, 47, 255, 0.4)' }}>
+                          <div className="flex items-center gap-2 text-[11px] font-mono font-bold text-[#a8f0ff]/80">
+                            <Sparkles className="w-4 h-4 shrink-0 text-[#7b2fff]" /> {alternativeSource.message}
                           </div>
                           {alternativeSource.candidates?.[0] && (
                             <button onClick={() => { const p = alternativeSource.candidates[0].retryPrompt; setIntentPrompt(p); handleProcessIntent(p); }}
-                              className="self-start px-3 py-1.5 rounded-xl bg-[#CCFF00] border-2 border-[#141414] text-[#141414] font-mono text-[11px] font-bold hover:-translate-y-0.5 transition-all shadow-[2px_2px_0_#141414]">
+                              className="self-start px-3 py-1.5 rounded-lg bg-[#7b2fff]/20 border border-[#7b2fff]/50 text-[#7b2fff] font-mono text-[11px] font-bold hover:bg-[#7b2fff]/30 transition-all">
                               Swap with {alternativeSource.candidates[0].symbol} instead
                             </button>
                           )}
+                          <div className="corner-br" />
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* inline result — key figures + route + guardian + execute, in the message flow */}
+                  {/* inline result */}
                   {hasResult && !isProcessing && (
-                    <div className="flex flex-col gap-2 w-full max-w-[780px] pop-in">
-                      {/* key figures row (no PAY card) */}
+                    <div className="flex flex-col gap-2 w-full max-w-[780px]">
+                      {/* key figures row */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <MiniStat label="Est. Output" value={`${expectedOutput} ${destSymbol}`} accent />
                         <MiniStat label="Impact" value={executionImpact} warn={parseFloat(executionImpact) >= 1} />
                         <MiniStat label="Slippage" value={optimalSlippage} />
-                        <MiniStat label="Guardian" value={guardianSafe ? `${guardianScore}/100` : `${guardianScore}/100`} danger={!guardianSafe} />
+                        <MiniStat label="Guardian" value={`${guardianScore}/100`} danger={!guardianSafe} />
                       </div>
 
-                      {/* inline route summary — single line */}
+                      {/* route summary */}
                       {routeNodes.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap rounded-xl border-2 border-[#141414]/70 bg-white/85 px-3 py-1.5">
-                          <span className="font-mono text-[7.5px] font-bold uppercase tracking-wider text-[#141414]/35">Route</span>
-                          <span className="font-mono text-[11px] font-bold text-[#141414]">{tradeAmount} {sourceSymbol}</span>
-                          <span className="text-[#141414]/30 text-[11px]">→</span>
+                        <div className="flex items-center gap-1.5 flex-wrap rounded-lg border border-[#00f0ff]/30 bg-[#0d0d14]/80 px-3 py-1.5">
+                          <span className="font-mono text-[8px] font-bold uppercase tracking-wider text-[#00f0ff]/35">Route</span>
+                          <span className="font-mono text-[11px] font-bold text-white">{tradeAmount} {sourceSymbol}</span>
+                          <span className="text-[#00f0ff]/30 text-[11px]">→</span>
                           {routeNodes.slice(0, 3).map((n, i) => (
                             <span key={i} className="flex items-center gap-1">
-                              <span className="rounded-md bg-[#7DDCFF]/40 border border-[#141414]/70 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#141414]">{n.dex}</span>
-                              {i < Math.min(routeNodes.length, 3) - 1 && <span className="text-[#141414]/30 text-[11px]">→</span>}
+                              <span className="rounded-md bg-[#7b2fff]/20 border border-[#7b2fff]/40 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#7b2fff]">{n.dex}</span>
+                              {i < Math.min(routeNodes.length, 3) - 1 && <span className="text-[#00f0ff]/30 text-[11px]">→</span>}
                             </span>
                           ))}
-                          <span className="text-[#141414]/30 text-[11px]">→</span>
-                          <span className="font-mono text-[11px] font-bold text-[#1c7a36]">{expectedOutput} {destSymbol}</span>
+                          <span className="text-[#00f0ff]/30 text-[11px]">→</span>
+                          <span className="font-mono text-[11px] font-bold text-[#39ff14]">{expectedOutput} {destSymbol}</span>
                         </div>
                       )}
 
-                      {/* guardian mini checks — WARNING/DANGER in red */}
+                      {/* guardian checks */}
                       {guardianChecks.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5">
                           {guardianChecks.slice(0, 4).map((c, i) => (
                             <span key={i} className={`rounded-md border px-1.5 py-0.5 font-mono text-[8.5px] font-bold ${
-                              c.status === 'DANGER' ? 'border-[#d33] bg-[#ff6b6b]/25 text-[#d33]'
-                                : c.status === 'WARNING' ? 'border-[#d33] bg-[#ff6b6b]/15 text-[#d33]'
-                                : 'border-[#141414]/60 bg-[#CCFF00]/20 text-[#1c7a36]'
+                              c.status === 'DANGER' ? 'border-[#ff2d7b]/50 bg-[#ff2d7b]/15 text-[#ff2d7b]'
+                                : c.status === 'WARNING' ? 'border-[#ffb800]/50 bg-[#ffb800]/15 text-[#ffb800]'
+                                : 'border-[#39ff14]/50 bg-[#39ff14]/10 text-[#39ff14]'
                             }`}>
                               {c.name}: {c.status}
                             </span>
@@ -685,44 +666,44 @@ export const ProSwapper: React.FC = () => {
                         </div>
                       )}
 
-                      {/* error inline */}
+                      {/* error */}
                       {errorMessage && (
-                        <div className="flex items-center gap-1.5 rounded-lg border border-[#d33]/60 bg-[#ff6b6b]/15 px-2 py-1 font-mono text-[9.5px] font-bold text-[#a00]">
+                        <div className="flex items-center gap-1.5 rounded-lg border border-[#ff2d7b]/50 bg-[#ff2d7b]/10 px-2 py-1 font-mono text-[9.5px] font-bold text-[#ff2d7b]">
                           <AlertCircle className="h-3 w-3 shrink-0" /> {errorMessage}
                         </div>
                       )}
 
                       {/* tx confirmed */}
                       {txDigest && (
-                        <div className="flex items-center justify-between gap-2 rounded-lg border-2 border-[#141414]/70 bg-[#CCFF00]/25 px-2 py-1 font-mono text-[10px]">
-                          <span className="flex items-center gap-1.5 font-bold text-[#141414]">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-[#1c7a36]" /> Swap confirmed!
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-[#39ff14]/50 bg-[#39ff14]/10 px-2 py-1 font-mono text-[10px]">
+                          <span className="flex items-center gap-1.5 font-bold text-[#39ff14]">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Swap confirmed!
                           </span>
                           <a href={`https://suiscan.xyz/mainnet/tx/${txDigest}`} target="_blank" rel="noreferrer"
-                             className="rounded-md bg-[#141414] px-2 py-0.5 text-[9px] font-bold text-[#CCFF00] inline-flex items-center gap-1">
+                             className="rounded-md bg-[#00f0ff] px-2 py-0.5 text-[9px] font-bold text-[#0a0a0f] inline-flex items-center gap-1 hover:bg-[#00f0ff]/80 transition-all">
                             Suiscan <ExternalLink className="h-2.5 w-2.5" />
                           </a>
                         </div>
                       )}
 
-                      {/* risk acknowledgment — user must confirm before execute */}
+                      {/* risk acknowledgment */}
                       {hasRiskWarnings && (
                         <div
-                          className="flex items-center gap-2 rounded-xl border-2 border-[#d33]/70 bg-[#ff6b6b]/10 px-3 py-2 cursor-pointer select-none transition-colors hover:bg-[#ff6b6b]/20"
+                          className="flex items-center gap-2 rounded-lg border border-[#ff2d7b]/50 bg-[#ff2d7b]/10 px-3 py-2 cursor-pointer select-none transition-colors hover:bg-[#ff2d7b]/15"
                           onClick={() => setHasConfirmedSettings(!hasConfirmedSettings)}
-                          title="I acknowledge the on-chain risk warnings detected by Guardian"
+                          title="I acknowledge the on-chain risk warnings"
                         >
                           <button
                             role="checkbox"
                             aria-checked={hasConfirmedSettings}
                             onClick={(e) => { e.stopPropagation(); setHasConfirmedSettings(!hasConfirmedSettings); }}
-                            className={`w-4 h-4 rounded border-2 border-[#141414] flex items-center justify-center transition-colors ${
-                              hasConfirmedSettings ? 'bg-[#CCFF00] text-[#141414]' : 'bg-white text-transparent'
+                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                              hasConfirmedSettings ? 'bg-[#39ff14] border-[#39ff14] text-[#0a0a0f]' : 'bg-[#0d0d14] border-[#ff2d7b]/50 text-transparent'
                             }`}
                           >
                             <Check className="w-3 h-3" />
                           </button>
-                          <span className="font-mono text-[9.5px] font-bold text-[#a00] leading-tight">
+                          <span className="font-mono text-[9.5px] font-bold text-[#ff2d7b] leading-tight">
                             I acknowledge the on-chain risk warnings detected by Guardian.
                           </span>
                         </div>
@@ -733,8 +714,10 @@ export const ProSwapper: React.FC = () => {
                         <button
                           onClick={handleExecuteSwap}
                           disabled={isExecuting || (!guardianSafe && !hasConfirmedSettings)}
-                          className={`flex-1 py-2.5 rounded-xl font-mono text-[12px] font-bold flex items-center justify-center gap-1.5 border-2 border-[#141414] transition-all ${
-                            !guardianSafe && !hasConfirmedSettings ? 'bg-[#e8e0cf] text-[#a39e8d] cursor-not-allowed' : 'pro3-btn shadow-none'
+                          className={`flex-1 py-2.5 rounded-lg font-mono text-[12px] font-bold flex items-center justify-center gap-1.5 border transition-all ${
+                            !guardianSafe && !hasConfirmedSettings
+                              ? 'bg-[#2a2a3e] text-[#a8f0ff]/30 border-[#2a2a3e] cursor-not-allowed'
+                              : 'cyber-btn pulse-neon'
                           }`}
                         >
                           {isExecuting ? (<><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Signing in Wallet...</>)
@@ -742,27 +725,25 @@ export const ProSwapper: React.FC = () => {
                               : !guardianSafe && !hasConfirmedSettings ? (<span>Acknowledge Risk to Proceed</span>)
                                 : (<><span>Execute Swap ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-3.5 h-3.5" /></>)}
                         </button>
-                        {/* expand/collapse full details */}
                         <button
                           onClick={() => setShowDetails(v => !v)}
                           title={showDetails ? 'Hide details' : 'Show full route & guardian audit'}
-                          className="px-3 py-2 rounded-xl border-2 border-[#141414] bg-white font-mono text-[10px] font-bold text-[#141414]/70 hover:bg-[#CCFF00]/40 transition-colors"
+                          className="px-3 py-2 rounded-lg border border-[#00f0ff]/30 bg-[#0d0d14] font-mono text-[10px] font-bold text-[#00f0ff]/70 hover:bg-[#00f0ff]/10 transition-colors"
                         >
                           {showDetails ? 'Hide ▲' : 'Details ▼'}
                         </button>
-                        {/* cancel — clears the current order/results */}
                         <button
                           onClick={handleCancelSwap}
                           title="Cancel this order"
-                          className="px-3 py-2 rounded-xl border-2 border-[#141414] bg-white font-mono text-[10px] font-bold text-[#d33] hover:bg-[#ff6b6b]/20 transition-colors"
+                          className="px-3 py-2 rounded-lg border border-[#ff2d7b]/30 bg-[#0d0d14] font-mono text-[10px] font-bold text-[#ff2d7b] hover:bg-[#ff2d7b]/10 transition-colors"
                         >
                           Cancel
                         </button>
                       </div>
 
-                      {/* full detail cards (expandable inside the flow) — height-capped */}
+                      {/* full detail cards */}
                       {showDetails && (
-                        <div className="flex flex-col gap-2.5 w-full max-h-[330px] overflow-y-auto custom-scrollbar rounded-xl pr-1">
+                        <div className="flex flex-col gap-2.5 w-full max-h-[330px] overflow-y-auto custom-scrollbar rounded-lg pr-1">
                           <ProRouteVisualizer
                             sourceSymbol={sourceSymbol}
                             destSymbol={destSymbol}
@@ -784,13 +765,14 @@ export const ProSwapper: React.FC = () => {
                     </div>
                   )}
 
-                  {/* cancel reply from Skull Buddy */}
+                  {/* cancel reply */}
                   {cancelMsg && !isProcessing && !hasResult && (
-                    <div className="flex items-end gap-2 pop-in">
-                      <SkullBuddy size={40} mood="chill" className="shrink-0 !animate-none" />
-                      <div className="relative chat-bubble-bot !rounded-[6px_18px_18px_18px] px-3.5 py-2 max-w-[85%]">
-                        <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#141414]/50 mb-0.5">ADIDAHOOD ★</div>
-                        <div className="text-[13px] font-bold leading-snug">{cancelMsg}</div>
+                    <div className="flex items-end gap-2">
+                      <SkullBuddy size={40} mood="chill" className="shrink-0 !animate-none skull-glow" />
+                      <div className="relative cyber-card cyber-card-magenta p-3.5 max-w-[85%]">
+                        <div className="font-mono text-[9px] font-bold tracking-[0.18em] text-[#ff00ff] mb-0.5">SOKA ★</div>
+                        <div className="text-[13px] font-semibold leading-snug text-white">{cancelMsg}</div>
+                        <div className="corner-br" />
                       </div>
                     </div>
                   )}
@@ -798,12 +780,12 @@ export const ProSwapper: React.FC = () => {
                   {/* processing bubble */}
                   {isProcessing && (
                     <div className="flex items-end gap-2">
-                      <SkullBuddy size={40} mood="thinking" className="shrink-0 !animate-none" />
-                      <div className="chat-bubble-bot !rounded-[6px_18px_18px_18px] px-3.5 py-2.5">
-                        <div className="flex items-center gap-2 font-mono text-[12px] font-bold text-[#141414]/70">
-                          <span className="w-2 h-2 rounded-full bg-[#CCFF00] border-[1.5px] border-[#141414] animate-pulse" />
-                          <span className="w-2 h-2 rounded-full bg-[#FFC900] border-[1.5px] border-[#141414] animate-pulse" style={{ animationDelay: '0.15s' }} />
-                          <span className="w-2 h-2 rounded-full bg-[#FF90E8] border-[1.5px] border-[#141414] animate-pulse" style={{ animationDelay: '0.3s' }} />
+                      <SkullBuddy size={40} mood="thinking" className="shrink-0 !animate-none skull-glow" />
+                      <div className="cyber-card p-3.5">
+                        <div className="flex items-center gap-2 font-mono text-[12px] font-bold text-[#00f0ff]/70">
+                          <span className="w-2 h-2 rounded-full bg-[#00f0ff] animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-[#7b2fff] animate-pulse" style={{ animationDelay: '0.15s' }} />
+                          <span className="w-2 h-2 rounded-full bg-[#ff00ff] animate-pulse" style={{ animationDelay: '0.3s' }} />
                           sniffing pools…
                         </div>
                       </div>
@@ -812,26 +794,26 @@ export const ProSwapper: React.FC = () => {
                 </div>
               </div>
 
-              {/* composer pinned at bottom of chat panel */}
-              <div className="px-3 pb-3 pt-1 shrink-0">
+              {/* composer */}
+              <div className="px-3 pb-3 pt-1 shrink-0 border-t border-[#00f0ff]/20 bg-[#0d0d14]/50">
                 <form onSubmit={(e) => { e.preventDefault(); handleProcessIntent(); }} className="flex items-end gap-2">
                   <div className="relative flex-1">
                     <input
                       type="text"
                       value={intentPrompt}
                       onChange={(e) => setIntentPrompt(e.target.value)}
-                      placeholder="Try “Swap 100 SUI to USDC, safest route”…"
-                      className="w-full px-4 py-3 pr-10 rounded-2xl pro3-input font-mono text-sm outline-none"
+                      placeholder={'Try "Swap 100 SUI to USDC, safest route"\u2026'}
+                      className="w-full px-4 py-3 pr-10 rounded-lg cyber-input font-mono text-sm outline-none"
                     />
-                    <span className="absolute right-3 bottom-1/2 translate-y-1/2 text-[10px] font-mono text-[#141414]/35 pointer-events-none hidden sm:block">
+                    <span className="absolute right-3 bottom-1/2 translate-y-1/2 text-[10px] font-mono text-[#00f0ff]/30 pointer-events-none hidden sm:block">
                       ENTER ↵
                     </span>
                   </div>
                   <button
                     type="submit"
                     disabled={isProcessing || !intentPrompt.trim()}
-                    className="pro3-btn !rounded-2xl px-5 py-3 text-sm shrink-0 disabled:opacity-50"
-                    title="Send to Buddy"
+                    className="cyber-btn !rounded-lg px-5 py-3 text-sm shrink-0 disabled:opacity-50"
+                    title="Send to SOKA"
                   >
                     {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <span>Send ⚡</span>}
                   </button>
@@ -845,7 +827,7 @@ export const ProSwapper: React.FC = () => {
                       type="button"
                       disabled={isProcessing}
                       onClick={() => { setIntentPrompt(q); handleProcessIntent(q); }}
-                      className="text-[10px] font-mono font-bold text-[#141414]/70 bg-white hover:bg-[#CCFF00] border-2 border-[#141414] rounded-full px-2.5 py-1 transition-colors disabled:opacity-50"
+                      className="text-[10px] font-mono font-bold text-[#00f0ff]/70 bg-[#0d0d14] hover:bg-[#00f0ff]/10 border border-[#00f0ff]/30 hover:border-[#00f0ff]/50 rounded-full px-2.5 py-1 transition-all disabled:opacity-50"
                     >
                       {q}
                     </button>
@@ -857,7 +839,7 @@ export const ProSwapper: React.FC = () => {
         </div>
       </main>
 
-      {/* History modal — task list with expandable detail sub-panel */}
+      {/* History modal */}
       {historyOpen && (
         <HistoryPanel
           history={history}
@@ -877,6 +859,4 @@ export const ProSwapper: React.FC = () => {
       />
     </div>
   );
-
 };
-

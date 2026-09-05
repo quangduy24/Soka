@@ -61,8 +61,8 @@ export const SkullBuddy: React.FC<{
         <ellipse cx="100" cy="222" rx="62" ry="9" fill="#141414" opacity="0.15" />
 
         {/* bandana tail */}
-        <path d="M56 78 c-16 4 -26 16 -22 30 c4 14 18 18 28 10" fill="#0f766e" stroke="#141414" strokeWidth="7" strokeLinejoin="round" />
-        <path d="M144 78 c16 4 26 16 22 30 c-4 14 -18 18 -28 10" fill="#0f766e" stroke="#141414" strokeWidth="7" strokeLinejoin="round" />
+        <path d="M56 78 c-16 4 -26 16 -22 30 c4 14 18 18 28 10" fill="#7b2fff" stroke="#141414" strokeWidth="7" strokeLinejoin="round" />
+        <path d="M144 78 c16 4 26 16 22 30 c-4 14 -18 18 -28 10" fill="#7b2fff" stroke="#141414" strokeWidth="7" strokeLinejoin="round" />
 
         {/* cranium */}
         <path
@@ -79,8 +79,8 @@ export const SkullBuddy: React.FC<{
 
         {/* pupils */}
         <g className="skull-blink">
-          <circle cx={74 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#CCFF00" />
-          <circle cx={126 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#CCFF00" />
+          <circle cx={74 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#00f0ff" />
+          <circle cx={126 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#00f0ff" />
         </g>
 
         {/* mood accents: x-eyes for thinking, sparkle for wow */}
@@ -115,13 +115,13 @@ export const SkullBuddy: React.FC<{
         {/* bandana band */}
         <path
           d="M44 70 C 64 88 136 88 156 70 L 152 82 C 130 100 70 100 48 82 Z"
-          fill="#14b8a6"
+          fill="#9333ea"
           stroke="#141414"
           strokeWidth="7"
           strokeLinejoin="round"
         />
         {/* skull button on bandana */}
-        <circle cx="100" cy="80" r="10" fill="#FFC900" stroke="#141414" strokeWidth="5" />
+        <circle cx="100" cy="80" r="10" fill="#00f0ff" stroke="#141414" strokeWidth="5" />
         <circle cx="96" cy="78" r="2.2" fill="#141414" />
         <circle cx="104" cy="78" r="2.2" fill="#141414" />
         <path d="M96 84 q4 4 8 0" stroke="#141414" strokeWidth="2.4" strokeLinecap="round" fill="none" />
