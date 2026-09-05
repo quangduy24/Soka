@@ -27,7 +27,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
   };
 
   return (
-    <header className="w-full z-40 border-b border-[#00f0ff]/20 bg-[#0d0d14]/95 backdrop-blur-md sticky top-0">
+    <header className="w-full z-40 border-b border-white/[0.06] bg-[#08080c]/80 backdrop-blur-xl sticky top-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand */}
         <div className="flex items-center gap-4">
@@ -37,17 +37,17 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="font-black leading-none text-[18px] text-white tracking-tight text-glow-cyan" style={{ fontFamily: 'var(--font-display)' }}>
+                <span className="font-bold leading-none text-[18px] text-white tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                   SOKA
                 </span>
                 <span
-                  className="font-black leading-none text-[12px] text-[#0a0a0f] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#00f0ff] to-[#7b2fff] border border-[#00f0ff]/50"
+                  className="font-semibold leading-none text-[11px] text-[#08080c] px-1.5 py-0.5 rounded-md bg-gradient-to-r from-[#6366f1] to-[#8b5cf6]"
                   style={{ fontFamily: 'var(--font-display)', transform: 'rotate(-2deg)' }}
                 >
                   PRO
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-[#00f0ff]/50 tracking-wider mt-0.5">INTENT ENGINE // V2</span>
+              <span className="text-[10px] font-mono text-white/30 tracking-wider mt-0.5">INTENT ENGINE // V2</span>
             </div>
           </Link>
 
@@ -57,8 +57,8 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
               to="/"
               className={`px-3 py-1.5 rounded-lg font-mono text-xs transition-all border ${
                 !isApp
-                  ? 'text-[#0a0a0f] bg-[#00f0ff] border-[#00f0ff] font-bold neon-cyan'
-                  : 'text-[#a8f0ff]/60 border-transparent hover:text-[#00f0ff] hover:bg-[#00f0ff]/10 hover:border-[#00f0ff]/30'
+                  ? 'text-white bg-[#6366f1]/20 border-[#6366f1]/40 font-semibold'
+                  : 'text-white/50 border-transparent hover:text-white/70 hover:bg-white/[0.04]'
               }`}
             >
               Overview
@@ -67,8 +67,8 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
               to="/app"
               className={`px-3 py-1.5 rounded-lg font-mono text-xs flex items-center gap-1.5 transition-all border ${
                 isApp
-                  ? 'text-[#0a0a0f] bg-[#00f0ff] border-[#00f0ff] font-bold neon-cyan'
-                  : 'text-[#a8f0ff]/60 border-transparent hover:text-[#00f0ff] hover:bg-[#00f0ff]/10 hover:border-[#00f0ff]/30'
+                  ? 'text-white bg-[#6366f1]/20 border-[#6366f1]/40 font-semibold'
+                  : 'text-white/50 border-transparent hover:text-white/70 hover:bg-white/[0.04]'
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
@@ -78,19 +78,19 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
         </div>
 
         {/* Telemetry Status Bar */}
-        <div className="hidden lg:flex items-center gap-3 text-[10px] font-mono text-[#a8f0ff]/60 px-3 py-1.5 rounded-full border border-[#00f0ff]/20 bg-[#0d0d14]/80">
+        <div className="hidden lg:flex items-center gap-3 text-[10px] font-mono text-white/40 px-3 py-1.5 rounded-full border border-white/[0.06] bg-white/[0.02]">
           <span className="flex items-center gap-1.5">
-            <span className="cyber-dot cyber-dot-green animate-pulse" />
-            <span className="font-bold text-[#00f0ff]">SOKA</span>
+            <span className="status-dot status-dot-green animate-pulse" />
+            <span className="font-medium text-white/70">SOKA</span>
           </span>
-          <span className="text-[#00f0ff]/20">|</span>
+          <span className="text-white/15">|</span>
           <span className="flex items-center gap-1.5">
-            <Shield className="w-3 h-3 text-[#39ff14]" />
-            <span>Guardian: <strong className="text-[#39ff14]">100% On-Chain</strong></span>
+            <Shield className="w-3 h-3 text-[#34d399]" />
+            <span>Guardian: <strong className="text-[#34d399]">On-Chain</strong></span>
           </span>
-          <span className="text-[#00f0ff]/20">|</span>
+          <span className="text-white/15">|</span>
           <span>
-            Gas: <strong className="text-[#00f0ff]">{gasPrice}</strong>
+            Gas: <strong className="text-white/60">{gasPrice}</strong>
           </span>
         </div>
 
@@ -104,7 +104,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
           ) : (
             <button
               onClick={handleConnect}
-              className="cyber-btn text-xs font-mono font-bold !py-2 !px-4"
+              className="glass-btn text-xs font-mono font-medium !py-2 !px-4"
             >
               <Wallet className="w-3.5 h-3.5" />
               <span>Connect</span>

@@ -79,8 +79,8 @@ export const SkullBuddy: React.FC<{
 
         {/* pupils */}
         <g className="skull-blink">
-          <circle cx={74 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#00f0ff" />
-          <circle cx={126 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#00f0ff" />
+          <circle cx={74 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#a78bfa" />
+          <circle cx={126 + lx} cy={102 + ly} r={moodEye === 'x' ? 6 : 8} fill="#a78bfa" />
         </g>
 
         {/* mood accents: x-eyes for thinking, sparkle for wow */}
@@ -121,7 +121,7 @@ export const SkullBuddy: React.FC<{
           strokeLinejoin="round"
         />
         {/* skull button on bandana */}
-        <circle cx="100" cy="80" r="10" fill="#00f0ff" stroke="#141414" strokeWidth="5" />
+        <circle cx="100" cy="80" r="10" fill="#a78bfa" stroke="#141414" strokeWidth="5" />
         <circle cx="96" cy="78" r="2.2" fill="#141414" />
         <circle cx="104" cy="78" r="2.2" fill="#141414" />
         <path d="M96 84 q4 4 8 0" stroke="#141414" strokeWidth="2.4" strokeLinecap="round" fill="none" />
