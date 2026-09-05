@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DIEPS · Sui Liquidity Graph</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #030008;
+      --surface: #0a0416;
+      --accent: #a855f7;
+      --accent-soft: #c084fc;
+      --accent-deep: #6d28d9;
+      --safe: #10B981;
+      --cyan: #0ea5e9;
+      --border: rgba(168, 85, 247, 0.28);
+      --border-soft: rgba(168, 85, 247, 0.16);
+    }
+
+    body {
+      background: transparent;
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      color: #e9e4ff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── Ambient mesh background (DIEPS card-mesh-purple) ─────────────────────── */
+    #mesh1, #mesh2 {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    #mesh1 {
+      background: radial-gradient(circle at 78% 22%, rgba(168, 85, 247, 0.20), transparent 52%);
+    }
+    #mesh2 {
+      background: radial-gradient(circle at 18% 82%, rgba(99, 102, 241, 0.16), transparent 55%);
+    }
+    #vignette {
+      display: none;
+    }
+
+    #stars {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    svg {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      position: relative;
+      z-index: 2;
+    }
+
+    .node circle {
+      cursor: pointer;
+    }
+    .node:hover circle {
+      filter: brightness(1.4) !important;
+    }
+    .node text {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .link {
+      fill: none;
+      stroke: rgba(168, 85, 247, 0.32);
+      stroke-width: 1.2px;
+      stroke-dasharray: 5 5;
+      animation: flow 16s linear infinite;
+    }
+    .link.highlight {
+      stroke: rgba(168, 85, 247, 0.92);
+      stroke-width: 2.2px;
+      filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.75));
+      stroke-dasharray: 8 8;
+      animation: flow 8s linear infinite;
+    }
+    @keyframes flow {
+      to { stroke-dashoffset: -100; }
+    }
+
+    .node.dimmed circle { opacity: 0.12; }
+    .node.dimmed text   { opacity: 0.06; }
+    .node.dimmed image  { opacity: 0.12; }
+    .link.dimmed        { opacity: 0.04; }
+
+    /* ── Tooltip (glass-modal, DIEPS-style) ──────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      background: rgba(10, 4, 22, 0.86);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 15px 11px;
+      font-size: 12px;
+      color: #e9e4ff;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.16s;
+      z-index: 25;
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      max-width: 220px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55), 0 0 24px rgba(168, 85, 247, 0.18), inset 0 0 18px rgba(168, 85, 247, 0.06);
+      overflow: hidden;
+    }
+    #tooltip::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--cyan), var(--accent), var(--cyan));
+    }
+    #tooltip .tok-name {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+      letter-spacing: 0.01em;
+    }
+    #tooltip .tok-type {
+      color: var(--accent-soft);
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    /* ── Brand strip (top-left) ──────────────────────────────────────────────── */
+    #brand {
+      position: fixed;
+      top: 20px;
+      left: 22px;
+      z-index: 12;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 14px 8px 12px;
+      background: rgba(10, 4, 22, 0.62);
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      pointer-events: none;
+    }
+    #brand .brand-dot {
+      width: 7px; height: 7px;
+      border-radius: 9999px;
+      background: var(--safe);
+      box-shadow: 0 0 10px var(--safe);
+      animation: sync-pulse 1.6s infinite ease-in-out;
+    }
+    #brand .brand-text {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2.4px;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
+    }
+    @keyframes sync-pulse {
+      0%, 100% { opacity: 0.4; transform: scale(0.9); }
+      50%      { opacity: 1;   transform: scale(1.1); }
+    }
+
+    /* ── Legend (bottom-left) ────────────────────────────────────────────────── */
+    #legend {
+      position: fixed;
+      bottom: 22px;
+      left: 22px;
+      z-index: 12;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding: 12px 14px;
+      background: rgba(10, 4, 22, 0.58);
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      pointer-events: none;
+    }
+    .lg-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: #b8a6e0;
+    }
+    .lg-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px rgba(168, 85, 247, 0.4);
+    }
+
+
+
+    /* Orbit ring spin (around SUI) */
+    @keyframes orbit-spin { to { stroke-dashoffset: -240; } }
+    .orbit-ring { animation: orbit-spin 14s linear infinite; }
+    .orbit-ring-slow { animation: orbit-spin 26s linear infinite reverse; }
+  </style>
+</head>
+
+<body>
+  <div id="mesh1"></div>
+  <div id="mesh2"></div>
+  <div id="vignette"></div>
+  <canvas id="stars"></canvas>
+
+  <div id="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-text">DIEPS · SUI LIQUIDITY GRAPH</span>
+  </div>
+
+  <div id="tooltip">
+    <div class="tok-name" id="tip-name"></div>
+    <div class="tok-type" id="tip-type"></div>
+  </div>
+
+  <div id="legend">
+    <div class="lg-row"><span class="lg-dot" style="background:#60a5fa;border:1.5px solid #93c5fd;box-shadow:0 0 8px #60a5fa;"></span>SUI · Layer 1</div>
+    <div class="lg-row"><span class="lg-dot" style="background:#4f46e5;border:1.5px solid #818cf8;"></span>Core DeFi</div>
+    <div class="lg-row"><span class="lg-dot" style="background:#4c1d95;border:1px solid #a78bfa;"></span>Protocol tokens</div>
+    <div class="lg-row"><span class="lg-dot" style="background:#2e1065;border:1px solid #7c3aed;"></span>Meme · niche</div>
+  </div>
+
+
+
+  <svg id="graph">
+    <defs>
+      <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+        orient="auto-start-reverse">
+        <path d="M2 2L8 5L2 8" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round" />
+      </marker>
+      <filter id="glow-sui">
+        <feGaussianBlur stdDeviation="7" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      <filter id="glow-mid">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      <!-- SUI stays blue (its real brand) -->
+      <radialGradient id="sui-grad" cx="50%" cy="35%" r="60%">
+        <stop offset="0%" stop-color="#60a5fa" />
+        <stop offset="100%" stop-color="#2563eb" />
+      </radialGradient>
+      <!-- Core DeFi = indigo bridge between SUI blue and DIEPS purple -->
+      <radialGradient id="core-grad" cx="50%" cy="35%" r="60%">
+        <stop offset="0%" stop-color="#4f46e5" />
+        <stop offset="100%" stop-color="#3730a3" />
+      </radialGradient>
+    </defs>
+    <g id="zoom-group">
+      <g id="links-group"></g>
+      <g id="nodes-group"></g>
+    </g>
+  </svg>
+
+  <script>
+    // ── Twinkling starfield + floating purple particles ─────────────────────────
+    (function () {
+      const c = document.getElementById('stars');
+      const ctx = c.getContext('2d');
+      let W = 0, H = 0, stars = [], particles = [];
+
+      function resize() {
+        W = c.width = window.innerWidth;
+        H = c.height = window.innerHeight;
+        stars = [];
+        const count = Math.min(260, Math.floor(W * H / 6500));
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            r: Math.random() * 1.2 + 0.2,
+            base: Math.random() * 0.45 + 0.12,
+            phase: Math.random() * Math.PI * 2,
+            speed: Math.random() * 0.02 + 0.006,
+            tint: Math.random() < 0.78 ? '255,255,255' : '192,132,252'
+          });
+        }
+      }
+
+      function spawnParticle() {
+        particles.push({
+          x: Math.random() * W,
+          y: H + 8,
+          r: Math.random() * 1.6 + 0.6,
+          vy: -(Math.random() * 0.35 + 0.18),
+          vx: (Math.random() - 0.5) * 0.18,
+          life: 0,
+          max: Math.random() * 420 + 380,
+          alpha: Math.random() * 0.4 + 0.18
+        });
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      let t = 0, acc = 0, last = performance.now();
+      function frame(now) {
+        const dt = Math.min(48, now - last); last = now; t += dt;
+        acc += dt;
+        if (acc > 180) { acc = 0; if (particles.length < 26) spawnParticle(); }
+
+        ctx.clearRect(0, 0, W, H);
+
+        for (let i = 0; i < stars.length; i++) {
+          const s = stars[i];
+          const tw = s.base + Math.sin(t * s.speed + s.phase) * 0.3;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, 2 * Math.PI);
+          ctx.fillStyle = `rgba(${s.tint},${Math.max(0, tw)})`;
+          ctx.fill();
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx; p.y += p.vy; p.life += dt;
+          if (p.y < -10 || p.life > p.max) { particles.splice(i, 1); continue; }
+          const fade = p.life < 120 ? p.life / 120 : p.life > p.max - 120 ? (p.max - p.life) / 120 : 1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+          ctx.fillStyle = `rgba(168,85,247,${p.alpha * fade})`;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = 'rgba(168,85,247,0.5)';
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+
+    // ── Data: only tokens NATIVE to SUI blockchain ─────────────────────────────
+    const nodes = [
+      // tier 0 = SUI
+      { id: "SUI", tier: 0, label: "SUI", type: "Layer 1 · Native token" },
+
+      // tier 1 = core DeFi / major protocols native to SUI
+      { id: "CETUS", tier: 1, label: "CETUS", type: "DEX · Concentrated liquidity (CLMM)" },
+      { id: "DEEP", tier: 1, label: "DEEP", type: "DeepBook · On-chain orderbook" },
+      { id: "WAL", tier: 1, label: "WAL", type: "Walrus · Decentralized storage" },
+      { id: "NAVI", tier: 1, label: "NAVI", type: "Navi Protocol · Lending & borrowing" },
+      { id: "SCA", tier: 1, label: "SCA", type: "Scallop · Lending & stablecoin" },
+      { id: "SEND", tier: 1, label: "SEND", type: "Suilend · Lending protocol" },
+      { id: "USDC", tier: 1, label: "USDC", type: "USD Coin · Native on SUI (Circle)" },
+      { id: "HAEDAL", tier: 1, label: "HAEDAL", type: "Haedal · Liquid staking protocol" },
+      { id: "LOFI", tier: 1, label: "LOFI", type: "LoFi · SUI meme token" },
+
+      // tier 2 = secondary SUI-native protocols
+      { id: "USDT", tier: 2, label: "USDT", type: "Tether · Bridged stablecoin on SUI" },
+      { id: "AFM", tier: 2, label: "AFM", type: "Aftermath Finance · Multi-asset DEX" },
+      { id: "NAVX", tier: 2, label: "NAVX", type: "Navi · Governance & utility token" },
+      { id: "SCLP", tier: 2, label: "SCLP", type: "Scallop · xSCA boosted token" },
+      { id: "BUCK", tier: 2, label: "BUCK", type: "Bucket Protocol · Decentralized stablecoin" },
+      { id: "TURB", tier: 2, label: "TURB", type: "Turbos Finance · DEX & yield" },
+      { id: "KRIYA", tier: 2, label: "KRIYA", type: "Kriya DEX · Perp & swap" },
+      { id: "ALF", tier: 2, label: "ALF", type: "AlphaFi · Automated DeFi vaults" },
+      { id: "BLUEFIN", tier: 2, label: "BLUEFIN", type: "Bluefin · Perp DEX on SUI" },
+      { id: "7K", tier: 2, label: "7K", type: "7K Aggregator · Best-rate swap router" },
+      { id: "TYPUS", tier: 2, label: "TYPUS", type: "Typus Finance · Options & structured products" },
+      { id: "SUIP", tier: 2, label: "SUIP", type: "SuiPad · IDO launchpad on SUI" },
+      { id: "NS", tier: 2, label: "NS", type: "Sui Name Service · .sui domain names" },
+      { id: "haSUI", tier: 2, label: "haSUI", type: "Haedal · Liquid staked SUI token" },
+      { id: "vSUI", tier: 2, label: "vSUI", type: "Volo · Liquid staked SUI token" },
+      { id: "afSUI", tier: 2, label: "afSUI", type: "Aftermath · Liquid staked SUI token" },
+      { id: "IKA", tier: 2, label: "IKA", type: "Ika Protocol · MPC & cross-chain (SUI-native)" },
+      { id: "MMT", tier: 2, label: "MMT", type: "Momentum Finance · DEX & liquidity hub" },
+      { id: "FLOW", tier: 2, label: "FLOW", type: "FlowX · DEX aggregator on SUI" },
+      { id: "SSWP", tier: 2, label: "SSWP", type: "Suiswap · Community-first DEX" },
+
+      // tier 3 = smaller / meme tokens verified on SUI
+      { id: "HIPPO", tier: 3, label: "HIPPO", type: "sudeng · First SUI meme token" },
+      { id: "FUD", tier: 3, label: "FUD", type: "Fud the Pug · SUI meme token" },
+      { id: "AXOL", tier: 3, label: "AXOL", type: "Axol · Axolotl-themed SUI meme" },
+      { id: "AAA", tier: 3, label: "AAA", type: "AAA Cat · SUI meme token" },
+      { id: "BLUB", tier: 3, label: "BLUB", type: "Blub · SUI meme token" },
+      { id: "SUIM", tier: 3, label: "SUIM", type: "Suiman · SUI meme token" },
+      { id: "WHAL", tier: 3, label: "WHAL", type: "Whale · SUI meme token" },
+      { id: "MOVE", tier: 3, label: "MOVE", type: "Move Dollar · SUI-native stablecoin" },
+      { id: "BUCKET", tier: 3, label: "BUCKET", type: "Bucket Protocol · Governance token" },
+      { id: "ALPHA", tier: 3, label: "ALPHA", type: "AlphaFi · Vault receipt token" },
+      { id: "FDUSD", tier: 3, label: "FDUSD", type: "First Digital USD · Stablecoin on SUI" },
+      { id: "SUIFRENS", tier: 3, label: "SUIFRENS", type: "SuiFrens · NFT / community token" },
+      { id: "IPXS", tier: 3, label: "IPXS", type: "Interest Protocol · SUI staking" },
+      { id: "BLUE", tier: 3, label: "BLUE", type: "Bluemove · NFT marketplace token" },
+    ];
+
+    const links = [
+      // SUI → tier 1
+      { source: "SUI", target: "CETUS" },
+      { source: "SUI", target: "DEEP" },
+      { source: "SUI", target: "WAL" },
+      { source: "SUI", target: "NAVI" },
+      { source: "SUI", target: "SCA" },
+      { source: "SUI", target: "SEND" },
+      { source: "SUI", target: "USDC" },
+      { source: "SUI", target: "HAEDAL" },
+      { source: "SUI", target: "LOFI" },
+      // SUI → tier 2
+      { source: "SUI", target: "KRIYA" },
+      { source: "SUI", target: "NS" },
+      { source: "SUI", target: "IKA" },
+      { source: "SUI", target: "MMT" },
+      { source: "SUI", target: "USDT" },
+      { source: "SUI", target: "AFM" },
+      // SUI → tier 3 (meme)
+      { source: "SUI", target: "HIPPO" },
+      { source: "SUI", target: "FUD" },
+      { source: "SUI", target: "AXOL" },
+      // core ↔ core
+      { source: "CETUS", target: "DEEP" },
+      { source: "CETUS", target: "NAVI" },
+      { source: "CETUS", target: "AFM" },
+      { source: "CETUS", target: "TURB" },
+      { source: "CETUS", target: "BLUEFIN" },
+      { source: "CETUS", target: "7K" },
+      { source: "CETUS", target: "FLOW" },
+      { source: "CETUS", target: "MMT" },
+      { source: "DEEP", target: "WAL" },
+      { source: "DEEP", target: "SCA" },
+      { source: "DEEP", target: "KRIYA" },
+      { source: "DEEP", target: "7K" },
+      { source: "NAVI", target: "USDC" },
+      { source: "NAVI", target: "NAVX" },
+      { source: "NAVI", target: "haSUI" },
+      { source: "SCA", target: "SCLP" },
+      { source: "SCA", target: "SEND" },
+      { source: "SEND", target: "ALF" },
+      { source: "USDC", target: "USDT" },
+      { source: "USDC", target: "BUCK" },
+      { source: "USDC", target: "MOVE" },
+      { source: "USDC", target: "FDUSD" },
+      { source: "HAEDAL", target: "haSUI" },
+      { source: "AFM", target: "afSUI" },
+      { source: "AFM", target: "ALPHA" },
+      // tier 2 links
+      { source: "NAVX", target: "NAVI" },
+      { source: "SCLP", target: "SCA" },
+      { source: "BUCK", target: "BUCKET" },
+      { source: "TURB", target: "TYPUS" },
+      { source: "KRIYA", target: "BLUEFIN" },
+      { source: "7K", target: "FLOW" },
+      { source: "7K", target: "SSWP" },
+      { source: "NS", target: "SUIP" },
+      { source: "SUIP", target: "IKA" },
+      { source: "vSUI", target: "HAEDAL" },
+      { source: "IPXS", target: "SCA" },
+      { source: "BLUE", target: "SUIFRENS" },
+      // tier 3
+      { source: "USDC", target: "AAA" },
+      { source: "USDC", target: "LOFI" },
+      { source: "USDC", target: "BLUB" },
+      { source: "USDC", target: "SUIM" },
+      { source: "USDC", target: "WHAL" },
+      { source: "CETUS", target: "SUIFRENS" },
+      { source: "CETUS", target: "IPXS" },
+      { source: "CETUS", target: "WHAL" },
+    ];
+
+    // ── Sizing by tier ─────────────────────────────────────────────────────────
+    const tierRadius = [38, 17, 12.5, 9];
+    const tierFontSize = [15, 9.5, 8.5, 7.8];
+    // SUI keeps its real blue; tiers 1-3 flow indigo → purple → deep purple (DIEPS brand)
+    const tierFill = ["url(#sui-grad)", "url(#core-grad)", "#4c1d95", "#2e1065"];
+    const tierStroke = ["#93c5fd", "#818cf8", "#a78bfa", "#7c3aed"];
+    const tierStrokeW = [3, 1.5, 1, 0.8];
+
+    const W = window.innerWidth, H = window.innerHeight;
+
+    const svg = d3.select("#graph");
+    const zoomGroup = d3.select("#zoom-group");
+    const linksGroup = d3.select("#links-group");
+    const nodesGroup = d3.select("#nodes-group");
+    const tooltip = document.getElementById('tooltip');
+    const tipName = document.getElementById('tip-name');
+    const tipType = document.getElementById('tip-type');
+
+    const sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+        const t = Math.max(d.source.tier ?? 0, d.target.tier ?? 0);
+        return [95, 140, 180, 220][t];
+      }).strength(d => (d.source.id === "SUI" || d.target.id === "SUI") ? 0.8 : 0.02))
+      .force("charge", d3.forceManyBody().strength(d => [-800, -500, -150, -85][d.tier]))
+      .force("center", d3.forceCenter(W / 2, H / 2))
+      .force("collision", d3.forceCollide().radius(d => tierRadius[d.tier] + 25).strength(1))
+      .force("radial", d3.forceRadial(d => [0, 160, 270, 360][d.tier], W / 2, H / 2)
+        .strength(d => [1, 2.5, 0.8, 0.4][d.tier]));
+
+    const link = linksGroup.selectAll("line").data(links).join("line")
+      .attr("class", "link").attr("marker-end", "url(#arrowhead)");
+
+    const node = nodesGroup.selectAll("g").data(nodes).join("g")
+      .attr("class", "node")
+      .call(d3.drag()
+        .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+        .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); if (d.tier !== 0) { d.fx = null; d.fy = null; } })
+      )
+      .on("click", handleClick)
+      .on("mousemove", (e, d) => {
+        tipName.textContent = d.label; tipType.textContent = d.type;
+        tooltip.style.opacity = 1;
+        tooltip.style.left = (e.clientX + 14) + "px"; tooltip.style.top = (e.clientY - 10) + "px";
+      })
+      .on("mouseleave", () => { tooltip.style.opacity = 0; });
+
+    // SUI outer glow rings — outer purple (DIEPS), inner blue (SUI brand)
+    node.filter(d => d.tier === 0).append("circle").attr("r", d => tierRadius[d.tier] + 22)
+      .attr("fill", "none").attr("stroke", "rgba(168,85,247,0.14)").attr("stroke-width", 14);
+    node.filter(d => d.tier === 0).append("circle").attr("r", d => tierRadius[d.tier] + 12)
+      .attr("fill", "none").attr("stroke", "rgba(96,165,250,0.24)").attr("stroke-width", 6);
+
+    // SUI orbit rings (dashed, spinning) — cosmic DIEPS feel
+    node.filter(d => d.tier === 0).append("circle").attr("r", d => tierRadius[d.tier] + 30)
+      .attr("fill", "none").attr("stroke", "rgba(168,85,247,0.28)").attr("stroke-width", 1.1)
+      .attr("stroke-dasharray", "4 10").attr("class", "orbit-ring");
+    node.filter(d => d.tier === 0).append("circle").attr("r", d => tierRadius[d.tier] + 42)
+      .attr("fill", "none").attr("stroke", "rgba(192,132,252,0.18)").attr("stroke-width", 0.9)
+      .attr("stroke-dasharray", "2 12").attr("class", "orbit-ring-slow");
+
+    // Orbiting satellites around SUI (SMIL rotation on inner group)
+    const suiSat = node.filter(d => d.tier === 0).append("g");
+    suiSat.append("circle").attr("cx", tierRadius[0] + 30).attr("cy", 0).attr("r", 2.8)
+      .attr("fill", "#a855f7").attr("filter", "url(#glow-mid)");
+    suiSat.append("animateTransform").attr("attributeName", "transform").attr("type", "rotate")
+      .attr("from", "0 0 0").attr("to", "360 0 0").attr("dur", "14s").attr("repeatCount", "indefinite");
+    const suiSat2 = node.filter(d => d.tier === 0).append("g");
+    suiSat2.append("circle").attr("cx", -(tierRadius[0] + 42)).attr("cy", 0).attr("r", 2.2)
+      .attr("fill", "#c084fc").attr("filter", "url(#glow-mid)");
+    suiSat2.append("animateTransform").attr("attributeName", "transform").attr("type", "rotate")
+      .attr("from", "360 0 0").attr("to", "0 0 0").attr("dur", "22s").attr("repeatCount", "indefinite");
+
+    // Logos from cetus-tokens
+    const tokenLogos = {
+      "SUI": "https://cryptologos.cc/logos/sui-sui-logo.png",
+      "CETUS": "https://cdn.dexscreener.com/cms/images/0f8ea11888b60cd099bb0be84471c80fd58c32bbc13d060d265d2d2a92a394cd?width=800&height=800&quality=95&format=auto",
+      "DEEP": "https://raw.githubusercontent.com/MystenLabs/deepbookv3/main/DeepBook_Logo_White.png",
+      "WAL": "https://cdn.dexscreener.com/cms/images/ee23ea64dbf653448db0f4c6b028d13ff91d1704aec7a44cf752e8bf002e4480?width=800&height=800&quality=95&format=auto",
+      "SCA": "https://assets.coingecko.com/coins/images/34648/thumb/sca.png?1705592307",
+      "SEND": "https://cdn.dexscreener.com/cms/images/9954559c1cddf2519f191080088af00457fd1dd29f740ec79f1ad2ed2009a721?width=800&height=800&quality=95&format=auto",
+      "USDC": "https://assets.coingecko.com/coins/images/6319/thumb/USDC.png?1769615602",
+      "USDT": "https://strapi.scand.app/uploads/usdt_8a23002ad6.png",
+      "HAEDAL": "https://cdn.dexscreener.com/cms/images/c3aa2088ffb8314bbd29c72d833457fe8177922ad4adddf5127ade7b6c567331?width=800&height=800&quality=95&format=auto",
+      "NAVX": "https://cdn.dexscreener.com/cms/images/7a19d1753f39c7a56fb903cb54c936d3464f47534e4ec5eb75c2927ecb301682?width=800&height=800&quality=95&format=auto",
+      "BUCK": "https://assets.coingecko.com/coins/images/33846/thumb/buck-icon.png?1703121631",
+      "TYPUS": "https://cdn.dexscreener.com/cms/images/29e6ea75abd0e9012b3c19a40452892bdee8acd490c918eb7357c787cf330f91?width=800&height=800&quality=95&format=auto",
+      "SUIP": "https://strapi.scand.app/uploads/Suip_Logo_9f03cfbd82.png",
+      "NS": "https://cdn.dexscreener.com/cms/images/17ee6d6595e0e36127cd6706e4f7da0ab5dc81b7fae5aec5e3e4a6a9653b02de?width=800&height=800&quality=95&format=auto",
+      "haSUI": "https://cdn.dexscreener.com/cms/images/8b99114eac9bb57c1f82558f298e8c3dd97c447980eb732c4b90dbcdb91776d7?width=800&height=800&quality=95&format=auto",
+      "afSUI": "https://cdn.dexscreener.com/cms/images/4e1cdbef7dc289222d7eaa87a5e98fdc58a8dcaf4a5bbf3c80c9ea6d403ab728?width=800&height=800&quality=95&format=auto",
+      "IKA": "https://cdn.dexscreener.com/cms/images/0666959b63c3339d4852184dda4e1f243276424d83af10b0e6997da7ead9c89d?width=800&height=800&quality=95&format=auto",
+      "MMT": "https://assets.coingecko.com/coins/images/69899/thumb/4_icon_PFP_RGB.png?1762090516",
+      "FUD": "https://cdn.dexscreener.com/cms/images/9e05872c94596cff8f7859940f402b257f9bcbedf837f8dea09e648c0f5dc5c0?width=800&height=800&quality=95&format=auto",
+      "AXOL": "https://cdn.dexscreener.com/cms/images/3a11f95981c48eb40138d61d524bf6f525962750ac8ead5b1c72b8c9de2257d9?width=800&height=800&quality=95&format=auto",
+      "AAA": "https://cdn.dexscreener.com/cms/images/7424e8f91cb1b03aca85a9d653b0010b46197f199274e436fd546c3247c7f3ad?width=800&height=800&quality=95&format=auto",
+      "LOFI": "https://cdn.dexscreener.com/cms/images/af69e4eebc3ebb04d6440799c415e2640107fe923411c3b39a55563745553460?width=800&height=800&quality=95&format=auto",
+      "BLUB": "https://cdn.dexscreener.com/cms/images/a226b2bd5ac8224293fa3f6d9a64a63e6bf76fe4e87d24e890ac93cf98e238a2?width=800&height=800&quality=95&format=auto",
+      "ALPHA": "https://assets.coingecko.com/coins/images/39087/thumb/Alpha_Logo_200_200.png?1720460811",
+      "FDUSD": "https://assets.coingecko.com/coins/images/31079/thumb/FDUSD_icon_black.png?1731097953",
+      "NAVI": "https://cdn.dexscreener.com/cms/images/7a19d1753f39c7a56fb903cb54c936d3464f47534e4ec5eb75c2927ecb301682?width=800&height=800&quality=95&format=auto"
+    };
+
+    // Define clip paths for logos
+    svg.append("defs").selectAll("clipPath")
+      .data(nodes)
+      .enter()
+      .append("clipPath")
+      .attr("id", d => "clip-" + d.id)
+      .append("circle")
+      .attr("r", d => tierRadius[d.tier] * 0.9);
+
+    // Main circles
+    node.append("circle")
+      .attr("r", d => tierRadius[d.tier])
+      .attr("fill", d => tierFill[d.tier])
+      .attr("stroke", d => tierStroke[d.tier])
+      .attr("stroke-width", d => tierStrokeW[d.tier])
+      .attr("filter", d => d.tier === 0 ? "url(#glow-sui)" : d.tier === 1 ? "url(#glow-mid)" : "none");
+
+    // Logo fallback ring (subtle backdrop behind logo)
+    node.append("circle")
+      .attr("r", d => tierRadius[d.tier] * 0.62)
+      .attr("fill", "rgba(255,255,255,0.04)")
+      .attr("pointer-events", "none");
+
+    // Images
+    node.append("image")
+      .attr("href", d => tokenLogos[d.id] || null)
+      .attr("width", d => tierRadius[d.tier] * 1.8)
+      .attr("height", d => tierRadius[d.tier] * 1.8)
+      .attr("x", d => -tierRadius[d.tier] * 0.9)
+      .attr("y", d => -tierRadius[d.tier] * 0.9)
+      .attr("clip-path", d => "url(#clip-" + d.id + ")")
+      .style("opacity", 1)
+      .style("pointer-events", "none");
+
+    // Labels — Space Grotesk for SUI/core, JetBrains Mono uppercase for tech tiers
+    node.append("text")
+      .text(d => d.label)
+      .attr("text-anchor", "middle").attr("dominant-baseline", "hanging")
+      .attr("font-size", d => Math.max(tierFontSize[d.tier] * 0.9, 8.5))
+      .attr("font-weight", d => d.tier <= 1 ? "700" : "600")
+      .attr("font-family", d => d.tier <= 1
+        ? "'Space Grotesk', system-ui, sans-serif"
+        : "'JetBrains Mono', ui-monospace, monospace")
+      .attr("letter-spacing", d => d.tier >= 2 ? "0.08em" : "0.01em")
+      .attr("text-transform", d => d.tier >= 2 ? "uppercase" : "none")
+      .attr("fill", d => d.tier === 0 ? "#ffffff" : d.tier === 1 ? "#e9e4ff" : "#c4b5fd")
+      .attr("dy", d => tierRadius[d.tier] + 6);
+
+    // SUI sublabel
+    node.filter(d => d.tier === 0).append("text").text("Layer 1")
+      .attr("text-anchor", "middle").attr("dominant-baseline", "hanging")
+      .attr("dy", d => tierRadius[d.tier] + 21).attr("font-size", 8.5)
+      .attr("font-family", "'JetBrains Mono', ui-monospace, monospace")
+      .attr("fill", "#a855f7").attr("letter-spacing", "0.18em").attr("font-weight", "600");
+
+    sim.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+        .attr("x2", d => { const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y, dist = Math.sqrt(dx * dx + dy * dy) || 1; return d.target.x - dx / dist * (tierRadius[d.target.tier] + 6); })
+        .attr("y2", d => { const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y, dist = Math.sqrt(dx * dx + dy * dy) || 1; return d.target.y - dy / dist * (tierRadius[d.target.tier] + 6); });
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    // ── Click highlight ────────────────────────────────────────────────────────
+    let selected = null;
+    function handleClick(e, d) {
+      e.stopPropagation();
+      if (selected === d.id) { resetHighlight(); selected = null; return; }
+      selected = d.id;
+      const conn = new Set([d.id]);
+      links.forEach(l => {
+        const s = typeof l.source === 'object' ? l.source.id : l.source;
+        const t = typeof l.target === 'object' ? l.target.id : l.target;
+        if (s === d.id) conn.add(t); if (t === d.id) conn.add(s);
+      });
+      node.classed("dimmed", n => !conn.has(n.id));
+      link.classed("dimmed", l => { const s = typeof l.source === 'object' ? l.source.id : l.source, t = typeof l.target === 'object' ? l.target.id : l.target; return s !== d.id && t !== d.id; });
+      link.classed("highlight", l => { const s = typeof l.source === 'object' ? l.source.id : l.source, t = typeof l.target === 'object' ? l.target.id : l.target; return s === d.id || t === d.id; });
+    }
+    function resetHighlight() { node.classed("dimmed", false); link.classed("dimmed", false).classed("highlight", false); }
+    svg.on("click", () => { resetHighlight(); selected = null; });
+
+
+
+    // Fix SUI to center
+    setTimeout(() => {
+      const sui = nodes.find(n => n.id === "SUI");
+      if (sui) { sui.fx = W / 2; sui.fy = H / 2; sim.alpha(0.1).restart(); }
+    }, 1000);
+  </script>
+</body>
+
+</html>

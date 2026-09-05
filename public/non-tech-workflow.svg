@@ -1,0 +1,247 @@
+<svg width="100%" height="100%" viewBox="0 0 1440 620" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <radialGradient id="meshPurple" cx="78%" cy="22%" r="55%">
+      <stop offset="0%" stop-color="#3898FF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#3898FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="meshIndigo" cx="18%" cy="82%" r="55%">
+      <stop offset="0%" stop-color="#0C2B5B" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#0C2B5B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3898FF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="nodeGlass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#051024" stop-opacity="0.94"/>
+      <stop offset="100%" stop-color="#030814" stop-opacity="0.96"/>
+    </linearGradient>
+
+    <linearGradient id="topAccent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="50%" stop-color="#3898FF"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+
+    <linearGradient id="badgeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3898FF" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#3898FF" stop-opacity="0.08"/>
+    </linearGradient>
+
+    <pattern id="dotGrid" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="0.9" fill="rgba(255,255,255,0.055)"/>
+    </pattern>
+
+    <filter id="nodeGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="particleGlow" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    .rect-bg { fill: transparent; }
+    .node-rect { fill: url(#nodeGlass); stroke: rgba(56,152,255,0.28); stroke-width: 1.2; }
+    .node-active { stroke: #3898FF; stroke-width: 1.6; }
+    .node-safe { stroke: #10B981; stroke-width: 1.6; }
+    .node-risk { stroke: #fbbf24; stroke-width: 1.6; }
+    .node-danger { stroke: #ef4444; stroke-width: 1.6; }
+    
+    /* Enlarged base fonts */
+    .node-label { fill: #FFFFFF; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 16px; text-anchor: middle; font-weight: 600; letter-spacing: 0.01em; }
+    .node-sub { fill: #3898FF; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 10px; text-transform: uppercase; text-anchor: middle; letter-spacing: 1.6px; font-weight: 600; }
+    .node-sub-danger { fill: #ef4444; }
+    
+    .step-badge { fill: url(#badgeGrad); stroke: rgba(56,152,255,0.38); stroke-width: 0.8; }
+    .step-text { fill: #90C2FF; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 9px; text-anchor: middle; font-weight: 700; letter-spacing: 1px; }
+    
+    .hdr-title { fill: #3898FF; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 10px; font-weight: 700; letter-spacing: 2.4px; }
+    
+    .line-base { fill: none; stroke: rgba(56,152,255,0.10); stroke-width: 1.4; stroke-dasharray: 4 5; }
+    .flow { fill: none; stroke: #3898FF; stroke-width: 1.8; stroke-dasharray: 10 10; animation: dash 2.2s linear infinite; opacity: 0.62; }
+    .flow-safe { fill: none; stroke: #10B981; stroke-width: 1.8; stroke-dasharray: 10 10; animation: dash 1.4s linear infinite; opacity: 0.70; }
+    .flow-danger { fill: none; stroke: #ef4444; stroke-width: 1.8; stroke-dasharray: 10 10; animation: dash 1.6s linear infinite; opacity: 0.70; }
+    
+    @keyframes dash { to { stroke-dashoffset: -40; } }
+    @keyframes pulsePurple { 0%,100% { stroke-opacity: 0.55; } 50% { stroke-opacity: 1; } }
+    @keyframes pulseSafe { 0%,100% { stroke-opacity: 0.55; } 50% { stroke-opacity: 1; } }
+    @keyframes pulseDanger { 0%,100% { stroke-opacity: 0.55; } 50% { stroke-opacity: 1; } }
+    
+    .pulse-purple { animation: pulsePurple 2.4s infinite; }
+    .pulse-safe { animation: pulseSafe 2.8s infinite; }
+    .pulse-danger { animation: pulseDanger 1.5s infinite; }
+
+    /* Enlarged list and math fonts */
+    .node-text-sm { fill: #E0F2FE; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; text-anchor: start; }
+    .node-text-safe { fill: #D1FAE5; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 500; text-anchor: start; }
+    .node-text-danger { fill: #FEF3C7; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13.5px; font-weight: 500; text-anchor: start; }
+    .node-sub-check { fill: #9CA3AF; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; opacity: 0.9; }
+    
+    .math-normal { fill: #E2E8F0; font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 13px; }
+    .math-line { stroke: #E2E8F0; stroke-width: 1; }
+    
+    .title-emoji { font-size: 18px; }
+  </style>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" class="rect-bg"/>
+  <rect width="100%" height="100%" fill="url(#meshPurple)"/>
+  <rect width="100%" height="100%" fill="url(#meshIndigo)"/>
+  <rect width="100%" height="100%" fill="url(#dotGrid)" opacity="0.55"/>
+  <circle cx="720" cy="300" r="500" fill="url(#centerGlow)"/>
+
+  <!-- Header strip -->
+  <g transform="translate(40, 22)">
+    <rect width="280" height="24" rx="12" fill="rgba(5,16,36,0.62)" stroke="rgba(56,152,255,0.22)" stroke-width="0.8"/>
+    <circle cx="15" cy="12" r="4" fill="#10B981"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite"/></circle>
+    <text class="hdr-title" x="30" y="15.5">DIEPS · TECHNICAL FLOW</text>
+  </g>
+
+  <!-- Base connectors -->
+  <path class="line-base" d="M 120 280 L 160 280"/>
+  <path class="line-base" d="M 420 280 L 460 280"/>
+  <path class="line-base" d="M 1060 280 L 1100 280"/>
+  <path class="line-base" d="M 1320 280 L 1360 280"/>
+  <path class="line-base" d="M 760 470 L 760 490"/>
+
+  <!-- Animated flow connectors -->
+  <path class="flow" d="M 120 280 L 160 280"/>
+  <path class="flow" d="M 420 280 L 460 280"/>
+  <path class="flow-safe" d="M 1060 280 L 1100 280"/>
+  <path class="flow-safe" d="M 1320 280 L 1360 280"/>
+  <path class="flow-danger" d="M 760 470 L 760 490"/>
+
+  <!-- Particles -->
+  <circle r="3.4" fill="#FFFFFF" filter="url(#particleGlow)"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 120 280 L 160 280"/></circle>
+  <circle r="3.4" fill="#3898FF" filter="url(#particleGlow)"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 420 280 L 460 280"/></circle>
+  <circle r="3.4" fill="#10B981" filter="url(#particleGlow)"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 1060 280 L 1100 280"/></circle>
+  <circle r="3.4" fill="#10B981" filter="url(#particleGlow)"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 1320 280 L 1360 280"/></circle>
+  <circle r="3.4" fill="#ef4444" filter="url(#particleGlow)"><animateMotion dur="1.5s" repeatCount="indefinite" path="M 760 470 L 760 490"/></circle>
+
+  <!-- Node 00: User Input -->
+  <g transform="translate(20, 235)">
+    <rect class="node-rect" width="100" height="90" rx="16"/>
+    <line x1="16" y1="1" x2="84" y2="1" stroke="url(#topAccent)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+    <text class="node-label" x="50" y="38"><tspan class="title-emoji">🙋‍♂️</tspan> User</text>
+    <text class="node-sub" x="50" y="60">Natural</text>
+    <text class="node-sub" x="50" y="75">Text</text>
+  </g>
+
+  <!-- Node 01: Intent Engine -->
+  <g transform="translate(160, 210)">
+    <rect class="node-rect node-active pulse-purple" width="260" height="140" rx="16" filter="url(#nodeGlow)"/>
+    <line x1="16" y1="1" x2="244" y2="1" stroke="url(#topAccent)" stroke-width="2" stroke-linecap="round"/>
+    
+    <rect class="step-badge" x="14" y="14" width="26" height="16" rx="4"/>
+    <text class="step-text" x="27" y="25">01</text>
+    <circle cx="244" cy="22" r="3" fill="#3898FF"><animate attributeName="opacity" values="0.4;1;0.4" dur="2.2s" repeatCount="indefinite"/></circle>
+    
+    <text class="node-label" x="130" y="30">Intent Engine (AI) 🧠</text>
+    
+    <text class="node-text-sm" x="25" y="65">• Understands request</text>
+    <text class="node-text-sm" x="25" y="90">• Checks wallet balance</text>
+    <text class="node-text-sm" x="25" y="115">• Finds best trade route</text>
+  </g>
+
+  <!-- Node 02: Risk Guardian -->
+  <g transform="translate(460, 90)">
+    <rect class="node-rect node-active pulse-purple" width="600" height="380" rx="16" filter="url(#nodeGlow)"/>
+    <line x1="16" y1="1" x2="584" y2="1" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+    
+    <!-- Divider Line -->
+    <line x1="300" y1="50" x2="300" y2="360" stroke="rgba(251,191,36,0.3)" stroke-width="1.2" stroke-dasharray="4 4" />
+
+    <rect class="step-badge" x="14" y="14" width="26" height="16" rx="4" style="fill: rgba(251,191,36,0.18); stroke: rgba(251,191,36,0.4);"/>
+    <text class="step-text" x="27" y="25" style="fill: #fcd34d;">02</text>
+    <circle cx="584" cy="22" r="3" fill="#fbbf24"><animate attributeName="opacity" values="0.4;1;0.4" dur="2.4s" repeatCount="indefinite"/></circle>
+    
+    <text class="node-label" x="300" y="30">Risk Guardian 🛡️</text>
+
+    <!-- LEFT COLUMN -->
+    <!-- 1. Price Impact -->
+    <text class="node-text-danger" x="25" y="65">• 1. Price Impact &amp; Slippage</text>
+    <text class="math-normal" x="40" y="95">Impact = <tspan font-style="italic">max</tspan>(Simulated%, Σ(Fee%) × 0.5)</text>
+
+    <!-- 2. Liquidity Risk -->
+    <text class="node-text-danger" x="25" y="140">• 2. Liquidity Risk (Trade Impact)</text>
+    <text class="math-normal" x="40" y="170">Impact Ratio = </text>
+    <text class="math-normal" x="180" y="157" text-anchor="middle">Trade<tspan font-size="9" dy="3">USD</tspan><tspan dy="-3"></tspan></text>
+    <line class="math-line" x1="135" y1="163" x2="225" y2="163" />
+    <text class="math-normal" x="180" y="179" text-anchor="middle">(Pool TVL / 2)</text>
+    <text class="math-normal" x="235" y="170"> × 100%</text>
+
+    <!-- 3. Liquidity Depth -->
+    <text class="node-text-danger" x="25" y="235">• 3. Liquidity Depth &amp; Fragmentation</text>
+    <text class="node-sub-check" x="40" y="255">Monitors max hops and pool utilization.</text>
+
+    <!-- 4. Absolute Pool Health -->
+    <text class="node-text-danger" x="25" y="305">• 4. Absolute Pool Health</text>
+    <text class="node-sub-check" x="40" y="325">Validates minimum USD liquidity in route.</text>
+    
+    <!-- RIGHT COLUMN -->
+    <!-- 5. Concentration -->
+    <text class="node-text-danger" x="320" y="65">• 5. Supply Concentration (Rug-pull)</text>
+    <text class="math-normal" x="335" y="95">Ratio = </text>
+    <text class="math-normal" x="450" y="82" text-anchor="middle">Token Depth in Pool</text>
+    <line class="math-line" x1="385" y1="88" x2="515" y2="88" />
+    <text class="math-normal" x="450" y="104" text-anchor="middle">Total Supply</text>
+    <text class="math-normal" x="525" y="95"> × 100%</text>
+
+    <!-- 6. DEX Verification -->
+    <text class="node-text-danger" x="320" y="155">• 6. DEX Verification</text>
+    <text class="node-sub-check" x="335" y="175">Ensures pool is on a verified DEX.</text>
+
+    <!-- 7. Pool Age -->
+    <text class="node-text-danger" x="320" y="215">• 7. Pool Age &amp; Activity</text>
+    <text class="node-sub-check" x="335" y="235">Detects abandoned/stale liquidity pools.</text>
+
+    <!-- 8. Token Safety -->
+    <text class="node-text-danger" x="320" y="275">• 8. Token Safety &amp; Blacklist</text>
+    <text class="node-sub-check" x="335" y="295">Scans for known honeypots and scams.</text>
+
+    <!-- 9. Mint Risk -->
+    <text class="node-text-danger" x="320" y="335">• 9. Creator Mint Risk (TreasuryCap)</text>
+    <text class="node-sub-check" x="335" y="355">Checks if creator can infinitely mint tokens.</text>
+  </g>
+
+  <!-- Node 03: PTB Builder -->
+  <g transform="translate(1100, 210)">
+    <rect class="node-rect node-safe pulse-safe" width="220" height="140" rx="16" filter="url(#nodeGlow)"/>
+    <line x1="16" y1="1" x2="204" y2="1" stroke="#10B981" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+    
+    <rect class="step-badge" x="14" y="14" width="26" height="16" rx="4" style="fill: rgba(16,185,129,0.18); stroke: rgba(16,185,129,0.4);"/>
+    <text class="step-text" x="27" y="25" style="fill: #6ee7b7;">03</text>
+    <circle cx="204" cy="22" r="3" fill="#10B981"><animate attributeName="opacity" values="0.5;1;0.5" dur="1.8s" repeatCount="indefinite"/></circle>
+    
+    <text class="node-label" x="110" y="30">PTB Builder 📦</text>
+    
+    <text class="node-text-safe" x="25" y="65">• Sets best slippage</text>
+    <text class="node-text-safe" x="25" y="90">• Packages TX block</text>
+    <text class="node-text-safe" x="25" y="115">• Prompts Signature</text>
+  </g>
+
+  <!-- Success -->
+  <g transform="translate(1360, 256)">
+    <circle cx="24" cy="24" r="24" fill="rgba(16,185,129,0.1)" stroke="#10B981" stroke-width="2"/>
+    <text x="24" y="32" font-size="22" text-anchor="middle">🎉</text>
+  </g>
+
+  <!-- Danger Blocked -->
+  <g transform="translate(640, 490)">
+    <rect class="node-rect node-danger pulse-danger" width="240" height="60" rx="12" filter="url(#nodeGlow)"/>
+    <line x1="16" y1="1" x2="224" y2="1" stroke="#ef4444" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+    <text class="node-label" x="120" y="25" fill="#ef4444"><tspan font-size="18px">⚠️</tspan> Trade Blocked</text>
+    <text class="node-sub node-sub-danger" x="120" y="45">To Protect Assets</text>
+  </g>
+</svg>
+

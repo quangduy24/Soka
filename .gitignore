@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.agents/
+
+# Sui & Move
+.dieps_registry
+dieps_registry/
+move-analyzer.exe
+sui.exe
+
+# Local documentation & agent files
+feature.md
+AGENTS.md
+report_bugs.md
+task_dev1_backend.md
+task_dev2_frontend.md
