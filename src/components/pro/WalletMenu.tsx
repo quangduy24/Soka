@@ -81,14 +81,14 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
 
             {/* total value - pastel with solid background */}
             <div className="flex shrink-0 flex-col gap-2 border-b border-[#F05391]/20 bg-[#F8E8EE] px-4 py-4">
-              <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#F05391]">
+              <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#F05391]" style={{ fontFamily: 'var(--font-body)' }}>
                 <Wallet className="h-3.5 w-3.5" /> Est. Total Value
               </span>
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-[#C2185B] tracking-tight" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 2.8vw, 34px)', lineHeight: 1, fontWeight: 700 }}>
+                <span className="text-[#1a1a2e] tracking-tight" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 2.8vw, 34px)', lineHeight: 1, fontWeight: 700 }}>
                   {mask(totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : '—')}
                 </span>
-                <span className="rounded-full bg-[#F8C8DC] px-2.5 py-1 font-mono text-[9px] font-bold text-[#C2185B]">
+                <span className="rounded-full bg-[#F8C8DC] px-2.5 py-1 font-mono text-[9px] font-bold text-[#C2185B]" style={{ fontFamily: 'var(--font-body)' }}>
                   {balances?.length ?? 0} asset{(balances?.length ?? 0) === 1 ? '' : 's'}
                 </span>
               </span>
@@ -106,7 +106,7 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
                     <div key={t.coinType} className="flex items-center gap-2 rounded-xl border border-transparent px-1.5 py-1.5 transition-colors hover:border-[#F05391]/20 hover:bg-white/20">
                       <Avatar sym={t.sym} />
                       <div className="min-w-0 flex-1 leading-none">
-                        <div className="truncate font-mono text-[11px] font-bold text-[#0f172a]">{t.sym}</div>
+                        <div className="truncate font-mono text-[11px] font-bold text-[#0f172a]" style={{ fontFamily: 'var(--font-body)' }}>{t.sym}</div>
                         <div className="mt-0.5 truncate font-mono text-[7.5px] text-[#0f172a]/40">{t.coinType.split('::').pop()}</div>
                       </div>
                       <div className="shrink-0 text-right leading-none">

@@ -2,7 +2,7 @@
 - Prefers communicating in Vietnamese. Confidence: 0.85
 - Prefers clean, minimal interface without widget grids or data-heavy sidebars (e.g., removed top movers, trending, newly listed gems panels). Confidence: 0.85
 - Likes strong, visible glassmorphism effects — prefers high blur (60-80px), low white opacity (15-30%), multi-layer shadows — wants clearly transparent/translucent panels with strong backdrop blur and saturation. Confidence: 0.9
-- For **popup/dropdown panels** specifically, prefers **higher opacity** (e.g., bg-white/60+) over very transparent glassmorphism — excessive transparency causes background content to bleed through and hurts readability. Functional panels need more opacity than decorative glass surfaces. Confidence: 0.75
+- For **popup/dropdown panels** specifically, prefers **solid non-transparent backgrounds** for content areas over glassmorphism transparency — background content bleeds through transparent surfaces and hurts readability. Functional panels need solid fills (e.g., pastel `#F8E8EE`) more than decorative glass surfaces. Confidence: 0.78
 - Wants **key financial figures** (total balance, portfolio value) to be **prominently highlighted and elegant** — uses gradient text, larger typography, gradient backgrounds, and badge-style asset counts to make numbers stand out as focal points. Confidence: 0.7
 - Prefers floating card layout with depth shadows and hover lift effects (translateY + scale). Confidence: 0.8
 - Likes hover interactions to combine **color transitions** (to accent color) with **floating highlight** effects — elements should shift color and lift/glow on hover for tactile feedback. Confidence: 0.7
@@ -20,6 +20,7 @@
 - Likes **3D depth effects on character/mascot** — drop shadows, perspective transforms, scale variations to create dimensionality. Confidence: 0.75
 - Character/mascot should **overflow its container** — not constrained within widget boxes; should break boundaries for dynamic visual impact. Confidence: 0.75
 - Prioritizes **text-background contrast for legibility** — actively flags when text "sinks" (chìm) into backgrounds; prefers solid high-contrast colors (e.g., deep pink on light pink, white on solid pink) over low-contrast gradient text that reduces readability. Confidence: 0.65
+- Prefers **pastel color tones for badges and accent UI elements** (e.g., soft pink `#F8C8DC`, light pink `#F8E8EE`) over vibrant/solid accent colors — pastels feel more elegant and pair better with glassmorphism aesthetics while maintaining visual hierarchy. Confidence: 0.6
 - Prefers chat messages aligned to the edges (left for bot, right for user) — flush against chatbox borders rather than centered. Confidence: 0.7
 - Likes **widget grid layouts** for landing pages — organizing content into distinct card-based grid sections (hero, stats, features, CTA) rather than long scrolling single-column layouts. Confidence: 0.7
 - When redesigning, prefers to **preserve existing design language** (colors, typography, effects) and only changes layout/structure — iterative redesign rather than full visual overhaul. Confidence: 0.7
