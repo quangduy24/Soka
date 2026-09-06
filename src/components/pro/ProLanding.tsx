@@ -43,7 +43,7 @@ export const ProLanding: React.FC = () => {
       <ProHeader />
 
       {/* Ribbon Marquee - Dark Pink Creative */}
-      <div className="ribbon-marquee overflow-hidden">
+      <div className="ribbon-marquee overflow-hidden hidden">
         <div className="ribbon-content py-1">
           <span className="ribbon-item"><Sparkles className="w-4 h-4" /> SOKA PROTOCOL</span>
           <span className="ribbon-item"><Zap className="w-4 h-4" /> AI-POWERED SWAPS</span>
