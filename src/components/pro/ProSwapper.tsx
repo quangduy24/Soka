@@ -168,7 +168,7 @@ export const ProSwapper: React.FC = () => {
     finally { setIsExecuting(false); }
   };
 
-  const quickPrompts = ["Swap 10 SUI to USDC", "Swap 100 SUI to CETUS", "Swap 50% SUI to DEEP", "Swap 500 SUI safe route"];
+  const quickPrompts = ["Deposit SUI", "Withdraw USDC", "Send tokens", "Create claim link"];
   const hasResult = routeNodes.length > 0 || guardianChecks.length > 0;
   const hasRiskWarnings = guardianChecks.some(c => c.status === "WARNING" || c.status === "DANGER") || !guardianSafe;
 
