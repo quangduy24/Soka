@@ -79,16 +79,16 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
               </div>
             </div>
 
-            {/* total value - vibrant pink with high contrast */}
-            <div className="flex shrink-0 flex-col gap-2 border-b border-[#F05391]/20 bg-gradient-to-br from-[#F05391]/25 via-[#F05391]/15 to-[#BE8CC2]/15 px-4 py-4">
+            {/* total value - pastel with solid background */}
+            <div className="flex shrink-0 flex-col gap-2 border-b border-[#F05391]/20 bg-[#F8E8EE] px-4 py-4">
               <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#F05391]">
                 <Wallet className="h-3.5 w-3.5" /> Est. Total Value
               </span>
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-[#C2185B] tracking-tight drop-shadow-sm" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 2.8vw, 34px)', lineHeight: 1, fontWeight: 700 }}>
+                <span className="text-[#C2185B] tracking-tight" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 2.8vw, 34px)', lineHeight: 1, fontWeight: 700 }}>
                   {mask(totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : '—')}
                 </span>
-                <span className="rounded-full bg-[#F05391] px-2.5 py-1 font-mono text-[9px] font-bold text-white shadow-sm">
+                <span className="rounded-full bg-[#F8C8DC] px-2.5 py-1 font-mono text-[9px] font-bold text-[#C2185B]">
                   {balances?.length ?? 0} asset{(balances?.length ?? 0) === 1 ? '' : 's'}
                 </span>
               </span>

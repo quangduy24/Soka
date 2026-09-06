@@ -19,6 +19,7 @@
 - Prefers **large, prominent mascot/character** on landing page — character should be a major visual focal point, not small or tucked away. Confidence: 0.8
 - Likes **3D depth effects on character/mascot** — drop shadows, perspective transforms, scale variations to create dimensionality. Confidence: 0.75
 - Character/mascot should **overflow its container** — not constrained within widget boxes; should break boundaries for dynamic visual impact. Confidence: 0.75
+- Prioritizes **text-background contrast for legibility** — actively flags when text "sinks" (chìm) into backgrounds; prefers solid high-contrast colors (e.g., deep pink on light pink, white on solid pink) over low-contrast gradient text that reduces readability. Confidence: 0.65
 - Prefers chat messages aligned to the edges (left for bot, right for user) — flush against chatbox borders rather than centered. Confidence: 0.7
 - Likes **widget grid layouts** for landing pages — organizing content into distinct card-based grid sections (hero, stats, features, CTA) rather than long scrolling single-column layouts. Confidence: 0.7
 - When redesigning, prefers to **preserve existing design language** (colors, typography, effects) and only changes layout/structure — iterative redesign rather than full visual overhaul. Confidence: 0.7
