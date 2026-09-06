@@ -63,7 +63,7 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
       {open && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-[calc(100%+8px)] z-[70] flex max-h-[min(70vh,480px)] w-[320px] flex-col overflow-hidden glass-strong pop-in">
+          <div className="absolute right-0 top-[calc(100%+8px)] z-[70] flex max-h-[min(70vh,480px)] w-[320px] flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/60 shadow-[0_20px_60px_-16px_rgba(0,0,0,0.2),0_8px_24px_-8px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-xl pop-in">
             {/* header */}
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/20 bg-white/20 px-3 py-2">
               <div className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#0f172a]/60">
@@ -79,16 +79,16 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
               </div>
             </div>
 
-            {/* total value */}
-            <div className="flex shrink-0 flex-col gap-1 border-b border-white/20 bg-gradient-to-r from-[#F05391]/10 to-[#BE8CC2]/10 px-4 py-3">
-              <span className="flex items-center gap-1.5 font-mono text-[8px] font-bold uppercase tracking-[0.22em] text-[#F05391]/70">
-                <Wallet className="h-3 w-3" /> Est. Total Value
+            {/* total value - elegant highlight */}
+            <div className="flex shrink-0 flex-col gap-2 border-b border-white/30 bg-gradient-to-br from-[#F05391]/15 via-[#BE8CC2]/10 to-[#FFF29]/10 px-4 py-4">
+              <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[#F05391]">
+                <Wallet className="h-3.5 w-3.5" /> Est. Total Value
               </span>
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-[#F05391] tracking-tight" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 30px)', lineHeight: 1 }}>
+                <span className="bg-gradient-to-r from-[#F05391] via-[#BE8CC2] to-[#F05391] bg-clip-text text-transparent tracking-tight" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 2.8vw, 34px)', lineHeight: 1, fontWeight: 700 }}>
                   {mask(totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : '—')}
                 </span>
-                <span className="font-mono text-[9px] font-bold text-[#0f172a]/50">
+                <span className="rounded-full bg-[#F05391]/10 px-2 py-0.5 font-mono text-[9px] font-bold text-[#F05391]">
                   {balances?.length ?? 0} asset{(balances?.length ?? 0) === 1 ? '' : 's'}
                 </span>
               </span>
