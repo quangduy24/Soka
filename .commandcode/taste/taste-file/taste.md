@@ -24,3 +24,7 @@
 - Prefers chat messages aligned to the edges (left for bot, right for user) — flush against chatbox borders rather than centered. Confidence: 0.7
 - Likes **widget grid layouts** for landing pages — organizing content into distinct card-based grid sections (hero, stats, features, CTA) rather than long scrolling single-column layouts. Confidence: 0.7
 - When redesigning, prefers to **preserve existing design language** (colors, typography, effects) and only changes layout/structure — iterative redesign rather than full visual overhaul. Confidence: 0.7
+- Prefers **owning the full backend stack** — replacing third-party/blockchain APIs (e.g., Sui API) with custom in-house API services (e.g., Mezo API) rather than relying on external backend processing. Values control and independence from third-party backends. Confidence: 0.8
+- Wants **chat-driven transaction flows** — embedding multi-step UI widgets (Form → Confirm → Processing → Success) directly inside the chat interface so users can perform financial actions (deposit, withdraw, send, claim) conversationally. Confidence: 0.75
+- **Quick intent prompts** below the chatbox should always reflect the **current active feature set** — dynamically updated to match available actions rather than static/hardcoded suggestions. Confidence: 0.7
+- Core product focus is **financial wallet actions**: Deposit, Withdraw, Send, Create Claim Link — these are the primary user journeys on the Soka platform. Confidence: 0.75
