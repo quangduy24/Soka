@@ -207,7 +207,7 @@ export const ProSwapper: React.FC = () => {
 
           {/* Messages */}
           <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 sm:px-6 py-5" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.01) 100%)" }}>
-            <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto">
+            <div className="flex flex-col gap-4 w-full max-w-3xl">
               {/* Intro */}
               <div className="flex items-end gap-3">
                 <img src="/icon-chatbox.png" alt="Soka" className="w-11 h-11 object-contain shrink-0" />
