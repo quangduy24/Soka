@@ -7,3 +7,7 @@
 - Prefers centered, focused single-column layouts over multi-column with sidebars. Confidence: 0.75
 - Likes rich gradient mesh / aura background textures using layered radial gradients with pastel color palettes (e.g., #F3C0D6 rose, #BE8CC2 lavender, #FFF29 cream) applied with background-attachment: fixed. Confidence: 0.75
 - Uses **#F05391 (pink)** as the primary accent/highlight color — for buttons, links, chips, gradient text, and interactive element states. Confidence: 0.85
+- Actively iterating on mascot/character design — has gone through SkullBuddy → SokaCat → new character from image reference. Not yet settled on final mascot. Confidence: 0.85
+- Uses **custom SVG mascot characters** as the main UI personality — embedded across Header, Landing, Terminal, and panels for brand identity. Confidence: 0.9
+- Prefers **vintage cartoon illustration style with bold black outlines** for character/mascot designs — clean, professional SVG aesthetics. Confidence: 0.8
+- Provides **visual reference images** to communicate desired character/mascot design — uses image uploads alongside descriptions. Confidence: 0.75
