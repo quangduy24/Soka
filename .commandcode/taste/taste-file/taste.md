@@ -28,3 +28,4 @@
 - Wants **chat-driven transaction flows** — embedding multi-step UI widgets (Form → Confirm → Processing → Success) directly inside the chat interface so users can perform financial actions (deposit, withdraw, send, claim) conversationally. Confidence: 0.75
 - **Quick intent prompts** below the chatbox should always reflect the **current active feature set** — dynamically updated to match available actions rather than static/hardcoded suggestions. Confidence: 0.7
 - Core product focus is **financial wallet actions**: Deposit, Withdraw, Send, Create Claim Link — these are the primary user journeys on the Soka platform. Confidence: 0.75
+- Prefers **mock data first, real API later** workflow — use temporary mock data layers to build and test UX, then explicitly signal cleanup (e.g., "xoá mock data") to replace mocks with real API integration when testing is complete. Confidence: 0.7

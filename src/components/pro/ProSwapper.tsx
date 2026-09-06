@@ -113,6 +113,7 @@ export const ProSwapper: React.FC = () => {
   const [alternativeSource, setAlternativeSource] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<string | null>(null);
 
   const upsertHistory = (id: string, patch: Partial<SwapSnapshot>) => {
     setHistory(prev => { const n = prev.map(x => (x.id === id ? { ...x, ...patch } : x)); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
