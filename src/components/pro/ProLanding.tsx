@@ -27,7 +27,7 @@ export const ProLanding: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen w-full canvas-bg text-[#1a1a2e] flex flex-col relative overflow-hidden">
+    <div className="min-h-screen w-full mesh-texture-soft text-[#1a1a2e] flex flex-col relative overflow-hidden">
       {/* Ambient blobs */}
       <div className="absolute top-[-150px] left-[-100px] w-[500px] h-[500px] rounded-full bg-[#6366f1]/[0.06] blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-150px] right-[-100px] w-[400px] h-[400px] rounded-full bg-[#8b5cf6]/[0.04] blur-[100px] pointer-events-none" />

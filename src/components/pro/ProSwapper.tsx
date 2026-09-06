@@ -174,7 +174,7 @@ export const ProSwapper: React.FC = () => {
   const hasRiskWarnings = guardianChecks.some(c => c.status === "WARNING" || c.status === "DANGER") || !guardianSafe;
 
   return (
-    <div className="h-[100dvh] w-full canvas-bg text-[#0f172a] flex flex-col overflow-hidden">
+    <div className="h-[100dvh] w-full mesh-texture text-[#0f172a] flex flex-col overflow-hidden">
       <div className="absolute top-[15%] left-[5%] w-[400px] h-[400px] rounded-full bg-[#6366f1]/[0.05] blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[10%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#8b5cf6]/[0.04] blur-[100px] pointer-events-none" />
 
