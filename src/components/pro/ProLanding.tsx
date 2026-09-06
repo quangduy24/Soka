@@ -42,13 +42,22 @@ export const ProLanding: React.FC = () => {
 
       <ProHeader />
 
-      {/* Marquee */}
-      <div className="border-y border-white/30 bg-white/20 overflow-hidden">
-        <div className="flex whitespace-nowrap py-3">
-          <span className="px-6 font-mono text-xs tracking-widest text-[#0f172a]/40">
-            ◆ SOKA PROTOCOL ◆ AI-POWERED SWAPS ◆ 7 ON-CHAIN CHECKS ◆ SUI NETWORK ◆&nbsp;
-            ◆ SOKA PROTOCOL ◆ AI-POWERED SWAPS ◆ 7 ON-CHAIN CHECKS ◆ SUI NETWORK ◆&nbsp;
-          </span>
+      {/* Ribbon Marquee - Dark Pink Creative */}
+      <div className="ribbon-marquee overflow-hidden">
+        <div className="ribbon-content py-1">
+          <span className="ribbon-item"><Sparkles className="w-4 h-4" /> SOKA PROTOCOL</span>
+          <span className="ribbon-item"><Zap className="w-4 h-4" /> AI-POWERED SWAPS</span>
+          <span className="ribbon-item"><ShieldCheck className="w-4 h-4" /> 7 ON-CHAIN CHECKS</span>
+          <span className="ribbon-item"><Globe className="w-4 h-4" /> SUI NETWORK</span>
+          <span className="ribbon-item"><TrendingUp className="w-4 h-4" /> $2.4M VOLUME</span>
+          <span className="ribbon-item"><Activity className="w-4 h-4" /> 99.9% UPTIME</span>
+          {/* Duplicate for seamless loop */}
+          <span className="ribbon-item"><Sparkles className="w-4 h-4" /> SOKA PROTOCOL</span>
+          <span className="ribbon-item"><Zap className="w-4 h-4" /> AI-POWERED SWAPS</span>
+          <span className="ribbon-item"><ShieldCheck className="w-4 h-4" /> 7 ON-CHAIN CHECKS</span>
+          <span className="ribbon-item"><Globe className="w-4 h-4" /> SUI NETWORK</span>
+          <span className="ribbon-item"><TrendingUp className="w-4 h-4" /> $2.4M VOLUME</span>
+          <span className="ribbon-item"><Activity className="w-4 h-4" /> 99.9% UPTIME</span>
         </div>
       </div>
 

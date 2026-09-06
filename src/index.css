@@ -321,6 +321,62 @@
 .dot-warning { background: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
 .dot-danger { background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   RIBBON MARQUEE - Creative Animation
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes ribbon-flow {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes ribbon-shimmer {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+
+@keyframes ribbon-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.ribbon-marquee {
+  background: linear-gradient(90deg, #D63A7A, #F05391, #D63A7A, #BE8CC2, #D63A7A);
+  background-size: 200% 100%;
+  animation: ribbon-flow 20s linear infinite, ribbon-shimmer 3s ease-in-out infinite;
+  border-top: 1px solid rgba(255,255,255,0.3);
+  border-bottom: 1px solid rgba(255,255,255,0.3);
+  box-shadow: 0 4px 20px rgba(240, 83, 145, 0.3);
+}
+
+.ribbon-marquee .ribbon-content {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ribbon-flow 25s linear infinite;
+}
+
+.ribbon-marquee .ribbon-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.ribbon-marquee .ribbon-item::after {
+  content: '◆';
+  margin-left: 24px;
+  opacity: 0.7;
+  animation: ribbon-bounce 2s ease-in-out infinite;
+}
+
+.ribbon-marquee .ribbon-item:nth-child(even)::after {
+  animation-delay: 0.5s;
+}
 /* ═══════════════════════════════════════════════════════════════
    OLD THEME OVERRIDES
    ═══════════════════════════════════════════════════════════════ */
