@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronUp, ArrowRight, ExternalLink, ShieldCheck, AlertTriangle,
   XCircle, CheckCircle2, Droplets, Layers, ArrowDownCircle, ArrowUpCircle, Activity, Trash2, History as HistoryIcon, Gauge, X
 } from 'lucide-react';
-import { SkullBuddy } from './SkullBuddy';
+import SokaCat from './SokaCat';
 import type { SwapSnapshot, RiskCheck, PtbStep, RouteNode } from '../../types/shared';
 import { suiscanUrl, shortenRef, timeAgo } from '../../utils/explorer';
 
@@ -362,7 +362,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-[#FFFDF4] p-3">
           {history.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-              <SkullBuddy size={84} mood="chill" />
+              <SokaCat size={84} />
               <div className="font-black text-[16px] text-[#141414]/70" style={{ fontFamily: '"Bungee", sans-serif' }}>No swaps yet</div>
               <p className="font-mono text-[11px] text-[#141414]/50">Go ask Buddy for a swap — it will show up here.</p>
             </div>

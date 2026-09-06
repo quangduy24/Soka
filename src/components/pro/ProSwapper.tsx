@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useDAppKit, useCurrentClient } from '@mysten/dapp-kit-react';
 import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check } from 'lucide-react';
 import { ProHeader } from './ProHeader';
-import { SkullBuddy } from './SkullBuddy';
+import SokaCat from './SokaCat';
 import { ProRouteVisualizer } from './ProRouteVisualizer';
 import { ProGuardianRadar } from './ProGuardianRadar';
 import { HistoryPanel } from './HistoryPanel';
@@ -187,7 +187,7 @@ export const ProSwapper: React.FC = () => {
           <div className="flex items-center gap-3 px-5 py-4 border-b border-white/40 bg-white/30 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-[#F05391]/10 border border-[#F05391]/15 flex items-center justify-center">
-                <SkullBuddy size={44} mood="happy" className="!animate-none skull-glow" />
+                <SokaCat size={44} className="!animate-none skull-glow" />
               </div>
               <div>
                 <div className="font-bold text-[16px] text-[#0f172a]" style={{ fontFamily: "var(--font-display)" }}>SOKA AI</div>
@@ -211,7 +211,7 @@ export const ProSwapper: React.FC = () => {
             <div className="flex flex-col gap-4 w-full max-w-3xl mx-auto">
               {/* Intro */}
               <div className="flex items-end gap-3">
-                <SkullBuddy size={44} mood="happy" className="shrink-0 !animate-none" />
+                <SokaCat size={44} className="shrink-0 !animate-none" />
                 <div className="glass p-4 max-w-[85%]">
                   <div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#F05391] mb-1">SOKA ★</div>
                   <div className="text-[15px] font-medium text-[#0f172a]/80 leading-relaxed">Tell me your dream swap. I sniff the route &amp; run 7 checks — no jargon, just vibes ⚡</div>
@@ -313,14 +313,14 @@ export const ProSwapper: React.FC = () => {
 
               {cancelMsg && !isProcessing && !hasResult && (
                 <div className="flex items-end gap-3">
-                  <SkullBuddy size={44} mood="chill" className="shrink-0 !animate-none" />
+                  <SokaCat size={44} className="shrink-0 !animate-none" />
                   <div className="glass p-4 max-w-[85%]"><div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#F05391] mb-1">SOKA ★</div><div className="text-[14px] font-medium text-[#0f172a]/80">{cancelMsg}</div></div>
                 </div>
               )}
 
               {isProcessing && (
                 <div className="flex items-end gap-3">
-                  <SkullBuddy size={44} mood="thinking" className="shrink-0 !animate-none" />
+                  <SokaCat size={44} className="shrink-0 !animate-none" />
                   <div className="glass p-4"><div className="flex items-center gap-2 font-mono text-[13px] font-medium text-[#0f172a]/50"><span className="w-2 h-2 rounded-full bg-[#F05391] animate-pulse" /><span className="w-2 h-2 rounded-full bg-[#a78bfa] animate-pulse" style={{ animationDelay: "0.15s" }} /><span className="w-2 h-2 rounded-full bg-[#8b5cf6] animate-pulse" style={{ animationDelay: "0.3s" }} />sniffing pools…</div></div>
                 </div>
               )}
