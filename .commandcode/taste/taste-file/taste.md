@@ -12,3 +12,4 @@
 - Prefers **vintage cartoon illustration style with bold black outlines** for character/mascot designs — clean, professional SVG aesthetics. Confidence: 0.8
 - Provides **visual reference images** to communicate desired character/mascot design — uses image uploads alongside descriptions. Confidence: 0.75
 - Prefers **checking the repo for existing image assets** before creating new ones from scratch — user expects agent to look for and reuse existing character/mascot images in the project. Confidence: 0.7
+- Wants **transparent backgrounds on character/mascot images** — assets should be PNG with alpha transparency so they blend seamlessly with glassmorphism/gradient UI backgrounds. Confidence: 0.75
