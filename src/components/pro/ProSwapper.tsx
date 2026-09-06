@@ -335,7 +335,7 @@ export const ProSwapper: React.FC = () => {
                 <span className="absolute right-4 bottom-1/2 translate-y-1/2 text-[11px] font-mono text-[#0f172a]/20 pointer-events-none hidden sm:block">↵</span>
               </div>
               <button type="submit" disabled={isProcessing || !intentPrompt.trim()} className="btn-primary !rounded-2xl px-6 py-4 shrink-0 disabled:opacity-50">
-                {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2">Send <Sparkles className="w-4 h-4" /></span>}
+                {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><img src="/icon-chatbox.png" alt="Send" className="w-5 h-5" /></span>}
               </button>
             </form>
             <div className="flex flex-wrap gap-2 mt-3">
