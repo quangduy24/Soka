@@ -183,8 +183,8 @@ export const ProLanding: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {features.map((f, i) => (
-              <div key={i} className="glass-card p-6 text-center group">
-                <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: f.color + '15', border: `1px solid ${f.color}25` }}>
+              <div key={i} className="feature-card glass-card p-6 text-center group">
+                <div className="icon-wrapper w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: f.color + '15', border: `1px solid ${f.color}25` }}>
                   <span style={{ color: f.color }}>{f.icon}</span>
                 </div>
                 <h3 className="font-bold text-[#0f172a] text-base mb-2" style={{ fontFamily: 'var(--font-body)' }}>{f.title}</h3>
