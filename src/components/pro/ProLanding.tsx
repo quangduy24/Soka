@@ -55,10 +55,17 @@ export const ProLanding: React.FC = () => {
       {/* Main Content - Widget Grid Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-10 relative z-10">
         
-        {/* Hero Widget - Full Width */}
-        <div className="glass-strong p-8 sm:p-10 mb-6 fade-in">
-          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
-            <div className="flex-1 text-center lg:text-left">
+        {/* Hero Widget - Full Width with 3D Character */}
+        <div className="relative mb-6 fade-in overflow-visible">
+          {/* Character - positioned to overflow */}
+          <div className="absolute -right-4 sm:right-0 top-0 lg:top-8 z-20 pointer-events-none">
+            <div className="transform lg:scale-110 xl:scale-125 origin-bottom-right perspective-1000">
+              <SokaCharacter size={280} className="float drop-shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(240, 83, 145, 0.3))' }} />
+            </div>
+          </div>
+          
+          <div className="glass-strong p-8 sm:p-10 lg:pr-[320px] xl:pr-[380px] relative z-10 overflow-hidden">
+            <div className="text-left">
               <div className="chip chip-accent mb-6 inline-flex">
                 <span className="dot dot-accent animate-pulse" />
                 <span>SOKA v2.0 • Sui Mainnet</span>
@@ -71,7 +78,7 @@ export const ProLanding: React.FC = () => {
               <p className="text-base sm:text-lg text-[#0f172a]/55 max-w-xl leading-relaxed mb-8" style={{ fontFamily: 'var(--font-body)' }}>
                 State your trading intent in plain English. SOKA computes the optimal multi-DEX route, runs a 7-point on-chain safety audit, and compiles an atomic transaction bundle.
               </p>
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <button onClick={() => handleLaunch()} className="btn-primary text-sm sm:text-base px-8 py-4 flex items-center gap-2">
                   <Terminal className="w-5 h-5" />
                   <span>Launch Terminal</span>
@@ -82,9 +89,6 @@ export const ProLanding: React.FC = () => {
                   <Sparkles className="w-4 h-4 text-[#F05391]" />
                 </button>
               </div>
-            </div>
-            <div className="flex-shrink-0">
-              <SokaCharacter size={180} className="skull-glow float" />
             </div>
           </div>
         </div>
