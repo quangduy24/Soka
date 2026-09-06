@@ -58,13 +58,13 @@ export const ProLanding: React.FC = () => {
         {/* Hero Widget - Full Width with 3D Character */}
         <div className="relative mb-6 fade-in overflow-visible">
           {/* Character - positioned to overflow */}
-          <div className="absolute -right-6 sm:right-0 lg:right-4 -top-4 lg:top-6 z-20 pointer-events-none">
-            <div className="transform lg:scale-105 xl:scale-115 origin-bottom-right">
-              <SokaCharacter size={220} className="float" style={{ filter: 'drop-shadow(0 20px 40px rgba(240, 83, 145, 0.3)) drop-shadow(0 8px 16px rgba(0,0,0,0.12))' }} />
+          <div className="absolute -right-4 sm:right-0 top-0 lg:top-8 z-20 pointer-events-none">
+            <div className="transform lg:scale-110 xl:scale-125 origin-bottom-right perspective-1000">
+              <SokaCharacter size={280} className="float drop-shadow-2xl" style={{ filter: 'drop-shadow(0 25px 50px rgba(240, 83, 145, 0.3))' }} />
             </div>
           </div>
           
-          <div className="glass-strong p-8 sm:p-10 lg:pr-[280px] xl:pr-[320px] relative z-10 overflow-visible">
+          <div className="glass-strong p-8 sm:p-10 lg:pr-[320px] xl:pr-[380px] relative z-10 overflow-hidden">
             <div className="text-left">
               <div className="chip chip-accent mb-6 inline-flex">
                 <span className="dot dot-accent animate-pulse" />
