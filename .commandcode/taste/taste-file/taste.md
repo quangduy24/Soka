@@ -13,6 +13,9 @@
 - Provides **visual reference images** to communicate desired character/mascot design — uses image uploads alongside descriptions. Confidence: 0.75
 - Prefers **checking the repo for existing image assets** before creating new ones from scratch — user expects agent to look for and reuse existing character/mascot images in the project. Confidence: 0.7
 - Wants **transparent backgrounds on character/mascot images** — assets should be PNG with alpha transparency so they blend seamlessly with glassmorphism/gradient UI backgrounds. Confidence: 0.75
+- Prefers **large, prominent mascot/character** on landing page — character should be a major visual focal point, not small or tucked away. Confidence: 0.8
+- Likes **3D depth effects on character/mascot** — drop shadows, perspective transforms, scale variations to create dimensionality. Confidence: 0.75
+- Character/mascot should **overflow its container** — not constrained within widget boxes; should break boundaries for dynamic visual impact. Confidence: 0.75
 - Prefers chat messages aligned to the edges (left for bot, right for user) — flush against chatbox borders rather than centered. Confidence: 0.7
 - Likes **widget grid layouts** for landing pages — organizing content into distinct card-based grid sections (hero, stats, features, CTA) rather than long scrolling single-column layouts. Confidence: 0.7
 - When redesigning, prefers to **preserve existing design language** (colors, typography, effects) and only changes layout/structure — iterative redesign rather than full visual overhaul. Confidence: 0.7
