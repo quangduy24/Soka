@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Terminal, ShieldCheck, Zap, ArrowRight, Layers, Cpu, Sparkles } from 'lucide-react';
 import { ProHeader } from './ProHeader';
-import SokaCat from './SokaCat';
+import SokaCharacter from './SokaCharacter';
 
 export const ProLanding: React.FC = () => {
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ export const ProLanding: React.FC = () => {
 
         {/* Skull Buddy + Speech */}
         <div className="flex items-center justify-center gap-5 mb-10 fade-in" style={{ animationDelay: '0.1s' }}>
-          <SokaCat size={100} className="skull-glow float" />
+          <SokaCharacter size={100} className="skull-glow float" />
           <div className="glass-strong p-5 text-left max-w-[360px]">
             <span className="font-mono text-[9px] font-bold tracking-[0.12em] text-[#F05391]">SOKA ★ AI</span>
             <p className="font-medium text-[15px] leading-snug mt-1 text-[#0f172a]/80">

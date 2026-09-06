@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { ConnectModal } from '@mysten/dapp-kit-react/ui';
 import { Shield, Terminal, Wallet } from 'lucide-react';
-import SokaCat from './SokaCat';
+import SokaCharacter from './SokaCharacter';
 import { WalletMenu } from './WalletMenu';
 
 interface ProHeaderProps {
@@ -29,7 +29,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="relative -my-2 hidden sm:block">
-              <SokaCat size={44} className="skull-glow" />
+              <SokaCharacter size={44} className="skull-glow" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold leading-none text-lg text-[#0f172a] tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>

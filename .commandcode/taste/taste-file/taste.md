@@ -11,3 +11,4 @@
 - Uses **custom SVG mascot characters** as the main UI personality — embedded across Header, Landing, Terminal, and panels for brand identity. Confidence: 0.9
 - Prefers **vintage cartoon illustration style with bold black outlines** for character/mascot designs — clean, professional SVG aesthetics. Confidence: 0.8
 - Provides **visual reference images** to communicate desired character/mascot design — uses image uploads alongside descriptions. Confidence: 0.75
+- Prefers **checking the repo for existing image assets** before creating new ones from scratch — user expects agent to look for and reuse existing character/mascot images in the project. Confidence: 0.7
