@@ -2,6 +2,8 @@
 - Prefers communicating in Vietnamese. Confidence: 0.85
 - Prefers clean, minimal interface without widget grids or data-heavy sidebars (e.g., removed top movers, trending, newly listed gems panels). Confidence: 0.85
 - Likes strong, visible glassmorphism effects — prefers high blur (60-80px), low white opacity (15-30%), multi-layer shadows — wants clearly transparent/translucent panels with strong backdrop blur and saturation. Confidence: 0.9
+- For **popup/dropdown panels** specifically, prefers **higher opacity** (e.g., bg-white/60+) over very transparent glassmorphism — excessive transparency causes background content to bleed through and hurts readability. Functional panels need more opacity than decorative glass surfaces. Confidence: 0.75
+- Wants **key financial figures** (total balance, portfolio value) to be **prominently highlighted and elegant** — uses gradient text, larger typography, gradient backgrounds, and badge-style asset counts to make numbers stand out as focal points. Confidence: 0.7
 - Prefers floating card layout with depth shadows and hover lift effects (translateY + scale). Confidence: 0.8
 - Likes hover interactions to combine **color transitions** (to accent color) with **floating highlight** effects — elements should shift color and lift/glow on hover for tactile feedback. Confidence: 0.7
 - Wants strong typography contrast and hierarchy: **Satoshi** for display/headings, **Inter** for body text and menus, JetBrains Mono for data/code. (Updated: switched from Space Grotesk to Satoshi for headings.) Confidence: 0.85
