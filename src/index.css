@@ -10,13 +10,13 @@
   --color-text-primary: #0f172a;
   --color-text-secondary: rgba(15, 23, 42, 0.6);
   --color-text-muted: rgba(15, 23, 42, 0.35);
-  --color-accent: #6366f1;
-  --color-accent-soft: rgba(99, 102, 241, 0.08);
-  --color-accent-medium: rgba(99, 102, 241, 0.15);
+  --color-accent: #F05391;
+  --color-accent-soft: rgba(240, 83, 145, 0.08);
+  --color-accent-medium: rgba(240, 83, 145, 0.15);
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Satoshi", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -100,7 +100,7 @@
   border: 1px solid rgba(99, 102, 241, 0.1);
   border-radius: 20px;
   box-shadow:
-    0 4px 20px -6px rgba(99, 102, 241, 0.12),
+    0 4px 20px -6px rgba(240, 83, 145, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -182,20 +182,20 @@
    ═══════════════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: linear-gradient(135deg, #F05391, #D63A7A);
   color: #fff; border: none; border-radius: 16px;
   font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding: 14px 28px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
   box-shadow:
-    0 8px 24px -6px rgba(99, 102, 241, 0.5),
-    0 4px 8px -2px rgba(99, 102, 241, 0.3),
+    0 8px 24px -6px rgba(240, 83, 145, 0.45),
+    0 4px 8px -2px rgba(240, 83, 145, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  background: linear-gradient(135deg, #D63A7A, #B82E68);
   box-shadow:
-    0 12px 32px -8px rgba(99, 102, 241, 0.6),
-    0 6px 12px -4px rgba(99, 102, 241, 0.4);
+    0 12px 32px -8px rgba(240, 83, 145, 0.5),
+    0 6px 12px -4px rgba(240, 83, 145, 0.3);
   transform: translateY(-2px);
 }
 .btn-ghost {
@@ -254,7 +254,7 @@
   border-radius: 999px; padding: 6px 14px;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.chip-accent { background: rgba(99, 102, 241, 0.1); color: #6366f1; border-color: rgba(99, 102, 241, 0.15); }
+.chip-accent { background: rgba(240, 83, 145, 0.1); color: #F05391; border-color: rgba(240, 83, 145, 0.2); }
 .chip-success { background: rgba(16, 185, 129, 0.08); color: #10b981; border-color: rgba(16, 185, 129, 0.15); }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -316,7 +316,7 @@
 .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent); }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dot-accent { background: #6366f1; box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
+.dot-accent { background: #F05391; box-shadow: 0 0 10px rgba(240, 83, 145, 0.5); }
 .dot-success { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
 .dot-warning { background: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
 .dot-danger { background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }

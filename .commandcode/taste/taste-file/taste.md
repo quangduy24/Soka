@@ -5,3 +5,4 @@
 - Prefers floating card layout with depth shadows and hover lift effects (translateY + scale). Confidence: 0.8
 - Wants strong typography contrast and hierarchy: Space Grotesk for display headings, Inter for body, JetBrains Mono for data/code. Confidence: 0.8
 - Prefers centered, focused single-column layouts over multi-column with sidebars. Confidence: 0.75
+- Likes rich gradient mesh / aura background textures using layered radial gradients with pastel color palettes (e.g., #F3C0D6 rose, #BE8CC2 lavender, #FFF29 cream) applied with background-attachment: fixed. Confidence: 0.75

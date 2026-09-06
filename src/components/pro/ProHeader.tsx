@@ -32,7 +32,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
               <SkullBuddy size={44} mood="chill" className="skull-glow" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold leading-none text-lg text-[#1a1a2e] tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              <span className="font-bold leading-none text-lg text-[#0f172a] tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
                 SOKA
               </span>
               <span className="text-[10px] font-mono text-[#1a1a2e]/40 tracking-wider mt-0.5">INTENT ENGINE</span>

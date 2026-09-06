@@ -175,7 +175,7 @@ export const ProSwapper: React.FC = () => {
 
   return (
     <div className="h-[100dvh] w-full mesh-texture text-[#0f172a] flex flex-col overflow-hidden">
-      <div className="absolute top-[15%] left-[5%] w-[400px] h-[400px] rounded-full bg-[#6366f1]/[0.05] blur-[120px] pointer-events-none" />
+      <div className="absolute top-[15%] left-[5%] w-[400px] h-[400px] rounded-full bg-[#F05391]/[0.05] blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[10%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#8b5cf6]/[0.04] blur-[100px] pointer-events-none" />
 
       <ProHeader onOpenWalletModal={() => setIsWalletModalOpen(true)} />
@@ -186,7 +186,7 @@ export const ProSwapper: React.FC = () => {
           {/* Header */}
           <div className="flex items-center gap-3 px-5 py-4 border-b border-white/40 bg-white/30 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-[#6366f1]/10 border border-[#6366f1]/15 flex items-center justify-center">
+              <div className="w-11 h-11 rounded-2xl bg-[#F05391]/10 border border-[#F05391]/15 flex items-center justify-center">
                 <SkullBuddy size={44} mood="happy" className="!animate-none skull-glow" />
               </div>
               <div>
@@ -195,10 +195,10 @@ export const ProSwapper: React.FC = () => {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <button onClick={() => setHistoryOpen(v => !v)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${historyOpen ? "bg-[#6366f1]/10 text-[#6366f1] border-[#6366f1]/20" : "bg-white/40 text-[#0f172a]/50 border-white/50 hover:bg-white/60"}`}>
+              <button onClick={() => setHistoryOpen(v => !v)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-medium transition-all ${historyOpen ? "bg-[#F05391]/10 text-[#F05391] border-[#F05391]/20" : "bg-white/40 text-[#0f172a]/50 border-white/50 hover:bg-white/60"}`}>
                 <HistoryIcon className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">History</span>
-                {history.length > 0 && <span className="ml-1 min-w-[18px] h-[18px] rounded-full bg-[#6366f1] text-white text-[9px] font-bold flex items-center justify-center">{history.length > 9 ? "9+" : history.length}</span>}
+                {history.length > 0 && <span className="ml-1 min-w-[18px] h-[18px] rounded-full bg-[#F05391] text-white text-[9px] font-bold flex items-center justify-center">{history.length > 9 ? "9+" : history.length}</span>}
               </button>
               <button onClick={() => { setIntentPrompt(""); setRouteNodes([]); setGuardianChecks([]); setErrorMessage(null); setTxDigest(null); activeSwapRef.current = null; }} className="w-9 h-9 rounded-xl bg-white/40 border border-white/50 flex items-center justify-center hover:bg-white/60 transition-all">
                 <span className="text-[#0f172a]/50 text-sm font-medium">+</span>
@@ -213,7 +213,7 @@ export const ProSwapper: React.FC = () => {
               <div className="flex items-end gap-3">
                 <SkullBuddy size={44} mood="happy" className="shrink-0 !animate-none" />
                 <div className="glass p-4 max-w-[85%]">
-                  <div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#6366f1] mb-1">SOKA ★</div>
+                  <div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#F05391] mb-1">SOKA ★</div>
                   <div className="text-[15px] font-medium text-[#0f172a]/80 leading-relaxed">Tell me your dream swap. I sniff the route &amp; run 7 checks — no jargon, just vibes ⚡</div>
                 </div>
               </div>
@@ -221,7 +221,7 @@ export const ProSwapper: React.FC = () => {
               {intentPrompt.trim() !== "" && (
                 <div className="flex justify-end">
                   <div className="glass-accent p-4 max-w-[85%]">
-                    <div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#6366f1] mb-1 text-right">YOU ★</div>
+                    <div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#F05391] mb-1 text-right">YOU ★</div>
                     <div className="text-[15px] font-medium text-[#0f172a]/80 break-words">{intentPrompt}</div>
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export const ProSwapper: React.FC = () => {
                 <div className="flex flex-col gap-3 w-full">
                   {tokenSuggestion && (
                     <div className="glass p-4">
-                      <div className="flex items-center gap-2 mb-2"><Info className="w-4 h-4 text-[#6366f1]" /><span className="font-mono text-[12px] font-bold text-[#0f172a]">Pick the exact token</span></div>
+                      <div className="flex items-center gap-2 mb-2"><Info className="w-4 h-4 text-[#F05391]" /><span className="font-mono text-[12px] font-bold text-[#0f172a]">Pick the exact token</span></div>
                       <p className="text-[12px] text-[#0f172a]/50 mb-3">{tokenSuggestion.message}</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {tokenSuggestion.candidates?.map((c: any, i: number) => (
@@ -263,7 +263,7 @@ export const ProSwapper: React.FC = () => {
                       <span className="text-[#0f172a]/20">→</span>
                       {routeNodes.slice(0, 3).map((n, i) => (
                         <span key={i} className="flex items-center gap-1">
-                          <span className="rounded-lg bg-[#6366f1]/10 border border-[#6366f1]/15 px-2 py-0.5 font-mono text-[10px] font-bold text-[#6366f1]">{n.dex}</span>
+                          <span className="rounded-lg bg-[#F05391]/10 border border-[#F05391]/15 px-2 py-0.5 font-mono text-[10px] font-bold text-[#F05391]">{n.dex}</span>
                           {i < Math.min(routeNodes.length, 3) - 1 && <span className="text-[#0f172a]/20">→</span>}
                         </span>
                       ))}
@@ -284,7 +284,7 @@ export const ProSwapper: React.FC = () => {
                   {txDigest && (
                     <div className="flex items-center justify-between gap-2 rounded-2xl border border-[#10b981]/20 bg-[#10b981]/8 px-3 py-2 font-mono text-[11px]">
                       <span className="flex items-center gap-2 font-bold text-[#10b981]"><CheckCircle2 className="h-4 w-4" /> Swap confirmed!</span>
-                      <a href={`https://suiscan.xyz/mainnet/tx/${txDigest}`} target="_blank" rel="noreferrer" className="rounded-lg bg-[#6366f1] px-2.5 py-1 text-[10px] font-bold text-white inline-flex items-center gap-1">Suiscan <ExternalLink className="h-3 w-3" /></a>
+                      <a href={`https://suiscan.xyz/mainnet/tx/${txDigest}`} target="_blank" rel="noreferrer" className="rounded-lg bg-[#F05391] px-2.5 py-1 text-[10px] font-bold text-white inline-flex items-center gap-1">Suiscan <ExternalLink className="h-3 w-3" /></a>
                     </div>
                   )}
                   {hasRiskWarnings && (
@@ -314,14 +314,14 @@ export const ProSwapper: React.FC = () => {
               {cancelMsg && !isProcessing && !hasResult && (
                 <div className="flex items-end gap-3">
                   <SkullBuddy size={44} mood="chill" className="shrink-0 !animate-none" />
-                  <div className="glass p-4 max-w-[85%]"><div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#6366f1] mb-1">SOKA ★</div><div className="text-[14px] font-medium text-[#0f172a]/80">{cancelMsg}</div></div>
+                  <div className="glass p-4 max-w-[85%]"><div className="font-mono text-[10px] font-bold tracking-[0.1em] text-[#F05391] mb-1">SOKA ★</div><div className="text-[14px] font-medium text-[#0f172a]/80">{cancelMsg}</div></div>
                 </div>
               )}
 
               {isProcessing && (
                 <div className="flex items-end gap-3">
                   <SkullBuddy size={44} mood="thinking" className="shrink-0 !animate-none" />
-                  <div className="glass p-4"><div className="flex items-center gap-2 font-mono text-[13px] font-medium text-[#0f172a]/50"><span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" /><span className="w-2 h-2 rounded-full bg-[#a78bfa] animate-pulse" style={{ animationDelay: "0.15s" }} /><span className="w-2 h-2 rounded-full bg-[#8b5cf6] animate-pulse" style={{ animationDelay: "0.3s" }} />sniffing pools…</div></div>
+                  <div className="glass p-4"><div className="flex items-center gap-2 font-mono text-[13px] font-medium text-[#0f172a]/50"><span className="w-2 h-2 rounded-full bg-[#F05391] animate-pulse" /><span className="w-2 h-2 rounded-full bg-[#a78bfa] animate-pulse" style={{ animationDelay: "0.15s" }} /><span className="w-2 h-2 rounded-full bg-[#8b5cf6] animate-pulse" style={{ animationDelay: "0.3s" }} />sniffing pools…</div></div>
                 </div>
               )}
             </div>
