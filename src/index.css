@@ -101,16 +101,16 @@
   border-radius: 24px;
 }
 
-/* Background mesh */
+/* Background mesh - reduced gradient intensity */
 .bg-mesh-terminal {
   background-color: #F8F9FD;
   background-image:
-    radial-gradient(at 5% 5%, rgba(251, 207, 232, 0.6) 0px, transparent 40%),
-    radial-gradient(at 95% 10%, rgba(233, 213, 255, 0.55) 0px, transparent 45%),
-    radial-gradient(at 85% 85%, rgba(254, 240, 138, 0.45) 0px, transparent 50%),
-    radial-gradient(at 10% 80%, rgba(252, 231, 243, 0.5) 0px, transparent 45%),
-    radial-gradient(at 50% 50%, rgba(244, 114, 182, 0.08) 0px, transparent 60%),
-    radial-gradient(at 40% 15%, rgba(186, 230, 253, 0.35) 0px, transparent 40%);
+    radial-gradient(at 5% 5%, rgba(251, 207, 232, 0.35) 0px, transparent 40%),
+    radial-gradient(at 95% 10%, rgba(233, 213, 255, 0.30) 0px, transparent 45%),
+    radial-gradient(at 85% 85%, rgba(254, 240, 138, 0.25) 0px, transparent 50%),
+    radial-gradient(at 10% 80%, rgba(252, 231, 243, 0.30) 0px, transparent 45%),
+    radial-gradient(at 50% 50%, rgba(244, 114, 182, 0.04) 0px, transparent 60%),
+    radial-gradient(at 40% 15%, rgba(186, 230, 253, 0.20) 0px, transparent 40%);
 }
 
 .texture-mesh-overlay {
@@ -206,6 +206,35 @@
   animation: gradientShift 3s ease infinite;
 }
 
+/* Ribbon flowing animations */
+@keyframes ribbon-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes ribbon-flow-reverse {
+  0% { background-position: 200% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-ribbon-flow {
+  animation: ribbon-flow 8s linear infinite;
+}
+
+.animate-ribbon-flow-reverse {
+  animation: ribbon-flow-reverse 8s linear infinite;
+}
+
+/* Blink animation for Soka avatar */
+@keyframes blink {
+  0%, 90%, 100% { opacity: 1; }
+  95% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 3s ease-in-out infinite;
+}
+
 /* Stagger delays */
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
@@ -254,24 +283,19 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BUTTONS
+   BUTTONS - Reduced gradient intensity
    ═══════════════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  background: linear-gradient(135deg, #F05391, #D63A7A);
+  background: linear-gradient(135deg, #F05391, #E7488A);
   color: #fff; border: none; border-radius: 16px;
   font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding: 14px 28px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
-  box-shadow:
-    0 8px 24px -6px rgba(240, 83, 145, 0.45),
-    0 4px 8px -2px rgba(240, 83, 145, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px -4px rgba(240, 83, 145, 0.35);
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #D63A7A, #B82E68);
-  box-shadow:
-    0 12px 32px -8px rgba(240, 83, 145, 0.5),
-    0 6px 12px -4px rgba(240, 83, 145, 0.3);
+  background: linear-gradient(135deg, #E7488A, #D63A7A);
+  box-shadow: 0 6px 20px -6px rgba(240, 83, 145, 0.4);
   transform: translateY(-2px);
 }
 
@@ -426,26 +450,22 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BUTTONS
+   BUTTONS - Reduced gradient intensity
    ═══════════════════════════════════════════════════════════════ */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  background: linear-gradient(135deg, #F05391, #D63A7A);
+  background: linear-gradient(135deg, #F05391, #E7488A);
   color: #fff; border: none; border-radius: 16px;
   font-weight: 600; font-size: 14px; letter-spacing: -0.01em; padding: 14px 28px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
-  box-shadow:
-    0 8px 24px -6px rgba(240, 83, 145, 0.45),
-    0 4px 8px -2px rgba(240, 83, 145, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px -4px rgba(240, 83, 145, 0.35);
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #D63A7A, #B82E68);
-  box-shadow:
-    0 12px 32px -8px rgba(240, 83, 145, 0.5),
-    0 6px 12px -4px rgba(240, 83, 145, 0.3);
+  background: linear-gradient(135deg, #E7488A, #D63A7A);
+  box-shadow: 0 6px 20px -6px rgba(240, 83, 145, 0.4);
   transform: translateY(-2px);
 }
+
 .btn-ghost {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   background: rgba(255, 255, 255, 0.6);

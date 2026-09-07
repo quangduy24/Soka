@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, ShieldCheck, Zap, ArrowRight, Layers, Cpu, Sparkles, TrendingUp, Activity, Wallet, Globe, Play, CheckCircle2, Zap as ZapIcon, Check, Heart } from 'lucide-react';
+import { Terminal, ShieldCheck, Zap, ArrowRight, Layers, Cpu, Sparkles, TrendingUp, Activity, Wallet, Globe, Play, CheckCircle2, Zap as ZapIcon, Check } from 'lucide-react';
 import { ProHeader } from './ProHeader';
+import { SokaAvatar } from './SokaAvatar';
 
 export const ProLanding: React.FC = () => {
   const navigate = useNavigate();
@@ -28,10 +29,10 @@ export const ProLanding: React.FC = () => {
   ];
 
   const stats = [
-    { label: "Total Volume", value: "$2.4M", icon: <TrendingUp className="w-4 h-4" />, change: "+24.6%", color: "pink" },
-    { label: "Active Users", value: "1,247", icon: <Wallet className="w-4 h-4" />, change: "+210 today", color: "blue" },
-    { label: "Routes Found", value: "12K+", icon: <Globe className="w-4 h-4" />, change: "84ms avg", color: "amber" },
-    { label: "Uptime", value: "99.9%", icon: <Activity className="w-4 h-4" />, change: "Guardian 8/8", color: "emerald" },
+    { label: "Total Volume", value: "$2.4M", icon: <TrendingUp className="w-4 h-4" />, change: "+24.6%", color: "pink", bgGlow: "from-pink-100/60 via-rose-50/40 to-transparent", borderColor: "group-hover:border-pink-300", iconBg: "bg-pink-50 text-pink-600 border-pink-200/80" },
+    { label: "Active Users", value: "1,247", icon: <Wallet className="w-4 h-4" />, change: "+210 today", color: "blue", bgGlow: "from-blue-100/60 via-indigo-50/40 to-transparent", borderColor: "group-hover:border-blue-300", iconBg: "bg-blue-50 text-blue-600 border-blue-200/80" },
+    { label: "Routes Found", value: "12K+", icon: <Globe className="w-4 h-4" />, change: "84ms avg", color: "amber", bgGlow: "from-amber-100/60 via-orange-50/40 to-transparent", borderColor: "group-hover:border-amber-300", iconBg: "bg-amber-50 text-amber-600 border-amber-200/80" },
+    { label: "Uptime", value: "99.9%", icon: <Activity className="w-4 h-4" />, change: "Guardian 8/8", color: "emerald", bgGlow: "from-emerald-100/60 via-teal-50/40 to-transparent", borderColor: "group-hover:border-emerald-300", iconBg: "bg-emerald-50 text-emerald-600 border-emerald-200/80" },
   ];
 
   const [activities, setActivities] = useState([
@@ -72,7 +73,7 @@ export const ProLanding: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-mesh-terminal text-[#0f172a] flex flex-col relative overflow-hidden">
+    <div className="min-h-screen w-full bg-mesh-terminal text-[#0f172a] flex flex-col relative overflow-x-hidden snap-y snap-mandatory">
       {/* Animated Ambient Orbs */}
       <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-pink-300/20 rounded-full blur-[120px] animate-float-slow" />
@@ -82,201 +83,196 @@ export const ProLanding: React.FC = () => {
 
       <ProHeader />
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-10 relative z-10">
+      {/* Section 1: Hero - Full Screen */}
+      <section className="flex items-center justify-center px-4 sm:px-6 py-12">
+        <div className="w-full max-w-6xl mx-auto">
         
-        {/* Hero Card - Ultra Depth */}
-        <div className="relative mb-6 overflow-visible">
-          <div className="card-ultra-depth p-8 sm:p-10 lg:p-12 relative overflow-visible">
-            {/* Animated top light beam */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden pointer-events-none rounded-t-[32px]">
-              <div className="w-1/2 h-full bg-gradient-to-r from-transparent via-pink-500 to-transparent animate-beam" />
-            </div>
-
-            {/* Mesh texture overlay */}
-            <div className="absolute inset-0 texture-mesh-overlay opacity-40 pointer-events-none rounded-[32px]" />
-
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* Hero Box - with background border image */}
+        <div className="relative animate-float-slow">
+          {/* Background border image */}
+          <div className="absolute inset-0 rounded-[32px] overflow-hidden">
+            <img 
+              src="/background-border.png" 
+              alt="" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          
+          {/* Main box - ultra-matte white ceramic */}
+          <div className="relative rounded-[32px] overflow-hidden border border-white/60 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(244,114,182,0.06)]">
+            
+            {/* Ceramic surface base */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50/80 to-white" />
+            
+            {/* Center gradient spreading outward with noise */}
+            <div className="absolute inset-0">
+              {/* Center glow gradient */}
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(244,114,182,0.06)_0%,rgba(244,114,182,0.02)_30%,transparent_70%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.04)_0%,rgba(168,85,247,0.01)_25%,transparent_60%)]" />
               
-              {/* Left Column: Hero Content */}
-              <div className="lg:col-span-7 flex flex-col justify-center space-y-6">
-                <div className="inline-flex items-center gap-2 self-start px-3.5 py-1.5 rounded-full bg-pink-50/95 border border-pink-200/90 shadow-sm backdrop-blur-md">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-                  </span>
-                  <span className="text-xs font-bold tracking-wider text-pink-600 uppercase font-mono">SOKA BETA V2.0 • SUI MAINNET</span>
-                </div>
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight">
-                  <span className="block bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 bg-clip-text text-transparent">SOKA</span>
-                  <span className="block text-slate-900 mt-1">AI Intent Swaps</span>
-                </h1>
-                <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl font-medium">
-                  State your trading intent in plain English. SOKA computes the optimal multi-DEX route, runs a 7-point on-chain safety audit, and compiles an atomic transaction bundle.
-                </p>
+              {/* Noise overlay for texture */}
+              <div className="absolute inset-0 opacity-[0.04]" style={{ 
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                backgroundSize: '256px 256px',
+                mixBlendMode: 'overlay'
+              }} />
+              
+              {/* Additional noise layer for depth */}
+              <div className="absolute inset-0 opacity-[0.02]" style={{ 
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise2)'/%3E%3C/svg%3E")`,
+                backgroundSize: '128px 128px',
+                mixBlendMode: 'soft-light'
+              }} />
+            </div>
+            
+            {/* Flowing 3D ribbon accents */}
+            <div className="absolute inset-0 overflow-hidden">
+              {/* Ribbon 1 - flows left to right */}
+              <div className="absolute top-[20%] left-[-20%] w-[140%] h-[30%] bg-gradient-to-r from-transparent via-pink-100/20 to-transparent rounded-full blur-xl rotate-[-3deg] animate-[ribbon-flow_12s_linear_infinite] bg-[length:200%_100%]" />
+              {/* Ribbon 2 - flows right to left */}
+              <div className="absolute bottom-[25%] right-[-20%] w-[140%] h-[25%] bg-gradient-to-r from-transparent via-purple-100/15 to-transparent rounded-full blur-xl rotate-[2deg] animate-[ribbon-flow-reverse_15s_linear_infinite] bg-[length:200%_100%]" />
+              {/* Ribbon 3 - subtle center glow */}
+              <div className="absolute top-[50%] left-[10%] w-[80%] h-[20%] bg-gradient-to-r from-transparent via-rose-100/10 to-transparent rounded-full blur-2xl animate-[ribbon-flow_20s_linear_infinite] bg-[length:200%_100%]" />
+            </div>
+            
+            {/* Sandblasted grain texture */}
+            <div className="absolute inset-0 opacity-[0.03]" style={{ 
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E")`,
+              backgroundSize: '100px 100px'
+            }} />
+            
+            {/* Soft noise gradient falloff */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(244,114,182,0.02)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.015)_0%,transparent_50%)]" />
+            
+            {/* Tactile micro-texture */}
+            <div className="absolute inset-0 opacity-[0.02]" style={{ 
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='micro'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.05' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23micro)'/%3E%3C/svg%3E")`,
+              backgroundSize: '50px 50px'
+            }} />
+            
+            {/* Matte finish highlight */}
+            <div className="absolute top-0 left-0 right-0 h-[30%] bg-gradient-to-b from-white/40 to-transparent" />
+            
+            {/* Edge definition */}
+            <div className="absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_2px_rgba(0,0,0,0.02),inset_1px_0_2px_rgba(0,0,0,0.01),inset_-1px_0_2px_rgba(0,0,0,0.01)]" />
 
-                {/* Interactive Intent Input Bar */}
-                <form onSubmit={handleHeroSubmit} className="pt-1">
-                  <div className="relative flex items-center p-2 bg-white/90 border border-slate-200/90 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-pink-500/15 focus-within:border-pink-400 transition-all duration-200">
-                    <div className="pl-3 pr-2 text-pink-500">
-                      <Sparkles className="w-5 h-5 animate-pulse" />
-                    </div>
-                    <input
-                      type="text"
-                      value={intentInput}
-                      onChange={(e) => setIntentInput(e.target.value)}
-                      placeholder="e.g. Swap 500 SUI for USDC with safest route..."
-                      className="w-full bg-transparent text-sm sm:text-base text-slate-800 placeholder-slate-400 focus:outline-none py-2 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold shadow-md hover:from-pink-600 hover:to-rose-600 transition-all cursor-pointer shrink-0"
-                    >
-                      <span>Parse Intent</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+            <div className="relative z-10 p-6 sm:p-8 text-center max-w-4xl mx-auto">
+              <div className="inline-flex items-center gap-2 self-center px-3.5 py-1.5 rounded-full bg-pink-50/95 border border-pink-200/90 shadow-sm backdrop-blur-md mb-6">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+                </span>
+                <span className="text-xs font-bold tracking-wider text-pink-600 uppercase font-mono">SOKA BETA V2.0 • SUI MAINNET</span>
+              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6">
+                <span className="block bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 bg-clip-text text-transparent">SOKA</span>
+                <span className="block text-slate-900 mt-1">AI Intent Swaps</span>
+              </h1>
+              <p className="text-base sm:text-lg text-slate-700 leading-relaxed max-w-2xl mx-auto font-medium mb-8">
+                State your trading intent in plain English. SOKA computes the optimal multi-DEX route, runs a 7-point on-chain safety audit, and compiles an atomic transaction bundle.
+              </p>
+
+              {/* Interactive Intent Input Bar */}
+              <form onSubmit={handleHeroSubmit} className="pt-1 mb-6 max-w-xl mx-auto">
+                <div className="relative flex items-center p-2 bg-white/90 border border-slate-200/90 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-pink-500/15 focus-within:border-pink-400 transition-all duration-200">
+                  <div className="pl-3 pr-2 text-pink-500">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
                   </div>
-
-                  {/* Quick Prompt Suggestions */}
-                  <div className="flex flex-wrap items-center gap-2 mt-2.5 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-400 font-mono">Quick:</span>
-                    <button
-                      type="button"
-                      onClick={() => { setIntentInput('Swap 500 SUI for USDC'); handleLaunch('Swap 500 SUI for USDC'); }}
-                      className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
-                    >
-                      "Swap 500 SUI for USDC"
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setIntentInput('Swap 1000 SUI to DEEP'); handleLaunch('Swap 1000 SUI to DEEP'); }}
-                      className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
-                    >
-                      "Swap 1000 SUI to DEEP"
-                    </button>
-                  </div>
-                </form>
-
-                {/* Action Buttons */}
-                <div className="flex flex-wrap items-center gap-3.5 pt-2">
+                  <input
+                    type="text"
+                    value={intentInput}
+                    onChange={(e) => setIntentInput(e.target.value)}
+                    placeholder="e.g. Swap 500 SUI for USDC with safest route..."
+                    className="w-full bg-transparent text-sm sm:text-base text-slate-800 placeholder-slate-400 focus:outline-none py-2 font-medium"
+                  />
                   <button
-                    onClick={() => handleLaunch()}
-                    className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 hover:from-pink-600 hover:to-rose-600 text-white font-extrabold text-sm shadow-[0_8px_24px_rgba(236,72,153,0.3)] hover:shadow-[0_12px_28px_rgba(236,72,153,0.4)] transition-all cursor-pointer hover:-translate-y-1"
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 text-white text-xs font-bold shadow-sm hover:from-pink-500 hover:to-rose-500 transition-all cursor-pointer shrink-0"
                   >
-                    <Terminal className="w-4 h-4" />
-                    <span>Launch Terminal</span>
-                    <ArrowRight className="w-4 h-4 ml-0.5" />
+                    <span>Parse Intent</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Quick Prompt Suggestions */}
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-2.5 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-400 font-mono">Quick:</span>
+                  <button
+                    type="button"
+                    onClick={() => { setIntentInput('Swap 500 SUI for USDC'); handleLaunch('Swap 500 SUI for USDC'); }}
+                    className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
+                  >
+                    "Swap 500 SUI for USDC"
                   </button>
                   <button
-                    onClick={() => navigate('/app')}
-                    className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm border border-slate-200 shadow-sm hover:border-slate-300 transition-all cursor-pointer hover:-translate-y-1"
+                    type="button"
+                    onClick={() => { setIntentInput('Swap 1000 SUI to DEEP'); handleLaunch('Swap 1000 SUI to DEEP'); }}
+                    className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
                   >
-                    <span>Quick Start</span>
-                    <Sparkles className="w-4 h-4 text-pink-500" />
+                    "Swap 1000 SUI to DEEP"
                   </button>
                 </div>
+              </form>
 
-                {/* Trust & Performance Proof Badges */}
-                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-slate-500 font-medium">
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-pink-500" />
-                    <span>&lt; 120ms Intent Parse</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>7-Point Risk Audit</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Multi-DEX Route</span>
-                  </div>
-                </div>
+              {/* Action Buttons - softer colors */}
+              <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2 mb-6">
+                <button
+                  onClick={() => handleLaunch()}
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 hover:from-pink-500 hover:via-rose-500 hover:to-pink-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5"
+                >
+                  <Terminal className="w-4 h-4" />
+                  <span>Launch Terminal</span>
+                  <ArrowRight className="w-4 h-4 ml-0.5" />
+                </button>
+                <button
+                  onClick={() => navigate('/app')}
+                  className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/80 hover:bg-white text-slate-700 font-semibold text-sm border border-slate-200/80 shadow-sm hover:border-slate-300 transition-all cursor-pointer hover:-translate-y-0.5"
+                >
+                  <span>Quick Start</span>
+                  <Sparkles className="w-4 h-4 text-pink-400" />
+                </button>
               </div>
-
-              {/* Right Column: Oversized, Borderless, Standalone Mascot Character */}
-              <div className="lg:col-span-5 relative flex flex-col items-center justify-center lg:-mt-10 lg:-mb-10 lg:-mr-6 overflow-visible z-20">
-                
-                {/* Rotating Orbital Dashed Ring for Web3 Highlight feel */}
-                <div className="absolute w-[340px] h-[340px] sm:w-[440px] sm:h-[440px] rounded-full border border-dashed border-pink-300/40 pointer-events-none animate-[spin_35s_linear_infinite]" />
-                <div className="absolute w-[290px] h-[290px] sm:w-[380px] sm:h-[380px] rounded-full border border-teal-300/35 pointer-events-none animate-[spin_25s_linear_infinite_reverse]" />
-
-                {/* Mascot Container with continuous floating physics */}
-                <div className="relative group w-full flex flex-col items-center pt-4 pb-4 overflow-visible">
-                  
-                  {/* Sparkle badge floating near character */}
-                  <div className="absolute top-10 right-4 sm:right-8 z-20 p-2 rounded-full bg-white/90 backdrop-blur-sm border border-pink-200 shadow-md animate-bounce pointer-events-none">
-                    <Sparkles className="w-4 h-4 text-pink-500" />
-                  </div>
-
-                  {/* PURE OVERSIZED CHARACTER - NO CARD, NO FRAME BORDER, NO BACKGROUND */}
-                  <div className="relative z-10 flex flex-col items-center cursor-pointer select-none group/mascot">
-                    {/* Standalone Cutout Character Image with drop shadow only */}
-                    <img
-                      src="/soka-character-fullbody.png"
-                      alt="SOKA AI Mascot - Intent Router"
-                      className="w-auto h-[380px] sm:h-[460px] lg:h-[520px] xl:h-[560px] max-w-none object-contain drop-shadow-[0_25px_35px_rgba(236,72,153,0.32)] drop-shadow-[0_12px_22px_rgba(15,23,42,0.16)] transform group-hover/mascot:scale-[1.03] transition-transform duration-500 ease-out animate-float"
-                    />
-
-                    {/* Realistic Contact Ground Shadow Ellipse */}
-                    <div className="w-48 sm:w-60 h-5 bg-slate-900/30 rounded-[100%] blur-md -mt-4 pointer-events-none animate-pulse-subtle" />
-                  </div>
-                </div>
-
-                {/* Floating Signal Badge 1: Guardian Safe */}
-                <div className="absolute top-16 -left-4 sm:-left-8 lg:-left-12 z-30 bg-white/95 backdrop-blur-xl px-3.5 py-2 rounded-2xl border border-white/90 shadow-[0_12px_28px_rgba(0,0,0,0.08),0_2px_8px_rgba(16,185,129,0.15)] flex items-center gap-2.5 animate-float-slow cursor-pointer hover:scale-105 transition-transform">
-                  <div className="w-7 h-7 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-200">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Audit Verified</div>
-                    <div className="text-xs font-black text-slate-900 flex items-center gap-1">
-                      <span>7/7 Checks</span>
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating Signal Badge 2: Best Route Split */}
-                <div className="absolute bottom-6 -right-3 sm:-right-6 lg:-right-10 z-30 bg-white/95 backdrop-blur-xl px-4 py-2.5 rounded-2xl border border-white/90 shadow-[0_14px_32px_rgba(236,72,153,0.22),0_2px_8px_rgba(0,0,0,0.06)] flex items-center gap-2.5 animate-float-reverse cursor-pointer hover:scale-105 transition-transform">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-400 text-white flex items-center justify-center shadow-sm">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-[10px] font-bold text-pink-600 uppercase tracking-wider font-mono">Optimal Route</div>
-                    <div className="text-xs font-black text-slate-900">Multi-DEX Split</div>
-                  </div>
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
 
-        {/* Stats Widget Row - Animated */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Stats Widget Row - Highlighted */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           {stats.map((stat, i) => (
-            <div key={i} className="group relative rounded-3xl bg-white/95 backdrop-blur-md p-5 border border-slate-200/80 hover:border-pink-300 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_24px_rgba(236,72,153,0.1)] transition-all duration-300 overflow-hidden cursor-pointer animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
-              <div className="flex items-center justify-between mb-3 relative z-10">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center bg-pink-50 text-pink-600 border border-pink-200/80 group-hover:scale-105 transition-transform">
+            <div key={i} className={`group relative rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(236,72,153,0.12)] transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1`} style={{ animationDelay: `${i * 0.1}s` }}>
+              {/* Gradient background on hover */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGlow} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
+              
+              {/* Top accent line */}
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.color === 'pink' ? 'from-pink-400 to-rose-400' : stat.color === 'blue' ? 'from-blue-400 to-indigo-400' : stat.color === 'amber' ? 'from-amber-400 to-orange-400' : 'from-emerald-400 to-teal-400'} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+              
+              <div className="relative z-10">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.iconBg} group-hover:scale-110 transition-transform duration-300`}>
                     {stat.icon}
                   </div>
-                  <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase font-mono">{stat.label}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 text-[10px] font-bold text-slate-600 border border-slate-200/60 group-hover:bg-white group-hover:shadow-sm transition-all font-mono">
+                    <ArrowRight className="w-2.5 h-2.5 text-pink-400" />
+                    {stat.change}
+                  </span>
                 </div>
-                <span className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-full bg-slate-100/90 text-[10px] font-bold text-slate-700 border border-slate-200/80 group-hover:bg-white group-hover:shadow-sm transition-all font-mono">
-                  <ArrowRight className="w-2.5 h-2.5 text-pink-500" />
-                  {stat.change}
-                </span>
-              </div>
-              <div className="relative z-10">
-                <div className="text-3xl font-black tracking-tight text-slate-900 group-hover:text-slate-950 transition-colors" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</div>
+                
+                {/* Value */}
+                <div className="text-3xl font-black tracking-tight text-slate-900 group-hover:text-slate-950 transition-colors mb-1" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</div>
+                
+                {/* Label */}
+                <div className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase font-mono">{stat.label}</div>
               </div>
             </div>
           ))}
         </div>
+        </div>
+      </section>
 
+      {/* Section 2: Quick Start + Live Activity */}
+      <section className="flex items-center justify-center px-4 sm:px-6 py-8">
+        <div className="w-full max-w-7xl mx-auto">
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
           
@@ -403,7 +399,12 @@ export const ProLanding: React.FC = () => {
             </div>
           </div>
         </div>
+        </div>
+        </section>
 
+        {/* Section 3: Features - Full Screen */}
+        <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-12 snap-start">
+        <div className="max-w-7xl w-full mx-auto">
         {/* Features Widget Grid - With Progress & Details */}
         <div className="mb-10">
           <div className="text-center mb-8">
@@ -438,23 +439,24 @@ export const ProLanding: React.FC = () => {
           </div>
         </div>
 
-        {/* CTA Widget */}
-        <div className="card-ultra-depth p-8 text-center">
-          <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-            Ready to swap with intent?
-          </h3>
-          <p className="text-slate-500 mb-6 max-w-lg mx-auto">
-            Join thousands of traders using natural language to execute optimal swaps on Sui Network.
-          </p>
-          <button onClick={() => handleLaunch()} className="inline-flex items-center gap-2 px-10 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white font-extrabold text-base shadow-[0_8px_24px_rgba(236,72,153,0.3)] hover:shadow-[0_12px_28px_rgba(236,72,153,0.4)] transition-all hover:-translate-y-1">
-            <span>Launch SOKA Terminal</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
+         {/* CTA Widget */}
+         <div className="card-ultra-depth p-8 text-center">
+           <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+             Ready to swap with intent?
+           </h3>
+           <p className="text-slate-500 mb-6 max-w-lg mx-auto">
+             Join thousands of traders using natural language to execute optimal swaps on Sui Network.
+           </p>
+           <button onClick={() => handleLaunch()} className="inline-flex items-center gap-2 px-10 py-4 rounded-2xl bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 text-white font-bold text-base shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5">
+             <span>Launch SOKA Terminal</span>
+             <ArrowRight className="w-5 h-5" />
+           </button>
+         </div>
         </div>
-      </main>
+      </section>
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-200 bg-white/50 py-8 relative z-10 mt-auto">
+      <footer className="w-full border-t border-slate-200 bg-white/50 py-8 relative z-10 snap-start">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
           <div className="flex items-center gap-2">
             <span className="dot dot-accent" />
