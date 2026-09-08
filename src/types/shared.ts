@@ -6,8 +6,8 @@
 
 /**
  * On-chain proof reference — points a risk check at the exact object,
- * coin type, transaction, or account it was derived from, so the UI can
- * link out to Suiscan for independent verification.
+ * token, contract, transaction, or account it was derived from, so the UI can
+ * link out to Mezo Explorer for independent verification.
  */
 export interface RiskReference {
   label: string;

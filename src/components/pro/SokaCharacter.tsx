@@ -11,14 +11,14 @@ export const SokaCharacter: React.FC<SokaCharacterProps> = ({ size = 120, classN
     className={`inline-block ${className}`} 
     style={{ 
       width: size, 
-      height: size * 1.4,
+      height: size,
       ...style 
     }}
   >
     <img 
-      src="/soka-character.png" 
+      src="/soka-logo.png" 
       alt="Soka Character" 
-      className="w-full h-full object-contain"
+      className="w-full h-full object-contain drop-shadow-md"
       draggable={false}
     />
   </div>

@@ -1,473 +1,687 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, ShieldCheck, Zap, ArrowRight, Layers, Cpu, Sparkles, TrendingUp, Activity, Wallet, Globe, Play, CheckCircle2, Zap as ZapIcon, Check } from 'lucide-react';
-import { ProHeader } from './ProHeader';
-import { SokaAvatar } from './SokaAvatar';
+import { ArrowRight, Sparkles, ShieldCheck, Compass } from 'lucide-react';
+import { GenerativeInkCanvas } from './GenerativeInkCanvas';
 
-export const ProLanding: React.FC = () => {
+export function ProLanding() {
   const navigate = useNavigate();
-  const [selectedIntent, setSelectedIntent] = useState<string | undefined>(undefined);
-  const [intentInput, setIntentInput] = useState('');
+  const bloomRef = useRef<HTMLDivElement | null>(null);
 
-  const handleLaunch = (intent?: string) => {
-    if (intent) navigate(`/app?intent=${encodeURIComponent(intent)}`);
-    else navigate('/app');
-  };
-
-  const features = [
-    { icon: <Cpu className="w-6 h-6" />, title: "AI Intent Parser", description: "Conversational prompts into deterministic execution payloads in under 120ms.", color: "#F05391", metric: "< 84ms", tag: "18-DECIMAL WEI" },
-    { icon: <Layers className="w-6 h-6" />, title: "Smart DEX Router", description: "Routes across multiple DEXs to minimize slippage and optimize output.", color: "#3B82F6", metric: "Multi-DEX", tag: "CLMM + TWAP" },
-    { icon: <ShieldCheck className="w-6 h-6" />, title: "Risk Guardian", description: "7-point on-chain safety audit with oracle-backed risk assessment.", color: "#10b981", metric: "8/8 Checks", tag: "SKIP + PYTH" },
-    { icon: <Zap className="w-6 h-6" />, title: "Dynamic Slippage", description: "Derives slippage limits from live pool depth and trade volume.", color: "#8B5CF6", metric: "Adaptive", tag: "GASLESS" },
-  ];
-
-  const samplePrompts = [
-    { id: '1', title: "Optimal Swap", prompt: "Swap 500 SUI for USDC with safest route", tag: "STABLE", output: "Cetus 70% + Turbos 30%" },
-    { id: '2', title: "Dynamic Ratio", prompt: "Swap 50% of my balance to CETUS", tag: "BALANCED", output: "Auto-split route" },
-    { id: '3', title: "Whale Mode", prompt: "Swap 1,000 SUI to DEEP with low impact", tag: "SAFE", output: "TWAP verified" },
-    { id: '4', title: "Direct", prompt: "Swap 100 SUI to USDC", tag: "FAST", output: "Single pool" },
-  ];
-
-  const stats = [
-    { label: "Total Volume", value: "$2.4M", icon: <TrendingUp className="w-4 h-4" />, change: "+24.6%", color: "pink", bgGlow: "from-pink-100/60 via-rose-50/40 to-transparent", borderColor: "group-hover:border-pink-300", iconBg: "bg-pink-50 text-pink-600 border-pink-200/80" },
-    { label: "Active Users", value: "1,247", icon: <Wallet className="w-4 h-4" />, change: "+210 today", color: "blue", bgGlow: "from-blue-100/60 via-indigo-50/40 to-transparent", borderColor: "group-hover:border-blue-300", iconBg: "bg-blue-50 text-blue-600 border-blue-200/80" },
-    { label: "Routes Found", value: "12K+", icon: <Globe className="w-4 h-4" />, change: "84ms avg", color: "amber", bgGlow: "from-amber-100/60 via-orange-50/40 to-transparent", borderColor: "group-hover:border-amber-300", iconBg: "bg-amber-50 text-amber-600 border-amber-200/80" },
-    { label: "Uptime", value: "99.9%", icon: <Activity className="w-4 h-4" />, change: "Guardian 8/8", color: "emerald", bgGlow: "from-emerald-100/60 via-teal-50/40 to-transparent", borderColor: "group-hover:border-emerald-300", iconBg: "bg-emerald-50 text-emerald-600 border-emerald-200/80" },
-  ];
-
-  const [activities, setActivities] = useState([
-    { id: '1', action: "Swap", detail: "500 SUI → USDC", time: "2s ago", status: "CONFIRMED", hash: "0x8f3a..." },
-    { id: '2', action: "Route", detail: "SUI → CETUS via Cetus", time: "5s ago", status: "CONFIRMED", hash: "0x2b7c..." },
-    { id: '3', action: "Guardian", detail: "7/7 checks passed", time: "8s ago", status: "SAFE", hash: "0x9d1e..." },
-    { id: '4', action: "Swap", detail: "1000 DEEP → USDC", time: "12s ago", status: "CONFIRMED", hash: "0x4f2a..." },
-  ]);
-
-  // Simulated live activity
+  // IntersectionObserver: smoothly reveals elements as they enter viewport
   useEffect(() => {
-    const interval = setInterval(() => {
-      const randomTx = [
-        { action: "Swap", detail: "0.05 BTC → 4,821 MUSD", hash: "0x" + Math.random().toString(16).substring(2, 6) + "..." },
-        { action: "Route", detail: "1,200 MUSD → 0.0124 BTC", hash: "0x" + Math.random().toString(16).substring(2, 6) + "..." },
-        { action: "Guardian", detail: "8/8 checks passed", hash: "0x" + Math.random().toString(16).substring(2, 6) + "..." },
-      ];
-      const selected = randomTx[Math.floor(Math.random() * randomTx.length)];
-      setActivities(prev => [{ ...selected, id: `act-${Date.now()}`, time: "Just now", status: "CONFIRMED" }, ...prev.slice(0, 4)]);
-    }, 5000);
-    return () => clearInterval(interval);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+          }
+        });
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -30px 0px',
+      }
+    );
+
+    const elements = document.querySelectorAll('.scroll-reveal');
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
   }, []);
 
-  const getTagStyle = (tag: string) => {
-    switch (tag) {
-      case 'STABLE': return 'bg-pink-50 text-pink-700 border-pink-200';
-      case 'BALANCED': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'SAFE': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'FAST': return 'bg-amber-50 text-amber-700 border-amber-200';
-      default: return 'bg-slate-50 text-slate-700 border-slate-200';
-    }
+  // Hardware-accelerated cursor bloom tracking (zero React re-renders, 120fps)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (bloomRef.current) {
+        bloomRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  const handleLaunch = () => {
+    navigate('/app');
   };
 
-  const handleHeroSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = intentInput.trim() || 'Swap 500 SUI for USDC with safest route';
-    handleLaunch(query);
-  };
+  // Words for The Manifesto section
+  const manifestoWords = [
+    "WE", "DO", "NOT", "ESTIMATE", "ROUTES.",
+    "WE", "WRITE", "DETERMINISTIC", "PROOFS",
+    "DIRECTLY", "TO", "MEZO", "CONSENSUS."
+  ];
 
   return (
-    <div className="min-h-screen w-full bg-mesh-terminal text-[#0f172a] flex flex-col relative overflow-x-hidden snap-y snap-mandatory">
-      {/* Animated Ambient Orbs */}
-      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-pink-300/20 rounded-full blur-[120px] animate-float-slow" />
-        <div className="absolute top-1/3 -right-40 w-[550px] h-[550px] bg-blue-300/15 rounded-full blur-[130px] animate-float-reverse" />
-        <div className="absolute -bottom-40 left-1/3 w-[650px] h-[650px] bg-purple-200/15 rounded-full blur-[140px] animate-float-slow" />
-      </div>
+    <div className="editorial-root relative min-h-screen w-full bg-[#FDF4F2] text-[#2C1924] selection:bg-[#EE97C2] selection:text-white">
+      
+      {/* ═══ 1. GENERATIVE INK BACKGROUND (ZERO BLACK - Luminous Soft Cream & Watercolor Plumes) ═══ */}
+      <GenerativeInkCanvas />
 
-      <ProHeader />
+      {/* ═══ 2. CURSOR DYE BLOOM (Hardware-accelerated DOM transform, zero re-renders) ═══ */}
+      <div 
+        ref={bloomRef}
+        className="fixed pointer-events-none z-10 w-[480px] h-[480px] rounded-full mix-blend-multiply opacity-40 blur-3xl transition-transform duration-100 ease-out hidden md:block"
+        style={{
+          top: 0,
+          left: 0,
+          background: 'radial-gradient(circle, #EE97C2 0%, rgba(253,244,242,0) 70%)',
+          willChange: 'transform'
+        }}
+      />
 
-      {/* Section 1: Hero - Full Screen */}
-      <section className="flex items-center justify-center px-4 sm:px-6 py-12">
-        <div className="w-full max-w-6xl mx-auto">
-        
-        {/* Hero Box - with background border image */}
-        <div className="relative animate-float-slow">
-          {/* Background border image */}
-          <div className="absolute inset-0 rounded-[32px] overflow-hidden">
-            <img 
-              src="/background-border.png" 
-              alt="" 
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          {/* Main box - ultra-matte white ceramic */}
-          <div className="relative rounded-[32px] overflow-hidden border border-white/60 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08),0_4px_16px_-4px_rgba(244,114,182,0.06)]">
-            
-            {/* Ceramic surface base */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50/80 to-white" />
-            
-            {/* Center gradient spreading outward with noise */}
-            <div className="absolute inset-0">
-              {/* Center glow gradient */}
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(244,114,182,0.06)_0%,rgba(244,114,182,0.02)_30%,transparent_70%)]" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.04)_0%,rgba(168,85,247,0.01)_25%,transparent_60%)]" />
-              
-              {/* Noise overlay for texture */}
-              <div className="absolute inset-0 opacity-[0.04]" style={{ 
-                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-                backgroundSize: '256px 256px',
-                mixBlendMode: 'overlay'
-              }} />
-              
-              {/* Additional noise layer for depth */}
-              <div className="absolute inset-0 opacity-[0.02]" style={{ 
-                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise2)'/%3E%3C/svg%3E")`,
-                backgroundSize: '128px 128px',
-                mixBlendMode: 'soft-light'
-              }} />
-            </div>
-            
-            {/* Flowing 3D ribbon accents */}
-            <div className="absolute inset-0 overflow-hidden">
-              {/* Ribbon 1 - flows left to right */}
-              <div className="absolute top-[20%] left-[-20%] w-[140%] h-[30%] bg-gradient-to-r from-transparent via-pink-100/20 to-transparent rounded-full blur-xl rotate-[-3deg] animate-[ribbon-flow_12s_linear_infinite] bg-[length:200%_100%]" />
-              {/* Ribbon 2 - flows right to left */}
-              <div className="absolute bottom-[25%] right-[-20%] w-[140%] h-[25%] bg-gradient-to-r from-transparent via-purple-100/15 to-transparent rounded-full blur-xl rotate-[2deg] animate-[ribbon-flow-reverse_15s_linear_infinite] bg-[length:200%_100%]" />
-              {/* Ribbon 3 - subtle center glow */}
-              <div className="absolute top-[50%] left-[10%] w-[80%] h-[20%] bg-gradient-to-r from-transparent via-rose-100/10 to-transparent rounded-full blur-2xl animate-[ribbon-flow_20s_linear_infinite] bg-[length:200%_100%]" />
-            </div>
-            
-            {/* Sandblasted grain texture */}
-            <div className="absolute inset-0 opacity-[0.03]" style={{ 
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E")`,
-              backgroundSize: '100px 100px'
-            }} />
-            
-            {/* Soft noise gradient falloff */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(244,114,182,0.02)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.015)_0%,transparent_50%)]" />
-            
-            {/* Tactile micro-texture */}
-            <div className="absolute inset-0 opacity-[0.02]" style={{ 
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='micro'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.05' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23micro)'/%3E%3C/svg%3E")`,
-              backgroundSize: '50px 50px'
-            }} />
-            
-            {/* Matte finish highlight */}
-            <div className="absolute top-0 left-0 right-0 h-[30%] bg-gradient-to-b from-white/40 to-transparent" />
-            
-            {/* Edge definition */}
-            <div className="absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_2px_rgba(0,0,0,0.02),inset_1px_0_2px_rgba(0,0,0,0.01),inset_-1px_0_2px_rgba(0,0,0,0.01)]" />
+      {/* ═══ 3. FIXED TRANSPARENT NAVIGATION ═══ */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 sm:px-12 py-3.5 bg-[#FDF4F2]/90 backdrop-blur-md border-b border-[#F7D1D7]/50 shadow-[0_4px_20px_rgba(223,122,167,0.06)]">
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="font-grotesk-125 text-xl tracking-tight text-[#2C1924] cursor-pointer hover:text-[#DF7AA7] transition-colors"
+        >
+          SOKA
+        </button>
 
-            <div className="relative z-10 p-6 sm:p-8 text-center max-w-4xl mx-auto">
-              <div className="inline-flex items-center gap-2 self-center px-3.5 py-1.5 rounded-full bg-pink-50/95 border border-pink-200/90 shadow-sm backdrop-blur-md mb-6">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-                </span>
-                <span className="text-xs font-bold tracking-wider text-pink-600 uppercase font-mono">SOKA BETA V2.0 • SUI MAINNET</span>
-              </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6">
-                <span className="block bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 bg-clip-text text-transparent">SOKA</span>
-                <span className="block text-slate-900 mt-1">AI Intent Swaps</span>
-              </h1>
-              <p className="text-base sm:text-lg text-slate-700 leading-relaxed max-w-2xl mx-auto font-medium mb-8">
-                State your trading intent in plain English. SOKA computes the optimal multi-DEX route, runs a 7-point on-chain safety audit, and compiles an atomic transaction bundle.
-              </p>
-
-              {/* Interactive Intent Input Bar */}
-              <form onSubmit={handleHeroSubmit} className="pt-1 mb-6 max-w-xl mx-auto">
-                <div className="relative flex items-center p-2 bg-white/90 border border-slate-200/90 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-pink-500/15 focus-within:border-pink-400 transition-all duration-200">
-                  <div className="pl-3 pr-2 text-pink-500">
-                    <Sparkles className="w-5 h-5 animate-pulse" />
-                  </div>
-                  <input
-                    type="text"
-                    value={intentInput}
-                    onChange={(e) => setIntentInput(e.target.value)}
-                    placeholder="e.g. Swap 500 SUI for USDC with safest route..."
-                    className="w-full bg-transparent text-sm sm:text-base text-slate-800 placeholder-slate-400 focus:outline-none py-2 font-medium"
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-400 to-rose-400 text-white text-xs font-bold shadow-sm hover:from-pink-500 hover:to-rose-500 transition-all cursor-pointer shrink-0"
-                  >
-                    <span>Parse Intent</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Quick Prompt Suggestions */}
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-2.5 text-xs text-slate-500">
-                  <span className="font-semibold text-slate-400 font-mono">Quick:</span>
-                  <button
-                    type="button"
-                    onClick={() => { setIntentInput('Swap 500 SUI for USDC'); handleLaunch('Swap 500 SUI for USDC'); }}
-                    className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
-                  >
-                    "Swap 500 SUI for USDC"
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setIntentInput('Swap 1000 SUI to DEEP'); handleLaunch('Swap 1000 SUI to DEEP'); }}
-                    className="px-2.5 py-1 rounded-lg bg-white/80 border border-slate-200/80 hover:border-pink-300 hover:text-pink-600 hover:bg-white shadow-sm transition-all cursor-pointer font-medium"
-                  >
-                    "Swap 1000 SUI to DEEP"
-                  </button>
-                </div>
-              </form>
-
-              {/* Action Buttons - softer colors */}
-              <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2 mb-6">
-                <button
-                  onClick={() => handleLaunch()}
-                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 hover:from-pink-500 hover:via-rose-500 hover:to-pink-600 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5"
-                >
-                  <Terminal className="w-4 h-4" />
-                  <span>Launch Terminal</span>
-                  <ArrowRight className="w-4 h-4 ml-0.5" />
-                </button>
-                <button
-                  onClick={() => navigate('/app')}
-                  className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white/80 hover:bg-white text-slate-700 font-semibold text-sm border border-slate-200/80 shadow-sm hover:border-slate-300 transition-all cursor-pointer hover:-translate-y-0.5"
-                >
-                  <span>Quick Start</span>
-                  <Sparkles className="w-4 h-4 text-pink-400" />
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className="flex items-center gap-6 sm:gap-8 font-meta text-[#2C1924]/80 text-[0.72rem]">
+          <a href="#argument" className="nav-link-item hidden sm:inline-flex items-center gap-1.5 hover:text-[#DF7AA7] transition-colors">
+            <span className="opacity-50">•</span> THE SHIFT
+          </a>
+          <a href="#offer" className="nav-link-item hidden md:inline-flex items-center gap-1.5 hover:text-[#DF7AA7] transition-colors">
+            <span className="opacity-50">•</span> THE JOURNEY
+          </a>
+          <a href="#spec" className="nav-link-item hidden md:inline-flex items-center gap-1.5 hover:text-[#DF7AA7] transition-colors">
+            <span className="opacity-50">•</span> THE PILLARS
+          </a>
+          <button
+            onClick={handleLaunch}
+            className="nav-link-item flex items-center gap-1.5 text-[#2C1924] font-bold cursor-pointer hover:text-white hover:bg-[#DF7AA7] hover:border-[#DF7AA7] transition-all duration-300 px-4 py-1.5 rounded-full border border-[#DF7AA7] bg-white/90 shadow-xs"
+          >
+            <span className="text-[#EE97C2] group-hover:text-white">•</span> LAUNCH TERMINAL
+          </button>
         </div>
+      </nav>
 
-        {/* Stats Widget Row - Highlighted */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          {stats.map((stat, i) => (
-            <div key={i} className={`group relative rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(236,72,153,0.12)] transition-all duration-300 overflow-hidden cursor-pointer hover:-translate-y-1`} style={{ animationDelay: `${i * 0.1}s` }}>
-              {/* Gradient background on hover */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGlow} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
-              
-              {/* Top accent line */}
-              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.color === 'pink' ? 'from-pink-400 to-rose-400' : stat.color === 'blue' ? 'from-blue-400 to-indigo-400' : stat.color === 'amber' ? 'from-amber-400 to-orange-400' : 'from-emerald-400 to-teal-400'} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-              
-              <div className="relative z-10">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.iconBg} group-hover:scale-110 transition-transform duration-300`}>
-                    {stat.icon}
-                  </div>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 text-[10px] font-bold text-slate-600 border border-slate-200/60 group-hover:bg-white group-hover:shadow-sm transition-all font-mono">
-                    <ArrowRight className="w-2.5 h-2.5 text-pink-400" />
-                    {stat.change}
-                  </span>
-                </div>
-                
-                {/* Value */}
-                <div className="text-3xl font-black tracking-tight text-slate-900 group-hover:text-slate-950 transition-colors mb-1" style={{ fontFamily: 'var(--font-display)' }}>{stat.value}</div>
-                
-                {/* Label */}
-                <div className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase font-mono">{stat.label}</div>
-              </div>
+      {/* ═══ 4. STACKING CARDS DECK CONTAINER ═══ */}
+      <main className="deck-container relative z-20 w-full max-w-[1340px] px-3 sm:px-6 lg:px-8 pt-20 pb-24 flex flex-col mx-auto">
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 1 (ACT I): THE PROLOGUE (Cover)
+            Vertically centered card with stacking cards behavior
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="cover"
+          className="stack-card stack-card-1 z-[10] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT I // THE PROLOGUE</span>
             </div>
-          ))}
-        </div>
-        </div>
-      </section>
-
-      {/* Section 2: Quick Start + Live Activity */}
-      <section className="flex items-center justify-center px-4 sm:px-6 py-8">
-        <div className="w-full max-w-7xl mx-auto">
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-          
-          {/* Quick Start Widget - 2 cols */}
-          <div className="lg:col-span-7 flex flex-col">
-            <div className="rounded-[32px] card-ultra-depth p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-pink-200/20 rounded-full blur-3xl pointer-events-none -z-10" />
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-pink-50 text-pink-600 border border-pink-200 flex items-center justify-center">
-                      <ZapIcon className="w-4 h-4" />
-                    </div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>Quick Start Intents</h2>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-50 border border-pink-200 text-[10px] font-extrabold tracking-wider text-pink-600 uppercase font-mono">
-                    <Play className="w-2.5 h-2.5 fill-pink-600" />
-                    Click to Execute
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-500 mb-6 font-medium">Choose a pre-formulated intent to inspect real-time multi-DEX split routing</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {samplePrompts.map((intent, idx) => {
-                    const isSelected = selectedIntent === intent.id;
-                    return (
-                      <button
-                        key={intent.id}
-                        onClick={() => { setSelectedIntent(intent.id); handleLaunch(intent.prompt); }}
-                        className={`group relative text-left p-4 sm:p-5 rounded-2xl border transition-all duration-300 overflow-hidden ${
-                          isSelected
-                            ? 'bg-pink-50/80 border-pink-300 shadow-[0_8px_24px_rgba(236,72,153,0.18)] ring-2 ring-pink-400/40'
-                            : 'bg-white/80 hover:bg-white border-slate-200/80 hover:border-pink-200 hover:shadow-[0_8px_24px_rgba(236,72,153,0.08)]'
-                        }`}
-                      >
-                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-pink-200/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="flex items-center justify-between mb-2.5">
-                          <span className="font-extrabold text-sm text-slate-900 group-hover:text-pink-600 transition-colors">{intent.title}</span>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border tracking-wider font-mono ${getTagStyle(intent.tag)}`}>{intent.tag}</span>
-                        </div>
-                        <p className="text-xs font-mono text-slate-600 leading-relaxed bg-slate-50/90 group-hover:bg-pink-50/40 p-2.5 rounded-xl border border-slate-200/60 group-hover:border-pink-200/70 transition-colors">
-                          "{intent.prompt}"
-                        </p>
-                        <div className="mt-3 flex items-center justify-between text-xs">
-                          <span className="font-medium text-slate-400 font-mono text-[11px]">Routing:</span>
-                          <span className="font-bold text-slate-700 group-hover:text-pink-600 flex items-center gap-1 transition-colors">
-                            {intent.output}
-                            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-pink-500" />
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <span className="flex items-center gap-1.5 text-slate-600 font-medium">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-500" />
-                  Autonomous Multi-DEX Arbitrage Engine
-                </span>
-                <span className="font-mono text-[11px] text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  <CheckCircle2 className="w-3 h-3" /> Zero MEV Slippage
-                </span>
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">SOKA INTENT ENGINE</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 01 / 07</span>
             </div>
           </div>
 
-          {/* Live Activity Feed */}
-          <div className="lg:col-span-5 flex flex-col">
-            <div className="rounded-[32px] card-ultra-depth p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-64 h-64 bg-blue-200/20 rounded-full blur-3xl pointer-events-none -z-10" />
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.6)]"></span>
-                    </span>
-                    <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase font-mono">LIVE NETWORK ACTIVITY</h2>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-full border border-slate-200/60">
-                    <Activity className="w-3 h-3 text-pink-500 animate-spin" style={{ animationDuration: '5s' }} />
-                    <span>Sui Block 2.8M</span>
-                  </span>
-                </div>
-                <div className="space-y-2.5">
-                  {activities.map((act) => {
-                    const isGuardian = act.action === 'Guardian';
-                    return (
-                      <div key={act.id} className="group flex items-center justify-between p-3.5 rounded-2xl bg-white/70 hover:bg-white border border-slate-200/70 hover:border-pink-200/80 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-[0_4px_16px_rgba(236,72,153,0.08)]">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 ${
-                            isGuardian 
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                              : 'bg-gradient-to-tr from-pink-50 to-rose-50 text-pink-600 border border-pink-200/80'
-                          }`}>
-                            {isGuardian ? <ShieldCheck className="w-4 h-4" /> : <Activity className="w-4 h-4" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-black text-slate-800">{act.action}</span>
-                              <span className="text-[10px] font-mono text-slate-400 bg-slate-100/90 px-1.5 py-0.5 rounded">{act.hash}</span>
-                            </div>
-                            <div className="text-xs text-slate-600 font-bold group-hover:text-slate-900 transition-colors mt-0.5">{act.detail}</div>
-                          </div>
-                        </div>
-                        <div className="text-right flex flex-col items-end">
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider font-mono border bg-emerald-50 text-emerald-600 border-emerald-200">{act.status}</span>
-                          <span className="text-[10px] text-slate-400 mt-1 font-mono">{act.time}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Consensus Latency: <span className="font-mono text-slate-800 font-black">~390ms</span>
-                </span>
-                <button className="text-[11px] font-extrabold text-pink-600 hover:text-pink-700 flex items-center gap-1 transition-colors cursor-pointer">
-                  <span>Inspect In Terminal</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
+          {/* Card Main Body */}
+          <div className="my-auto flex flex-col items-center text-center py-4 sm:py-6">
+            <div className="scroll-reveal inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#F7D1D7] bg-white/85 mb-5 font-meta text-[0.66rem] text-[#2C1924]/80 shadow-xs">
+              <Sparkles className="w-3 h-3 text-[#DF7AA7]" />
+              <span>THE FIRST BITCOIN INTENT PROTOCOL ON MEZO</span>
             </div>
+
+            <h1 className="scroll-reveal scroll-reveal-delay-1 font-grotesk-125 text-[clamp(2.4rem,6.2vw,5.5rem)] leading-[1.15] tracking-[-0.012em] mb-6 text-[#2C1924]">
+              TRADE WITH<br />
+              <span className="text-[#DF7AA7] drop-shadow-[0_4px_25px_rgba(223,122,167,0.25)]">
+                INTENTION
+              </span>
+            </h1>
+
+            <div className="scroll-reveal scroll-reveal-delay-2 font-grotesk-78 text-[clamp(1rem,1.8vw,1.45rem)] text-[#2C1924]/90 tracking-tight max-w-[28ch] mb-5 leading-[1.45]">
+              FROM HUMAN THOUGHT TO ATOMIC EXECUTION
+            </div>
+
+            <p className="scroll-reveal scroll-reveal-delay-2 font-sans text-xs sm:text-sm text-[#2C1924]/80 max-w-[48ch] leading-relaxed mb-7 font-normal">
+              No manual slippage math. No sandwich bot anxieties. Simply speak your trade, and let mathematical certainty seal it on-chain.
+            </p>
+
+            <button
+              onClick={handleLaunch}
+              className="scroll-reveal scroll-reveal-delay-3 inline-flex items-center gap-2.5 px-8 py-3 rounded-full border border-[#DF7AA7] bg-white/95 hover:bg-[#DF7AA7] hover:text-white transition-all duration-300 font-meta text-[0.7rem] cursor-pointer shadow-[0_8px_25px_rgba(223,122,167,0.22)] text-[#2C1924] hover:shadow-[0_12px_32px_rgba(223,122,167,0.35)] hover:-translate-y-0.5"
+            >
+              <span>ENTER THE TERMINAL</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+            </button>
           </div>
-        </div>
-        </div>
+
+          {/* Card Footer Hint */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>SCROLL DOWN TO REVEAL NEXT DECK CARD</span>
+            <span className="text-[#DF7AA7] font-bold">↓ THE SHIFT</span>
+          </div>
         </section>
 
-        {/* Section 3: Features - Full Screen */}
-        <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-12 snap-start">
-        <div className="max-w-7xl w-full mx-auto">
-        {/* Features Widget Grid - With Progress & Details */}
-        <div className="mb-10">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-50/90 border border-pink-200/90 text-pink-700 text-xs font-bold uppercase tracking-wider mb-4 font-mono">
-              <Sparkles className="w-3.5 h-3.5 text-pink-500 animate-pulse" />
-              <span>SYSTEM NOVELTY</span>
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 2 (ACT II): THE SHIFT (The Conflict)
+            Slides over Card 1 as user scrolls
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="argument"
+          className="stack-card stack-card-2 z-[20] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#F8B6A5]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT II // THE SHIFT</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900" style={{ fontFamily: 'var(--font-display)' }}>
-              Engineered for Zero-Friction DeFi
-            </h2>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">PARADIGM REVOLUTION</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 02 / 07</span>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {features.map((f, i) => (
-              <div key={i} className="group relative rounded-[28px] p-5 sm:p-6 bg-white/95 backdrop-blur-md border border-slate-200/80 hover:border-pink-300 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_36px_rgba(236,72,153,0.14)] transition-all duration-300 cursor-pointer overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white to-transparent" />
-                <div className="flex items-center justify-between mb-4 mt-1">
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center border shadow-sm group-hover:scale-110 transition-transform duration-300" style={{ backgroundColor: f.color + '15', borderColor: f.color + '25' }}>
-                    <span style={{ color: f.color }}>{f.icon}</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-slate-100/90 text-slate-600 border border-slate-200/70">{f.metric}</span>
-                </div>
-                <h3 className="text-base font-black text-slate-900 group-hover:text-pink-600 transition-colors mb-2">{f.title}</h3>
-                <p className="text-xs text-slate-600 leading-relaxed mb-4 font-normal">{f.description}</p>
-                <div className="pt-3.5 border-t border-slate-100 space-y-2">
-                  <div className="flex items-start gap-1.5 text-[11px] text-slate-500 font-medium">
-                    <Check className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
-                    <span className="leading-tight">{f.tag}</span>
-                  </div>
+
+          {/* Card Main Body: 2-Column Story */}
+          <div className="my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center py-2">
+            
+            {/* Left Column: Compact Headline */}
+            <div className="lg:col-span-6 scroll-reveal scroll-reveal-delay-1">
+              <h2 className="font-grotesk-125 text-[clamp(2.2rem,4.8vw,4.2rem)] leading-[0.9] text-[#2C1924] mb-3.5">
+                TELL IT WHAT<br />
+                <span style={{ color: '#DF7AA7' }}>YOU WANT</span>
+              </h2>
+              <p className="font-meta text-[#2C1924]/65 tracking-wider text-[0.66rem] leading-relaxed max-w-md">
+                THE PROTOCOL COMPILES YOUR GOALS DIRECTLY INTO MEZO EVM CONSENSUS — NO MANUAL DEXTABS, NO COMPLEX SLIPPAGE CALCULATIONS.
+              </p>
+            </div>
+
+            {/* Right Column: Story Conflict Card */}
+            <div className="lg:col-span-6 scroll-reveal scroll-reveal-delay-2">
+              <div className="rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] p-5 sm:p-6 shadow-[0_8px_25px_rgba(223,122,167,0.08)] hover:border-[#DF7AA7] hover:shadow-[0_12px_32px_rgba(223,122,167,0.14)] transition-all duration-300">
+                <h3 className="font-grotesk-90 text-base sm:text-lg text-[#2C1924] mb-2">
+                  DeFi made you do the work of a computer.
+                </h3>
+                <p className="font-sans text-xs sm:text-sm text-[#2C1924]/80 leading-relaxed mb-4">
+                  Calculating slippage tolerance, hopping between multiple DEX tabs, and dodging predatory MEV bots in the mempool.
+                  Trading shouldn't feel like navigating a minefield.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'SPEAK YOUR OUTCOME',
+                    'IMMUNE TO SANDWICH BOTS',
+                    'OPTIMAL LIQUIDITY SPLIT',
+                    'VERIFIED BY CODE'
+                  ].map((chip) => (
+                    <span 
+                      key={chip}
+                      className="pill-invert-chip font-meta px-3.5 py-1.5 rounded-full cursor-default text-[0.62rem]"
+                    >
+                      {chip}
+                    </span>
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
+
           </div>
+
+          {/* Card Footer Hint */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>PREVIOUS: ACT I PROLOGUE</span>
+            <span className="text-[#DF7AA7] font-bold">NEXT: ACT III THE JOURNEY ↓</span>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 3 (ACT III): THE JOURNEY (The 3 Phases)
+            Slides over Card 2
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="offer"
+          className="stack-card stack-card-3 z-[30] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT III // THE JOURNEY</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">3 STAGES OF EXECUTION</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 03 / 07</span>
+            </div>
+          </div>
+
+          {/* Card Main Body */}
+          <div className="my-auto py-2">
+            <div className="scroll-reveal flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
+              <div>
+                <h2 className="font-grotesk-125 text-2xl sm:text-3xl text-[#2C1924]">
+                  THE VOYAGE OF <span style={{ color: '#DF7AA7' }}>AN INTENT</span>
+                </h2>
+              </div>
+              <p className="font-sans text-xs text-[#2C1924]/75 max-w-md">
+                From the moment you speak or type, your order travels through three stages of absolute mathematical protection.
+              </p>
+            </div>
+
+            <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Step 1 */}
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-1 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#EE97C2]" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">STEP 01</span>
+                    <span className="font-meta text-[0.62rem] text-[#2C1924]/40">// DECOMPILE</span>
+                  </div>
+                  <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">YOU SPEAK IN PLAIN WORDS</h3>
+                  <p className="text-xs text-[#2C1924]/75 leading-relaxed mb-4 font-sans">
+                    "Swap 0.05 BTC for the safest route into MUSD." Our natural engine decompiles your intention into strict mathematical parameters in under 84ms.
+                  </p>
+                </div>
+                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                  <span className="text-[#2C1924]/60">INPUT</span>
+                  <span className="text-[#DF7AA7] font-bold">NATURAL LANGUAGE</span>
+                </div>
+                <span className="step-watermark absolute -bottom-5 -right-2 font-grotesk-125 text-6xl text-[#F7D1D7] opacity-40 pointer-events-none select-none">
+                  01
+                </span>
+              </div>
+
+              {/* Step 2 */}
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-2 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#DF7AA7]" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">STEP 02</span>
+                    <span className="font-meta text-[0.62rem] text-[#2C1924]/40">// DISCOVER</span>
+                  </div>
+                  <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">WE HARVEST MEZO POOLS</h3>
+                  <p className="text-xs text-[#2C1924]/75 leading-relaxed mb-4 font-sans">
+                    The protocol fragments and routes liquidity across Mezo Pools concentrated ticks, finding the most capital-efficient path through MUSD or MEZO.
+                  </p>
+                </div>
+                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                  <span className="text-[#2C1924]/60">POOLS</span>
+                  <span className="text-[#DF7AA7] font-bold">MEZO POOLS LIQUIDITY</span>
+                </div>
+                <span className="step-watermark absolute -bottom-5 -right-2 font-grotesk-125 text-6xl text-[#F7D1D7] opacity-40 pointer-events-none select-none">
+                  02
+                </span>
+              </div>
+
+              {/* Step 3 */}
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-3 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#F8B6A5]" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">STEP 03</span>
+                    <span className="font-meta text-[0.62rem] text-[#2C1924]/40">// GUARANTEE</span>
+                  </div>
+                  <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">SEALED AT CONSENSUS</h3>
+                  <p className="text-xs text-[#2C1924]/75 leading-relaxed mb-4 font-sans">
+                    An 8-point Risk Guardian evaluates live Skip + Pyth oracles and tBTC proof-of-reserves. Mezo executes via gasless meta-transactions: full settlement or zero loss.
+                  </p>
+                </div>
+                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                  <span className="text-[#2C1924]/60">ASSURANCE</span>
+                  <span className="text-[#DF7AA7] font-bold">META-TX RELAY</span>
+                </div>
+                <span className="step-watermark absolute -bottom-5 -right-2 font-grotesk-125 text-6xl text-[#F7D1D7] opacity-40 pointer-events-none select-none">
+                  03
+                </span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Card Footer */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>PREVIOUS: ACT II THE SHIFT</span>
+            <span className="text-[#DF7AA7] font-bold">NEXT: ACT IV THE CREED ↓</span>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 4 (ACT IV): THE CREED (The Manifesto)
+            Slides over Card 3
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="position"
+          className="stack-card stack-card-4 z-[40] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#EE97C2]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT IV // THE CREED</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">SOKA MANIFESTO</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 04 / 07</span>
+            </div>
+          </div>
+
+          {/* Card Main Body */}
+          <div className="my-auto text-center py-4 sm:py-6">
+            <div className="scroll-reveal flex flex-col items-center gap-1.5 mb-6">
+              <span className="font-meta text-[#2C1924]/50 text-[0.66rem]">THE CERTAINTY PROMISE</span>
+              <div className="section-hairline bg-[#DF7AA7]" />
+            </div>
+
+            <div className="scroll-reveal scroll-reveal-delay-1 max-w-4xl mx-auto flex flex-wrap justify-center gap-x-3 gap-y-1.5 mb-5">
+              {manifestoWords.map((word, idx) => {
+                const isAccentWord = word === "DETERMINISTIC" || word === "PROOFS";
+                return (
+                  <span 
+                    key={idx}
+                    className={`font-grotesk-125 text-[clamp(1.6rem,3.8vw,3.2rem)] leading-[1] inline-block ${
+                      isAccentWord ? 'text-[#DF7AA7] drop-shadow-[0_2px_15px_rgba(223,122,167,0.25)]' : 'text-[#2C1924]'
+                    }`}
+                  >
+                    {word}
+                  </span>
+                );
+              })}
+            </div>
+
+            <div className="scroll-reveal scroll-reveal-delay-2 font-meta text-[0.68rem] text-[#2C1924]/60 tracking-widest mt-3">
+              — SOKA PROTOCOL // VERIFIED AT MEZO CONSENSUS
+            </div>
+          </div>
+
+          {/* Card Footer */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>PREVIOUS: ACT III THE JOURNEY</span>
+            <span className="text-[#DF7AA7] font-bold">NEXT: ACT V THE PROOF ↓</span>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 5 (ACT V): THE PROOF (Real-Time Telemetry & Outcomes)
+            Slides over Card 4
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="index"
+          className="stack-card stack-card-5 z-[50] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#F5C5B7]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT V // THE PROOF</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">EMPIRICAL OUTCOMES</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 05 / 07</span>
+            </div>
+          </div>
+
+          {/* Card Main Body */}
+          <div className="my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center py-2">
+            
+            <div className="lg:col-span-5 flex flex-col items-start scroll-reveal scroll-reveal-delay-1">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DF7AA7] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#DF7AA7]"></span>
+                </span>
+                <span className="font-meta text-[0.65rem] text-[#2C1924]/60 tracking-wider">
+                  REAL-TIME TELEMETRY
+                </span>
+              </div>
+              <div className="font-grotesk-125 text-[clamp(2.8rem,5.5vw,5rem)] text-[#2C1924] leading-[0.85] mb-2.5">
+                &lt; 84<span style={{ color: '#DF7AA7' }}>ms</span>
+              </div>
+              <h4 className="font-grotesk-90 text-base sm:text-lg text-[#2C1924] mb-2">
+                Faster than human thought.
+              </h4>
+              <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed max-w-sm">
+                In less time than a single eye-blink, your spoken intention is validated, compiled, and presented with transparent price guarantees.
+              </p>
+            </div>
+
+            <div className="lg:col-span-7 flex flex-col border-t border-[#F7D1D7] scroll-reveal scroll-reveal-delay-2">
+              {[
+                { 
+                  title: 'ZERO MEV VULNERABILITY', 
+                  desc: 'Protected by Mezo Risk Guardian & oracle validation so predatory bots cannot front-run your trade.' 
+                },
+                { 
+                  title: 'CONVERSATIONAL PRECISION', 
+                  desc: 'State amounts, limits, or strategies in your own everyday words (BTC, sats, MUSD).' 
+                },
+                { 
+                  title: 'HYPER-OPTIMAL FILL', 
+                  desc: 'Mezo Pools concentrated liquidity ticks automatically balanced for minimal price impact.' 
+                },
+                { 
+                  title: 'PRE-FLIGHT GUARDIAN', 
+                  desc: 'Eight automated safety checks verify Skip + Pyth oracles, pool depth, and tBTC bridge health.' 
+                },
+                { 
+                  title: 'GASLESS META-TRANSACTIONS', 
+                  desc: 'Sponsor execution via permit + relay when users have no native BTC on hand.' 
+                },
+                { 
+                  title: 'NON-CUSTODIAL PURITY', 
+                  desc: 'Your private keys never leave your custody. You interact directly with the blockchain.' 
+                },
+              ].map((row, i) => (
+                <div 
+                  key={i}
+                  className="row-hover-fill py-2 px-2.5 border-b border-[#F7D1D7] flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3 cursor-pointer"
+                >
+                  <div className="relative z-10 flex items-baseline gap-2.5">
+                    <span className="font-meta text-[#2C1924]/40 text-[0.62rem]">0{i + 1}</span>
+                    <span className="row-name font-grotesk-90 text-xs font-bold tracking-tight text-inherit">
+                      {row.title}
+                    </span>
+                  </div>
+                  <span className="relative z-10 font-sans text-[0.75rem] text-[#2C1924]/70 sm:text-right max-w-md">
+                    {row.desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+          </div>
+
+          {/* Card Footer */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>PREVIOUS: ACT IV THE CREED</span>
+            <span className="text-[#DF7AA7] font-bold">NEXT: ACT VI THE ARCHITECTURE ↓</span>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 6 (ACT VI): THE PILLARS (Architecture)
+            Slides over Card 5
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="spec"
+          className="stack-card stack-card-6 z-[60] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT VI // THE ARCHITECTURE</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">3 CORE FOUNDATIONS</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 06 / 07</span>
+            </div>
+          </div>
+
+          {/* Card Main Body */}
+          <div className="my-auto py-2">
+            <div className="scroll-reveal scroll-reveal-delay-1 flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
+              <h2 className="font-grotesk-125 text-2xl sm:text-3xl text-[#2C1924]">
+                THE THREE <span style={{ color: '#DF7AA7' }}>PILLARS</span>
+              </h2>
+              <p className="font-sans text-xs text-[#2C1924]/70 max-w-md">
+                Three layers of engineering built together so you never have to guess the outcome of a trade again.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              
+              {/* Pillar 1: Cognitive */}
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-1 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#EE97C2]/20 flex items-center justify-center text-[#DF7AA7]">
+                    <Sparkles className="w-3 h-3" />
+                  </div>
+                  <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">PILLAR I // COGNITIVE</span>
+                </div>
+                <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">
+                  Natural Language Intent Engine
+                </h3>
+                <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
+                  Translates human intent into structured Mezo on-chain orders. Normalizes amounts into 18-decimal BTC and validates confirmed vs. pending tBTC bridge balances.
+                </p>
+                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                  <span>LATENCY: &lt; 84MS</span>
+                  <span className="text-[#DF7AA7] font-bold">INTENT DECOMPILE</span>
+                </div>
+              </div>
+
+              {/* Pillar 2: Liquidity */}
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-2 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#F8B6A5]/25 flex items-center justify-center text-[#DF7AA7]">
+                    <Compass className="w-3 h-3" />
+                  </div>
+                  <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">PILLAR II // LIQUIDITY</span>
+                </div>
+                <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">
+                  Mezo Pools Smart Router
+                </h3>
+                <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
+                  Taps Mezo Pools concentrated-liquidity AMM with multi-hop paths across BTC, MUSD, and MEZO, reserving native BTC gas before calculating tradeable volume.
+                </p>
+                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                  <span>INTEGRATION: MEZO POOLS</span>
+                  <span className="text-[#DF7AA7] font-bold">CONCENTRATED AMM</span>
+                </div>
+              </div>
+
+              {/* Pillar 3: Guardian */}
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-3 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#DF7AA7]/20 flex items-center justify-center text-[#DF7AA7]">
+                    <ShieldCheck className="w-3 h-3" />
+                  </div>
+                  <span className="font-meta text-[0.62rem] text-[#DF7AA7] font-bold">PILLAR III // GUARDIAN</span>
+                </div>
+                <h3 className="font-grotesk-90 text-sm sm:text-base text-[#2C1924] mb-1.5">
+                  On-Chain Risk Guardian
+                </h3>
+                <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
+                  Cross-checks Skip oracle (BTC/USD) with Pyth, monitors tBTC bridge proof-of-reserves, and validates pool depth before signing or gasless relay.
+                </p>
+                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                  <span>AUDIT: 8/8 CHECKS</span>
+                  <span className="text-[#DF7AA7] font-bold">SKIP + PYTH ORACLES</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Card Footer */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>PREVIOUS: ACT V THE PROOF</span>
+            <span className="text-[#DF7AA7] font-bold">NEXT: ACT VII THE HORIZON ↓</span>
+          </div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CARD 7 (ACT VII): THE HORIZON (The Terminal CTA)
+            The final card in the deck, slides over Card 6
+            ═══════════════════════════════════════════════════════════════ */}
+        <section 
+          id="close"
+          className="stack-card stack-card-7 z-[70] mb-16 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
+        >
+          {/* Card Top Tab */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
+              <span className="font-bold tracking-wider text-[#2C1924]">ACT VII // THE HORIZON</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[#DF7AA7] font-medium">TERMINAL ACCESS</span>
+              <span className="font-mono tracking-widest text-[#2C1924]/40">CARD 07 / 07</span>
+            </div>
+          </div>
+
+          {/* Card Main Body */}
+          <div className="my-auto text-center max-w-3xl mx-auto flex flex-col items-center py-4 sm:py-6">
+            <h2 className="scroll-reveal scroll-reveal-delay-1 font-grotesk-125 text-[clamp(2rem,5vw,4.2rem)] leading-[0.9] text-[#2C1924] mb-4">
+              THE NEXT ERA OF TRADING IS A<br />
+              <span>
+                <span style={{ color: '#EE97C2' }}>CON</span>
+                <span style={{ color: '#F8B6A5' }}>VER</span>
+                <span style={{ color: '#DF7AA7' }}>SA</span>
+                <span style={{ color: '#DF7AA7' }}>TION</span>
+              </span>
+            </h2>
+
+            <p className="scroll-reveal scroll-reveal-delay-2 font-sans text-xs sm:text-sm text-[#2C1924]/75 max-w-[46ch] leading-relaxed mb-6">
+              Step into the terminal where your intent is sovereign, your funds are uncompromised, and execution is absolute.
+            </p>
+
+            <button
+              onClick={handleLaunch}
+              className="scroll-reveal scroll-reveal-delay-3 close-pill-btn px-8 py-3.5 border border-[#DF7AA7] bg-white/95 text-[#2C1924] font-meta text-[0.75rem] tracking-wider uppercase mb-6 cursor-pointer group shadow-[0_10px_35px_rgba(223,122,167,0.22)] hover:border-[#EE97C2]"
+            >
+              <div className="btn-fill" />
+              <div className="relative z-10 flex items-center gap-2.5">
+                <span>LAUNCH INTENT CONSOLE</span>
+                <ArrowRight className="btn-arrow w-4 h-4 text-[#DF7AA7] group-hover:text-white" />
+              </div>
+            </button>
+
+            <div className="scroll-reveal scroll-reveal-delay-4 flex flex-wrap justify-center items-center gap-5 sm:gap-8 font-meta text-[0.62rem] text-[#2C1924]/65">
+              <a href="https://github.com" target="_blank" rel="noreferrer" className="nav-link-item hover:text-[#DF7AA7] transition-colors">GITHUB</a>
+              <span className="opacity-30">•</span>
+              <a href="#spec" className="nav-link-item hover:text-[#DF7AA7] transition-colors">DOCUMENTATION</a>
+              <span className="opacity-30">•</span>
+              <a href="#argument" className="nav-link-item hover:text-[#DF7AA7] transition-colors">PROTOCOL STORY</a>
+              <span className="opacity-30">•</span>
+              <a href="https://discord.com" target="_blank" rel="noreferrer" className="nav-link-item hover:text-[#DF7AA7] transition-colors">COMMUNITY</a>
+            </div>
+          </div>
+
+          {/* Card Footer */}
+          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+            <span>END OF SOKA PROTOCOL DOSSIER</span>
+            <span className="text-[#DF7AA7] font-bold">ALL 7 CARDS STACKED</span>
+          </div>
+        </section>
+
+      </main>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          FOOTER (Reveals cleanly below the finished card deck)
+          ═══════════════════════════════════════════════════════════════ */}
+      <footer className="relative w-full border-t border-[#F7D1D7] px-6 sm:px-14 py-6 bg-gradient-to-b from-transparent to-[#FDF4F2] flex flex-col sm:flex-row items-center justify-between gap-4 z-20">
+        <div className="flex items-center gap-4">
+          <span className="font-grotesk-125 text-xl tracking-tight text-[#2C1924]">
+            SOKA
+          </span>
+          <span className="hidden sm:inline-block w-px h-3 bg-[#F7D1D7]" />
+          <span className="font-meta text-[0.62rem] text-[#2C1924]/60">
+            AI-POWERED BITCOIN INTENT PROTOCOL ON MEZO (CHAIN ID 31612)
+          </span>
         </div>
 
-         {/* CTA Widget */}
-         <div className="card-ultra-depth p-8 text-center">
-           <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-             Ready to swap with intent?
-           </h3>
-           <p className="text-slate-500 mb-6 max-w-lg mx-auto">
-             Join thousands of traders using natural language to execute optimal swaps on Sui Network.
-           </p>
-           <button onClick={() => handleLaunch()} className="inline-flex items-center gap-2 px-10 py-4 rounded-2xl bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 text-white font-bold text-base shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5">
-             <span>Launch SOKA Terminal</span>
-             <ArrowRight className="w-5 h-5" />
-           </button>
-         </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="w-full border-t border-slate-200 bg-white/50 py-8 relative z-10 snap-start">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="dot dot-accent" />
-            <span>SOKA Protocol © 2026</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <span className="hover:text-[#F05391] cursor-pointer transition-colors" onClick={() => navigate('/app')}>Terminal</span>
-            <span className="hover:text-[#F05391] cursor-pointer transition-colors" onClick={() => navigate('/')}>Overview</span>
-          </div>
+        <div className="font-meta text-[0.62rem] text-[#2C1924]/50">
+          © 2026 SOKA PROTOCOL. ALL RIGHTS RESERVED.
         </div>
       </footer>
+
     </div>
   );
-};
+}

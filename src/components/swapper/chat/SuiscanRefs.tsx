@@ -18,8 +18,8 @@ interface SuiscanRefsProps {
 }
 
 /**
- * Renders guardian on-chain references as clickable Suiscan proof chips.
- * Every chip opens the exact object / coin / tx / wallet on the explorer,
+ * Renders guardian on-chain references as clickable Mezo Explorer proof chips.
+ * Every chip opens the exact token / contract / tx / wallet on the explorer,
  * so each risk verdict is backed by verifiable on-chain evidence.
  */
 export const SuiscanRefs: React.FC<SuiscanRefsProps> = ({ references, className = '', dedupe = true }) => {
@@ -38,7 +38,7 @@ export const SuiscanRefs: React.FC<SuiscanRefsProps> = ({ references, className 
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          title={`Verify on Suiscan: ${ref.value}`}
+          title={`Verify on Mezo Explorer: ${ref.value}`}
           className="group flex items-center justify-between gap-2 px-2.5 py-1.5 w-[calc(50%-6px)] rounded-lg bg-[#CCFF00]/10 hover:bg-[#CCFF00]/20 border border-[#141414] hover:border-[#141414] transition-all duration-200"
         >
           <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">

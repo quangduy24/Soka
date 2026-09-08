@@ -1,30 +1,33 @@
 /**
- * Suiscan explorer helpers.
+ * Mezo explorer helpers.
  *
  * Guardian risk checks carry `references` — the exact on-chain artifacts
- * (coin type, pool object, transaction, or wallet) they were derived from.
- * These builders turn those references into verifiable Suiscan links so the
+ * (token address, pool contract, transaction hash, or wallet address) they were derived from.
+ * These builders turn those references into verifiable Mezo Explorer links so the
  * risk assessment is backed by independent on-chain proof.
  */
 
 import type { RiskReference } from '../types/shared';
 
-const SUISCAN_BASE = 'https://suiscan.xyz/mainnet';
+const MEZO_EXPLORER_BASE = 'https://explorer.mezo.org';
 
-export const suiscanUrl = (ref: RiskReference): string => {
+export const mezoExplorerUrl = (ref: RiskReference): string => {
   switch (ref.type) {
     case 'coin':
-      return `${SUISCAN_BASE}/coin/${encodeURIComponent(ref.value)}`;
+      return `${MEZO_EXPLORER_BASE}/token/${encodeURIComponent(ref.value)}`;
     case 'object':
-      return `${SUISCAN_BASE}/object/${ref.value}`;
+      return `${MEZO_EXPLORER_BASE}/address/${ref.value}`;
     case 'tx':
-      return `${SUISCAN_BASE}/tx/${ref.value}`;
+      return `${MEZO_EXPLORER_BASE}/tx/${ref.value}`;
     case 'account':
-      return `${SUISCAN_BASE}/account/${ref.value}`;
+      return `${MEZO_EXPLORER_BASE}/address/${ref.value}`;
     default:
-      return `${SUISCAN_BASE}/object/${ref.value}`;
+      return `${MEZO_EXPLORER_BASE}/address/${ref.value}`;
   }
 };
+
+// Backwards-compatible alias
+export const suiscanUrl = mezoExplorerUrl;
 
 /** Short, human-readable form of an on-chain identifier (0x1234…abcd). */
 export const shortenRef = (value: string): string => {

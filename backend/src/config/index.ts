@@ -27,8 +27,9 @@ export const CETUS_SUPPORTED_DEXES = [
   'cetus', 'deepbook', 'deepbookv3', 'kriya', 'flowx', 'aftermath', 'turbos', 'bluefin',
 ];
 
-// ─── LLM Configuration (OpenRouter) ───────────────────────────
+// ─── LLM Configuration (Gemini & OpenRouter) ───────────────────────────
 
+export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 export const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -160,19 +161,15 @@ export const NODE_ENV = process.env.NODE_ENV || 'development';
 // ─── Startup Validation ────────────────────────────────────────
 
 /**
- * Validate required environment configuration at startup so the server fails
- * fast with a clear message instead of erroring only at request time.
- * OPENROUTER_API_KEY is optional in dev (deterministic fallbacks keep the demo
- * UI usable) but required in production.
+ * Validate required environment configuration at startup.
+ * Uses GEMINI_API_KEY or OPENROUTER_API_KEY for LLM parsing, with deterministic fallbacks.
  */
 export function validateConfig(): void {
-  const missing: string[] = [];
-  if (!OPENROUTER_API_KEY) missing.push('OPENROUTER_API_KEY');
-
-  if (missing.length > 0 && NODE_ENV === 'production') {
-    throw new Error(
-      `Missing required environment variable(s): ${missing.join(', ')}. ` +
-      `Set them in your .env file before starting the server.`
+  const hasAiKey = Boolean(GEMINI_API_KEY || OPENROUTER_API_KEY);
+  if (!hasAiKey && NODE_ENV === 'production') {
+    // Log a warning if no API key is set, but permit deterministic parser fallbacks
+    console.warn(
+      'Warning: Neither GEMINI_API_KEY nor OPENROUTER_API_KEY is configured. Deterministic intent parsing will be used.'
     );
   }
 }

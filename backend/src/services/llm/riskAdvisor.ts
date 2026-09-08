@@ -4,9 +4,20 @@
  * from risk guardian checks using the OpenRouter LLM.
  */
 
-import { OPENROUTER_API_KEY, OPENROUTER_MODEL_CANDIDATES, OPENROUTER_BASE_URL } from '../../config/index.js';
+import { GoogleGenAI } from '@google/genai';
+import { GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL_CANDIDATES, OPENROUTER_BASE_URL } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import type { RiskCheck, RouteNode } from '../../types/index.js';
+
+let geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  const key = GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: key });
+  }
+  return geminiClient;
+}
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -259,51 +270,104 @@ export async function generateRiskSummary(
     })), null, 2)}\n\n` +
     `Trade: ${amount} ${sourceToken} → ${destToken}`;
 
-  for (const model of OPENROUTER_MODEL_CANDIDATES) {
+  // 1. Try Gemini
+  const gemini = getGeminiClient();
+  if (gemini) {
     try {
-      const raw = await callOpenRouter(model, systemPrompt, userMsg, 0.2, 1200);
-
-      // Strip markdown code fences if present
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = JSON.parse(cleaned);
-
-      if (parsed.summary && parsed.detailedAnalysis) {
-        // LLM may return detailedAnalysis as a structured object instead of a
-        // flat string. Convert it to readable text so the frontend can display it.
-        let detailedText: string;
-        if (typeof parsed.detailedAnalysis === 'string') {
-          detailedText = parsed.detailedAnalysis;
-        } else if (typeof parsed.detailedAnalysis === 'object' && parsed.detailedAnalysis !== null) {
-          // Format category-keyed objects: { "Slippage": "...", "Concentration": "..." }
-          detailedText = Object.entries(parsed.detailedAnalysis)
-            .map(([key, val]) => `[${key}]\n${typeof val === 'string' ? val : JSON.stringify(val, null, 2)}`)
-            .join('\n\n');
-        } else {
-          detailedText = String(parsed.detailedAnalysis);
-        }
-
-        return {
-          summary: parsed.summary,
-          detailedAnalysis: detailedText,
-          riskLevel: computeRiskLevel(guardianChecks),
-          hasHighRisk: guardianChecks.some((c) => c.status === 'DANGER'),
-          uiLabels: parsed.uiLabels || {
-            slippageLabel: 'Safe Slippage',
-            slippageSubLabel: 'Within safe parameters.',
-            distributionLabel: 'Concentration',
-            distributionSubLabel: 'Low concentration risk.',
-            poolsLabel: 'Liquidity & Pools',
-            poolsSubLabel: 'Analysis completed.',
-            category: 'Neutral'
-          }
-        };
-      }
-      throw new Error('Missing required fields in LLM response');
-    } catch (err: any) {
-      logger.warn('Risk summary model failed, trying next candidate', {
-        model,
-        error: err.message,
+      const resp = await gemini.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: userMsg,
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
       });
+      const text = resp.text?.trim();
+      if (text) {
+        const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed.summary && parsed.detailedAnalysis) {
+          let detailedText: string;
+          if (typeof parsed.detailedAnalysis === 'string') {
+            detailedText = parsed.detailedAnalysis;
+          } else if (typeof parsed.detailedAnalysis === 'object' && parsed.detailedAnalysis !== null) {
+            detailedText = Object.entries(parsed.detailedAnalysis)
+              .map(([key, val]) => `[${key}]\n${typeof val === 'string' ? val : JSON.stringify(val, null, 2)}`)
+              .join('\n\n');
+          } else {
+            detailedText = String(parsed.detailedAnalysis);
+          }
+
+          return {
+            summary: parsed.summary,
+            detailedAnalysis: detailedText,
+            riskLevel: computeRiskLevel(guardianChecks),
+            hasHighRisk: guardianChecks.some((c) => c.status === 'DANGER'),
+            uiLabels: parsed.uiLabels || {
+              slippageLabel: 'Safe Slippage',
+              slippageSubLabel: 'Within safe parameters.',
+              distributionLabel: 'Concentration',
+              distributionSubLabel: 'Low concentration risk.',
+              poolsLabel: 'Liquidity & Pools',
+              poolsSubLabel: 'Analysis completed.',
+              category: 'Neutral'
+            }
+          };
+        }
+      }
+    } catch (err: any) {
+      logger.warn('Gemini risk summary failed, trying fallback', { error: err.message });
+    }
+  }
+
+  if (OPENROUTER_API_KEY) {
+    for (const model of OPENROUTER_MODEL_CANDIDATES) {
+      try {
+        const raw = await callOpenRouter(model, systemPrompt, userMsg, 0.2, 1200);
+
+        // Strip markdown code fences if present
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        const parsed = JSON.parse(cleaned);
+
+        if (parsed.summary && parsed.detailedAnalysis) {
+          // LLM may return detailedAnalysis as a structured object instead of a
+          // flat string. Convert it to readable text so the frontend can display it.
+          let detailedText: string;
+          if (typeof parsed.detailedAnalysis === 'string') {
+            detailedText = parsed.detailedAnalysis;
+          } else if (typeof parsed.detailedAnalysis === 'object' && parsed.detailedAnalysis !== null) {
+            // Format category-keyed objects: { "Slippage": "...", "Concentration": "..." }
+            detailedText = Object.entries(parsed.detailedAnalysis)
+              .map(([key, val]) => `[${key}]\n${typeof val === 'string' ? val : JSON.stringify(val, null, 2)}`)
+              .join('\n\n');
+          } else {
+            detailedText = String(parsed.detailedAnalysis);
+          }
+
+          return {
+            summary: parsed.summary,
+            detailedAnalysis: detailedText,
+            riskLevel: computeRiskLevel(guardianChecks),
+            hasHighRisk: guardianChecks.some((c) => c.status === 'DANGER'),
+            uiLabels: parsed.uiLabels || {
+              slippageLabel: 'Safe Slippage',
+              slippageSubLabel: 'Within safe parameters.',
+              distributionLabel: 'Concentration',
+              distributionSubLabel: 'Low concentration risk.',
+              poolsLabel: 'Liquidity & Pools',
+              poolsSubLabel: 'Analysis completed.',
+              category: 'Neutral'
+            }
+          };
+        }
+        throw new Error('Missing required fields in LLM response');
+      } catch (err: any) {
+        logger.warn('Risk summary model failed, trying next candidate', {
+          model,
+          error: err.message,
+        });
+      }
     }
   }
 
@@ -324,10 +388,6 @@ export async function summarizeRiskAdvice(
 
   const fallbackMessage = "⚠️ High Risk Detected: " + risks.map(r => r.message).join(' ');
 
-  if (!OPENROUTER_API_KEY) {
-    return fallbackMessage;
-  }
-
   const systemPrompt =
     `You are a DeFi security advisor on the Sui blockchain. The user is about to swap ${sourceToken} for ${destToken}. ` +
     `The system has detected some high-risk warnings (e.g. high slippage, concentration, or stale pools). ` +
@@ -335,6 +395,32 @@ export async function summarizeRiskAdvice(
     `Do not use markdown formatting. Be concise and helpful, emphasizing caution.`;
 
   const userMsg = `Risks detected: ${JSON.stringify(risks.map(r => ({ risk: r.name, detail: r.message })))}`;
+
+  // 1. Try Gemini
+  const gemini = getGeminiClient();
+  if (gemini) {
+    try {
+      const resp = await gemini.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: userMsg,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.3,
+          maxOutputTokens: 150,
+        },
+      });
+      const text = resp.text?.trim();
+      if (text) {
+        return `⚠️ ${text}`;
+      }
+    } catch (err: any) {
+      logger.warn('Gemini risk advice failed, trying fallback', { error: err.message });
+    }
+  }
+
+  if (!OPENROUTER_API_KEY) {
+    return fallbackMessage;
+  }
 
   for (const model of OPENROUTER_MODEL_CANDIDATES) {
     try {

@@ -6,9 +6,20 @@
  * exact token from the list shown in the chat.
  */
 
-import { OPENROUTER_API_KEY, OPENROUTER_MODEL_CANDIDATES, OPENROUTER_BASE_URL } from '../../config/index.js';
+import { GoogleGenAI } from '@google/genai';
+import { GEMINI_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL_CANDIDATES, OPENROUTER_BASE_URL } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import type { TokenCandidate } from '../coin/tokenResolver.js';
+
+let geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI | null {
+  const key = GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: key });
+  }
+  return geminiClient;
+}
 
 export interface TokenMatchSummary {
   missingSymbol: string;
@@ -20,7 +31,7 @@ export interface TokenMatchSummary {
 /**
  * Ask the LLM for a short intro summarising that we found N similar tokens and
  * inviting the user to pick one. The LLM must NOT recommend or choose a token —
- * selection is entirely the user's. Robust by design: tries each fallback model
+ * selection is entirely the user's. Robust by design: tries Gemini, then fallback models,
  * and falls back to a deterministic message if the LLM is unavailable.
  */
 export async function summarizeTokenMatches(
@@ -34,17 +45,39 @@ export async function summarizeTokenMatches(
 
   const fallbackMessage = buildFallbackMessage(missingSymbol, candidates.length);
 
-  if (!OPENROUTER_API_KEY) {
-    return { missingSymbol, candidates, message: fallbackMessage };
-  }
-
   const systemPrompt =
-    `You are a Sui DeFi assistant. The user wants to swap to a token "${missingSymbol}" that is not in the verified whitelist. ` +
+    `You are a DeFi assistant. The user wants to swap to a token "${missingSymbol}" that is not in the verified whitelist. ` +
     `A search found ${candidates.length} token(s) whose symbol or name is similar. ` +
     `Write 1-2 short, friendly sentences telling the user you found ${candidates.length} possible match(es) and asking them to pick the exact token they want from the list below. ` +
     `Do NOT recommend, rank, or choose one yourself — the user decides. Do NOT list contract addresses (the UI shows them). No markdown, no code fences.`;
 
   const userMsg = `Original request: "${userPrompt}". Unresolved token: ${missingSymbol}. Matches found: ${candidates.length}.`;
+
+  // 1. Try Gemini
+  const gemini = getGeminiClient();
+  if (gemini) {
+    try {
+      const response = await gemini.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: userMsg,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.3,
+          maxOutputTokens: 150,
+        },
+      });
+      const text = response.text?.trim();
+      if (text) {
+        return { missingSymbol, candidates, message: text };
+      }
+    } catch (err: any) {
+      logger.warn('Gemini token match summary failed, trying fallback', { error: err.message });
+    }
+  }
+
+  if (!OPENROUTER_API_KEY) {
+    return { missingSymbol, candidates, message: fallbackMessage };
+  }
 
   for (const model of OPENROUTER_MODEL_CANDIDATES) {
     try {

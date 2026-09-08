@@ -197,11 +197,11 @@ const TaskCard: React.FC<{ snap: SwapSnapshot; expanded: boolean; onToggle: () =
             <Metric label="Amount" value={amountStr} unit={source} />
             <Metric label="Est. Output" value={outStr} unit={dest} accent />
             <Metric label="Slippage" value={slipStr} unit="%" />
-            <Metric label="Gas" value={gasNum} unit="SUI" />
+            <Metric label="Gas" value={gasNum} unit="BTC" />
           </div>
 
           {snap.txDigest && (
-            <a href={`https://suiscan.xyz/mainnet/tx/${snap.txDigest}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start rounded-xl border border-white/30 bg-white/20 px-2.5 py-1.5 font-mono text-[10px] font-bold text-[#0f172a] hover:bg-white/30">
+            <a href={`https://explorer.mezo.org/tx/${snap.txDigest}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start rounded-xl border border-white/30 bg-white/20 px-2.5 py-1.5 font-mono text-[10px] font-bold text-[#0f172a] hover:bg-white/30">
               <ExternalLink className="h-3 w-3" /> View transaction {shortenRef(snap.txDigest)}
             </a>
           )}
@@ -260,35 +260,35 @@ const TaskCard: React.FC<{ snap: SwapSnapshot; expanded: boolean; onToggle: () =
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, expandedId, onToggle, onRerun, onDelete, onClear, onClose }) => {
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4">
-      <div className="absolute inset-0 bg-[#0f172a]/30 backdrop-blur-md" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[min(88vh,780px)] w-full max-w-[720px] flex-col overflow-hidden glass-strong">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/20 bg-white/20 px-5 py-3.5">
+      <div className="absolute inset-0 bg-[#2C1924]/30 backdrop-blur-md" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[min(88vh,780px)] w-full max-w-[720px] flex-col overflow-hidden rounded-3xl border border-[#F7D1D7] bg-[#FDF4F2]/95 backdrop-blur-2xl shadow-[0_20px_50px_-16px_rgba(44,25,36,0.15)]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#F7D1D7] bg-white/60 px-5 py-3.5">
           <div className="flex items-center gap-2">
-            <HistoryIcon className="h-4 w-4 text-[#F05391]" />
-            <span className="font-bold text-[15px] text-[#0f172a]" style={{ fontFamily: 'var(--font-display)' }}>SOKA History</span>
+            <HistoryIcon className="h-4 w-4 text-[#DF7AA7]" />
+            <span className="font-bold text-[15px] text-[#2C1924]" style={{ fontFamily: 'var(--font-display)' }}>SOKA History</span>
           </div>
           <div className="flex items-center gap-2">
             {history.length > 0 && (
-              <button onClick={onClear} title="Clear history" className="inline-flex items-center gap-1 rounded-lg border border-white/30 bg-white/20 px-2.5 py-1 font-mono text-[10px] font-bold text-[#ef4444] transition-colors hover:bg-[#ef4444]/15">
+              <button onClick={onClear} title="Clear history" className="inline-flex items-center gap-1 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-2.5 py-1 font-mono text-[10px] font-bold text-[#ef4444] transition-colors hover:bg-[#ef4444]/20 cursor-pointer">
                 <Trash2 className="h-3 w-3" /> Clear
               </button>
             )}
-            <button onClick={onClose} title="Close" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-white/20 font-bold text-[#0f172a] transition-colors hover:bg-white/40">
+            <button onClick={onClose} title="Close" className="flex h-8 w-8 items-center justify-center rounded-full border border-[#F7D1D7] bg-white/70 font-bold text-[#2C1924] transition-colors hover:bg-white cursor-pointer">
               ✕
             </button>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-white/10 p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-4">
           {history.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
               <SokaCharacter size={84} />
-              <div className="font-bold text-[16px] text-[#0f172a]/60" style={{ fontFamily: 'var(--font-display)' }}>No swaps yet</div>
-              <p className="font-mono text-[11px] text-[#0f172a]/40">Go ask SOKA for a swap — it will show up here.</p>
+              <div className="font-bold text-[16px] text-[#2C1924]/60" style={{ fontFamily: 'var(--font-display)' }}>No swaps yet</div>
+              <p className="font-meta text-[11px] text-[#2C1924]/40">Go ask SOKA for a swap — it will show up here.</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 px-1 font-mono text-[9px] uppercase tracking-[0.15em] text-[#0f172a]/35">
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-2 px-1 font-meta text-[9px] uppercase tracking-[0.15em] text-[#2C1924]/40">
                 <Gauge className="h-3 w-3" /> {history.length} task{history.length === 1 ? '' : 's'} · tap to expand
               </div>
               {history.map((h) => (

@@ -16,22 +16,22 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getScoreColor = (sc: number) => {
-    if (sc >= 80) return 'text-[#1c7a36] border-[#141414] bg-[#CCFF00]/30';
-    if (sc >= 60) return 'text-[#0b7285] border-[#141414] bg-[#7DDCFF]/30';
-    if (sc >= 30) return 'text-[#8a5a00] border-[#141414] bg-[#FFC900]/30';
-    return 'text-[#d33] border-[#141414] bg-[#ff6b6b]/20';
+    if (sc >= 80) return 'text-[#10b981] border-[#10b981]/30 bg-[#10b981]/10';
+    if (sc >= 60) return 'text-[#06b6d4] border-[#06b6d4]/30 bg-[#06b6d4]/10';
+    if (sc >= 30) return 'text-[#f59e0b] border-[#f59e0b]/30 bg-[#f59e0b]/10';
+    return 'text-[#ef4444] border-[#ef4444]/30 bg-[#ef4444]/10';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'SAFE':
-        return <CheckCircle2 className="w-3.5 h-3.5 text-[#1c7a36] shrink-0" />;
+        return <CheckCircle2 className="w-3.5 h-3.5 text-[#10b981] shrink-0" />;
       case 'WARNING':
-        return <AlertTriangle className="w-3.5 h-3.5 text-[#8a5a00] shrink-0" />;
+        return <AlertTriangle className="w-3.5 h-3.5 text-[#f59e0b] shrink-0" />;
       case 'DANGER':
-        return <XCircle className="w-3.5 h-3.5 text-[#d33] shrink-0" />;
+        return <XCircle className="w-3.5 h-3.5 text-[#ef4444] shrink-0" />;
       default:
-        return <CheckCircle2 className="w-3.5 h-3.5 text-[#1c7a36] shrink-0" />;
+        return <CheckCircle2 className="w-3.5 h-3.5 text-[#10b981] shrink-0" />;
     }
   };
 
@@ -51,34 +51,34 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
   };
 
   return (
-    <div className="pro3-card p-5 border-[3px] border-[#141414] flex flex-col gap-4">
+    <div className="p-5 rounded-2xl bg-white/85 border border-[#F7D1D7] shadow-sm flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b-[3px] border-[#141414] pb-3">
+      <div className="flex items-center justify-between border-b border-[#F7D1D7]/60 pb-3">
         <div className="flex items-center gap-2">
-          <Skull className="w-5 h-5 text-[#1c7a36]" />
-          <span className="font-mono text-xs font-bold text-[#141414] tracking-wider uppercase">
+          <ShieldCheck className="w-4 h-4 text-[#10b981]" />
+          <span className="font-meta text-xs font-bold text-[#2C1924] tracking-wider uppercase">
             100% On-Chain Risk Guardian
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono text-[#141414]/50">Zero External APIs</span>
-          <span className="pro3-dot pro3-dot-green" />
+          <span className="text-[10px] font-mono text-[#2C1924]/50">Zero External APIs</span>
+          <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
         </div>
       </div>
 
       {/* Score and Safety Tier Badge */}
-      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white border-[3px] border-[#141414] shadow-[3px_3px_0_rgba(20,20,20,0.15)]">
+      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7]">
         <div className="flex flex-col">
-          <span className="text-[10px] font-mono text-[#141414]/50 uppercase">Deterministic Safety Score</span>
+          <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">Deterministic Safety Score</span>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className={`text-2xl font-mono font-extrabold ${score >= 80 ? 'text-[#1c7a36]' : score >= 60 ? 'text-[#0b7285]' : score >= 30 ? 'text-[#8a5a00]' : 'text-[#d33]'}`}>
+            <span className={`text-2xl font-mono font-extrabold ${score >= 80 ? 'text-[#10b981]' : score >= 60 ? 'text-[#06b6d4]' : score >= 30 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
               {score}
             </span>
-            <span className="text-xs font-mono text-[#141414]/50">/ 100</span>
+            <span className="text-xs font-mono text-[#2C1924]/50">/ 100</span>
           </div>
         </div>
 
-        <div className={`px-3 py-1.5 rounded-xl border-2 font-mono text-xs font-bold ${getScoreColor(score)}`}>
+        <div className={`px-3 py-1.5 rounded-xl border font-mono text-xs font-bold ${getScoreColor(score)}`}>
           {riskLevel || (score >= 80 ? 'LOW RISK' : score >= 60 ? 'MODERATE' : 'ELEVATED RISK')}
         </div>
       </div>
@@ -88,11 +88,11 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
         {categories.map((cat, i) => {
           const status = getCategoryStatus(cat);
           const badgeStyle = 
-            status === 'DANGER' ? 'bg-[#ff6b6b]/20 border-[#141414] text-[#d33]' :
-            status === 'WARNING' ? 'bg-[#FFC900]/30 border-[#141414] text-[#8a5a00]' :
-            'bg-[#CCFF00]/30 border-[#141414] text-[#1c7a36]';
+            status === 'DANGER' ? 'bg-[#ef4444]/10 border-[#ef4444]/20 text-[#ef4444]' :
+            status === 'WARNING' ? 'bg-[#f59e0b]/10 border-[#f59e0b]/20 text-[#f59e0b]' :
+            'bg-[#10b981]/10 border-[#10b981]/20 text-[#10b981]';
           return (
-            <div key={i} className={`px-2.5 py-1.5 rounded-lg border-2 flex items-center justify-between text-[11px] font-mono ${badgeStyle}`}>
+            <div key={i} className={`px-3 py-2 rounded-xl border flex items-center justify-between text-[11px] font-mono ${badgeStyle}`}>
               <span>{cat}</span>
               <span className="font-bold">{status}</span>
             </div>
@@ -101,55 +101,55 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
       </div>
 
       {/* Expandable 7-Point Audit Drawer */}
-      <div className="border-t-[3px] border-[#141414]/15 pt-3">
+      <div className="border-t border-[#F7D1D7]/60 pt-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between py-1 text-xs font-mono text-[#141414]/70 hover:text-[#141414] transition-colors"
+          className="w-full flex items-center justify-between py-1 text-xs font-meta text-[#2C1924]/70 hover:text-[#DF7AA7] transition-colors"
         >
           <span>7-Point On-Chain Audit Details ({checks.length || 7} checks)</span>
-          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#141414]" />}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#2C1924]" />}
         </button>
 
         {isExpanded && (
-          <div className="flex flex-col gap-2 mt-3 pt-2 border-t-2 border-[#141414]/15">
+          <div className="flex flex-col gap-2 mt-3 pt-2 border-t border-[#F7D1D7]/60">
             {checks.map((chk, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-2xl bg-white border-[3px] border-[#141414] flex flex-col gap-1 text-xs font-mono"
+                className="p-3 rounded-2xl bg-white border border-[#F7D1D7] flex flex-col gap-1 text-xs font-mono shadow-2xs"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(chk.status)}
-                    <span className="font-bold text-[#141414]/90">{chk.name}</span>
+                    <span className="font-bold text-[#2C1924]">{chk.name}</span>
                   </div>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border-2 ${
-                    chk.status === 'DANGER' ? 'text-[#d33] bg-[#ff6b6b]/15 border-[#141414]' :
-                    chk.status === 'WARNING' ? 'text-[#8a5a00] bg-[#FFC900]/25 border-[#141414]' :
-                    'text-[#1c7a36] bg-[#CCFF00]/25 border-[#141414]'
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    chk.status === 'DANGER' ? 'text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/25' :
+                    chk.status === 'WARNING' ? 'text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/25' :
+                    'text-[#10b981] bg-[#10b981]/10 border-[#10b981]/25'
                   }`}>
                     {chk.status}
                   </span>
                 </div>
 
-                <p className="text-[11px] text-[#141414]/60 leading-relaxed pl-5">
+                <p className="text-[11px] text-[#2C1924]/60 leading-relaxed pl-5">
                   {chk.message}
                 </p>
 
                 {chk.references && chk.references.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-5 mt-1">
                     {chk.references.map((ref, rIdx) => {
-                      const url = ref.type === 'object' || ref.type === 'coin'
-                        ? `https://suiscan.xyz/mainnet/object/${ref.value}`
+                      const url = ref.type === 'coin'
+                        ? `https://explorer.mezo.org/token/${ref.value}`
                         : ref.type === 'tx'
-                        ? `https://suiscan.xyz/mainnet/tx/${ref.value}`
-                        : `https://suiscan.xyz/mainnet/account/${ref.value}`;
+                        ? `https://explorer.mezo.org/tx/${ref.value}`
+                        : `https://explorer.mezo.org/address/${ref.value}`;
                       return (
                         <a
                           key={rIdx}
                           href={url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[10px] text-[#0b7285] hover:underline"
+                          className="inline-flex items-center gap-1 text-[10px] text-[#DF7AA7] hover:underline"
                         >
                           <span>{ref.label}: {ref.value.slice(0, 6)}...{ref.value.slice(-4)}</span>
                           <ExternalLink className="w-2.5 h-2.5" />

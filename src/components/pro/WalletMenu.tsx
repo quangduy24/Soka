@@ -52,12 +52,12 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
     <div className="relative" ref={rootRef}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-2 rounded-xl border border-white/40 px-3 py-1.5 font-mono text-xs text-[#0f172a] backdrop-blur-sm transition-all ${open ? 'bg-white/40' : 'bg-white/20 hover:bg-white/30'}`}
+        className={`flex items-center gap-2 rounded-xl border border-pink-200/90 px-3.5 py-1.5 font-mono text-xs text-slate-800 font-bold backdrop-blur-sm shadow-2xs transition-all ${open ? 'bg-pink-100/90 border-pink-300' : 'bg-pink-50/80 hover:bg-pink-100/80'}`}
         title="Wallet balances"
       >
-        <span className="dot dot-accent" />
+        <span className="dot dot-accent animate-pulse" />
         <span>{addr}</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform text-pink-600 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
