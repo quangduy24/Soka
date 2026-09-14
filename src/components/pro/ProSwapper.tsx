@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useDAppKit, useCurrentClient } from '@mysten/dapp-kit-react';
-import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp, User } from 'lucide-react';
 import { ProHeader } from './ProHeader';
 import { ProRouteVisualizer } from './ProRouteVisualizer';
 import { ProGuardianRadar } from './ProGuardianRadar';
 import { HistoryPanel } from './HistoryPanel';
+import { GenerativeInkCanvas } from './GenerativeInkCanvas';
 import type { RiskCheck, RouteNode, PtbStep, SwapSnapshot } from '../../types/shared';
 import { makeHistoryId } from '../../utils/explorer';
 import { ConnectModal } from '@mysten/dapp-kit-react/ui';
@@ -15,9 +16,9 @@ const LEGACY_HISTORY_KEY = 'adidahood:swap-history';
 const MAX_HISTORY = 12;
 
 const MiniStat: React.FC<{ label: string; value: string; accent?: boolean; warn?: boolean; danger?: boolean }> = ({ label, value, accent, warn, danger }) => (
-  <div className="p-3 rounded-2xl bg-white/80 border border-[#F7D1D7] text-left shadow-2xs">
-    <div className="font-meta text-[9px] font-bold uppercase tracking-[0.12em] text-[#2C1924]/40">{label}</div>
-    <div className={`mt-1 truncate font-mono text-[14px] font-bold ${danger ? "text-[#ef4444]" : warn ? "text-[#f59e0b]" : accent ? "text-[#10b981]" : "text-[#2C1924]"}`} title={value}>{value}</div>
+  <div className="p-3 rounded-2xl bg-white border border-[#2C1924]/[0.08] text-left shadow-2xs">
+    <div className="font-meta text-[9px] font-bold uppercase tracking-[0.12em] text-[#845D74]/75">{label}</div>
+    <div className={`mt-1 truncate font-mono text-[14px] font-bold ${danger ? "text-[#ef4444]" : warn ? "text-[#f59e0b]" : accent ? "text-[#DF7AA7]" : "text-[#2C1924]"}`} title={value}>{value}</div>
   </div>
 );
 
@@ -87,6 +88,7 @@ export const ProSwapper: React.FC = () => {
   const walletAddress = currentAccount?.address || null;
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [intentPrompt, setIntentPrompt] = useState<string>(searchParams.get("intent") || "");
+  const [submittedUserPrompt, setSubmittedUserPrompt] = useState<string | null>(searchParams.get("intent") || null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -95,6 +97,17 @@ export const ProSwapper: React.FC = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const activeSwapRef = useRef<SwapSnapshot | null>(null);
+  const bloomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (bloomRef.current) {
+        bloomRef.current.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
   const [sourceSymbol, setSourceSymbol] = useState("BTC");
   const [destSymbol, setDestSymbol] = useState("MUSD");
   const [tradeAmount, setTradeAmount] = useState("0.05");
@@ -157,7 +170,7 @@ export const ProSwapper: React.FC = () => {
     setHistory(prev => { const n = prev.map(x => (x.id === id ? { ...x, ...patch } : x)); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
     if (activeSwapRef.current?.id === id) activeSwapRef.current = { ...activeSwapRef.current, ...patch };
   };
-  const clearHistory = () => { setHistory([]); setExpandedHistory(null); try { localStorage.removeItem(HISTORY_KEY); } catch { /* */ } };
+  const clearHistory = () => { setHistory([]); setExpandedHistory(null); setSubmittedUserPrompt(null); try { localStorage.removeItem(HISTORY_KEY); } catch { /* */ } };
   // Reset all features to initial state
   const resetAllFeatures = () => {
     setShowTransactionMenu(false);
@@ -175,10 +188,11 @@ export const ProSwapper: React.FC = () => {
     setLiquidityAmount("");
     setActiveAction(null);
   };
-  const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
+  const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
   const handleSelectSubAction = (action: string) => {
     setShowTransactionMenu(false);
     const actionLabels: Record<string, string> = { deposit: "Deposit", withdraw: "Withdraw", send: "Send", receive: "Receive" };
+    setSubmittedUserPrompt(`Action: ${actionLabels[action]}`);
     setSokaMessage(`You selected ${actionLabels[action]}. Please tell me the amount and token you'd like to ${action}.`);
     setIntentPrompt("");
   };
@@ -451,6 +465,8 @@ export const ProSwapper: React.FC = () => {
     const prompt = promptToRun || intentPrompt;
     if (!prompt.trim() || isProcessing) return;
 
+    setSubmittedUserPrompt(prompt);
+
     // Try to parse intent locally first
     const handled = parseUserIntent(prompt);
     if (handled) {
@@ -503,151 +519,162 @@ export const ProSwapper: React.FC = () => {
   const hasRiskWarnings = guardianChecks.some(c => c.status === "WARNING" || c.status === "DANGER") || !guardianSafe;
 
   return (
-    <div className="h-[100dvh] w-full bg-[#FDF4F2] text-[#2C1924] flex flex-col overflow-hidden relative">
-      <div className="absolute top-[15%] left-[5%] w-[420px] h-[420px] rounded-full bg-[#DF7AA7]/[0.06] blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-[10%] right-[10%] w-[360px] h-[360px] rounded-full bg-[#F8B6A5]/[0.05] blur-[120px] pointer-events-none" />
+    <div className="h-[100dvh] w-full bg-[#FDF2F2] text-[#2C1924] flex flex-col overflow-hidden relative selection:bg-[#EE97C2] selection:text-white">
+      {/* Full-viewport Generative Ink Canvas (identical to Landing Page) */}
+      <GenerativeInkCanvas />
+
+      {/* Interactive Cursor Dye Bloom */}
+      <div 
+        ref={bloomRef}
+        className="fixed pointer-events-none z-0 w-[480px] h-[480px] rounded-full mix-blend-multiply opacity-40 blur-3xl transition-transform duration-100 ease-out hidden md:block"
+        style={{
+          top: 0,
+          left: 0,
+          background: 'radial-gradient(circle, #EE97C2 0%, rgba(253,242,242,0) 70%)',
+          willChange: 'transform'
+        }}
+      />
 
       <ProHeader onOpenWalletModal={() => setIsWalletModalOpen(true)} />
 
-      <main className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 relative z-10 flex flex-col">
-        {/* Ambient 3D Depth Glow behind chatbox */}
-        <div className="absolute inset-x-8 sm:inset-x-12 top-6 bottom-6 rounded-[36px] bg-gradient-to-b from-[#DF7AA7]/20 via-[#EE97C2]/15 to-[#F8B6A5]/20 blur-2xl -z-10 pointer-events-none opacity-80" />
-
-        {/* Main Chat Card - Floating 3D Glass */}
-        <div className="h-full rounded-3xl border border-white/90 ring-1 ring-[#F7D1D7]/80 bg-[#FDF4F2]/70 backdrop-blur-3xl shadow-[0_30px_70px_-15px_rgba(223,122,167,0.22),0_18px_36px_-10px_rgba(44,25,36,0.1),inset_0_1.5px_2px_0_rgba(255,255,255,0.95),inset_0_-2px_4px_0_rgba(223,122,167,0.15)] flex flex-col overflow-hidden relative">
-          {/* 3D Top Specular Light Highlight */}
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none z-20" />
+      <main className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-4 sm:px-6 py-3.5 sm:py-5 relative z-10 flex flex-col">
+        {/* Main Chat Card - Crisp, Soft & Clean Redesign */}
+        <div className="h-full bg-white rounded-[26px] sm:rounded-[30px] flex flex-col overflow-hidden relative border border-[#2C1924]/[0.09] shadow-[0_16px_44px_-10px_rgba(44,25,36,0.07),0_2px_8px_rgba(44,25,36,0.03)]">
+          {/* Subtle Top Specular Light Highlight */}
+          <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#2C1924]/[0.06] to-transparent pointer-events-none z-20 rounded-t-[26px] sm:rounded-t-[30px]" />
 
           {/* Header */}
-          <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#F7D1D7]/70 bg-white/50 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#2C1924]/[0.07] bg-white shrink-0 rounded-t-[26px] sm:rounded-t-[30px]">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-pink-50/80 border border-[#F7D1D7] flex items-center justify-center shadow-2xs">
-                <img src="/icon-chatbox.png" alt="SOKA AI" className="w-10 h-10 object-contain drop-shadow-xs transition-transform hover:scale-105" />
+              <div className="w-10 h-10 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-xs">
+                <img src="/icon-chatbox.png" alt="SOKA AI" className="w-8 h-8 object-contain drop-shadow-2xs transition-transform hover:scale-105" />
               </div>
               <div>
-                <div className="font-extrabold text-[16px] text-[#2C1924]" style={{ fontFamily: "var(--font-display)" }}>SOKA AI</div>
-                <div className="text-[11px] font-bold text-[#10b981] flex items-center gap-1.5 font-meta">
-                  <span className="w-2 h-2 rounded-full bg-[#10b981] ring-4 ring-[#10b981]/20 animate-pulse" /> 
+                <div className="font-extrabold text-[15px] tracking-tight text-[#2C1924]" style={{ fontFamily: "var(--font-display)" }}>SOKA AI</div>
+                <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1.5 font-meta">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" /> 
                   Online · Mezo Network
                 </div>
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2 font-meta">
-              <button onClick={() => setHistoryOpen(v => !v)} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${historyOpen ? "bg-white text-[#DF7AA7] border-[#DF7AA7] shadow-xs" : "bg-white/80 text-[#2C1924]/75 border-[#F7D1D7] hover:border-[#DF7AA7]/60 hover:text-[#DF7AA7] hover:bg-white"}`}>
-                <HistoryIcon className="w-3.5 h-3.5 text-[#DF7AA7]" />
+              <button onClick={() => setHistoryOpen(v => !v)} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${historyOpen ? "bg-[#DF7AA7] text-white border-[#DF7AA7] shadow-xs" : "bg-[#FAF8FA] text-[#2C1924] border-[#2C1924]/10 hover:border-[#DF7AA7]/60 hover:text-[#DF7AA7] hover:bg-white"}`}>
+                <HistoryIcon className={`w-3.5 h-3.5 ${historyOpen ? 'text-white' : 'text-[#DF7AA7]'}`} />
                 <span className="hidden sm:inline">History</span>
-                {history.length > 0 && <span className="ml-1 min-w-[18px] h-[18px] rounded-full bg-[#DF7AA7] text-white text-[9px] font-bold flex items-center justify-center">{history.length > 9 ? "9+" : history.length}</span>}
+                {history.length > 0 && <span className={`ml-1 min-w-[18px] h-[18px] rounded-full text-[9px] font-bold flex items-center justify-center ${historyOpen ? 'bg-white text-[#DF7AA7]' : 'bg-[#DF7AA7] text-white'}`}>{history.length > 9 ? "9+" : history.length}</span>}
               </button>
-              <button onClick={() => { setIntentPrompt(""); setRouteNodes([]); setGuardianChecks([]); setErrorMessage(null); setTxDigest(null); activeSwapRef.current = null; }} className="w-9 h-9 rounded-xl bg-white/80 border border-[#F7D1D7] flex items-center justify-center hover:bg-white hover:border-[#DF7AA7]/60 text-[#2C1924] hover:text-[#DF7AA7] font-bold transition-all shadow-2xs cursor-pointer" title="New Session">
+              <button onClick={() => { setIntentPrompt(""); setSubmittedUserPrompt(null); setRouteNodes([]); setGuardianChecks([]); setErrorMessage(null); setTxDigest(null); activeSwapRef.current = null; }} className="w-8 h-8 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white hover:border-[#DF7AA7]/60 text-[#2C1924] hover:text-[#DF7AA7] font-bold transition-all shadow-2xs cursor-pointer" title="New Session">
                 <span className="text-base font-bold">+</span>
               </button>
             </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 sm:px-6 py-5 bg-gradient-to-b from-white/30 via-transparent to-white/10">
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 sm:px-6 py-5 bg-[#FCFAFA]">
             <div className="flex flex-col gap-4 w-full">
               {/* Intro */}
               <div className="flex items-end gap-3">
-                <img src="/icon-chatbox.png" alt="Soka" className="w-11 h-11 object-contain shrink-0" />
-                <div className="p-4 rounded-2xl bg-white/85 border border-[#F7D1D7] shadow-2xs max-w-[85%]">
-                  <div className="font-meta text-[10px] font-bold tracking-[0.1em] text-[#DF7AA7] mb-1">SOKA ★ INTENT ENGINE</div>
-                  <div className="text-[15px] font-medium text-[#2C1924]/85 leading-relaxed">Tell me your dream swap. I sniff the route &amp; run 7 checks — no jargon, just vibes ⚡</div>
+                <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center shadow-2xs shrink-0">
+                  <img src="/icon-chatbox.png" alt="Soka" className="w-7 h-7 object-contain" />
+                </div>
+                <div className="p-4 sm:p-4.5 rounded-[22px] rounded-tl-[6px] bg-white border border-[#2C1924]/[0.08] shadow-[0_2px_12px_-2px_rgba(44,25,36,0.05)] max-w-[85%] relative overflow-hidden">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="font-meta text-[10px] font-bold tracking-[0.12em] text-[#DF7AA7] uppercase">SOKA AI</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#DF7AA7]" />
+                    <span className="font-meta text-[9px] font-semibold text-[#845D74]/80">Intent Engine</span>
+                  </div>
+                  <div className="text-[14.5px] font-medium text-[#2C1924] leading-relaxed">Tell me your dream swap. I sniff the route &amp; run 7 checks — no jargon, just vibes ⚡</div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 ml-0 sm:ml-14">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2 ml-0 sm:ml-12">
                 <button 
                   onClick={() => { resetAllFeatures(); setActiveAction("transaction"); setShowTransactionMenu(true); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-3 px-3.5 rounded-2xl border transition-all duration-200 select-none cursor-pointer overflow-hidden ${
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "transaction" 
-                      ? "bg-white border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-[0_8px_24px_rgba(223,122,167,0.25)] ring-2 ring-[#DF7AA7]/30 scale-[1.02]" 
-                      : "bg-white/80 hover:bg-white border-[#F7D1D7] text-[#2C1924] font-semibold shadow-2xs hover:border-[#DF7AA7]/60 hover:text-[#DF7AA7] hover:shadow-[0_8px_20px_rgba(223,122,167,0.16)] hover:-translate-y-0.5 active:scale-98"
+                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
-                  <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shadow-2xs shrink-0 ${
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
                     activeAction === "transaction" 
                       ? "bg-[#DF7AA7] text-white" 
-                      : "bg-pink-50 text-[#DF7AA7] border border-[#F7D1D7] group-hover:bg-[#DF7AA7] group-hover:text-white group-hover:scale-110 group-hover:shadow-[0_4px_12px_rgba(223,122,167,0.35)]"
+                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
                   }`}>
-                    <ArrowRightLeft className="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" />
+                    <ArrowRightLeft className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180" />
                   </div>
-                  <span className="text-[13px] font-semibold tracking-tight font-meta">Transaction</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Transaction</span>
                 </button>
 
                 <button 
                   onClick={() => { resetAllFeatures(); setActiveAction("borrow"); handleOpenBorrow(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-3 px-3.5 rounded-2xl border transition-all duration-200 select-none cursor-pointer overflow-hidden ${
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "borrow" 
-                      ? "bg-white border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-[0_8px_24px_rgba(223,122,167,0.25)] ring-2 ring-[#DF7AA7]/30 scale-[1.02]" 
-                      : "bg-white/80 hover:bg-white border-[#F7D1D7] text-[#2C1924] font-semibold shadow-2xs hover:border-[#DF7AA7]/60 hover:text-[#DF7AA7] hover:shadow-[0_8px_20px_rgba(223,122,167,0.16)] hover:-translate-y-0.5 active:scale-98"
+                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
-                  <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shadow-2xs shrink-0 ${
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
                     activeAction === "borrow" 
                       ? "bg-[#DF7AA7] text-white" 
-                      : "bg-purple-50 text-[#DF7AA7] border border-[#F7D1D7] group-hover:bg-[#DF7AA7] group-hover:text-white group-hover:scale-110 group-hover:shadow-[0_4px_12px_rgba(223,122,167,0.35)]"
+                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
                   }`}>
-                    <Landmark className="w-4 h-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+                    <Landmark className="w-3.5 h-3.5 transition-transform duration-300 group-hover:-translate-y-0.5" />
                   </div>
-                  <span className="text-[13px] font-semibold tracking-tight font-meta">Borrow</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Borrow</span>
                 </button>
 
                 <button 
                   onClick={() => { resetAllFeatures(); setActiveAction("vault"); handleOpenVault(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-3 px-3.5 rounded-2xl border transition-all duration-200 select-none cursor-pointer overflow-hidden ${
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "vault" 
-                      ? "bg-white border-[#10b981] text-[#10b981] font-bold shadow-[0_8px_24px_rgba(16,185,129,0.25)] ring-2 ring-[#10b981]/30 scale-[1.02]" 
-                      : "bg-white/80 hover:bg-white border-[#F7D1D7] text-[#2C1924] font-semibold shadow-2xs hover:border-[#10b981]/60 hover:text-[#10b981] hover:shadow-[0_8px_20px_rgba(16,185,129,0.16)] hover:-translate-y-0.5 active:scale-98"
+                      ? "bg-emerald-50/70 border-emerald-500 text-emerald-700 font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-emerald-400 hover:text-emerald-700 shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
-                  <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shadow-2xs shrink-0 ${
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
                     activeAction === "vault" 
-                      ? "bg-[#10b981] text-white" 
-                      : "bg-emerald-50 text-[#10b981] border border-[#F7D1D7] group-hover:bg-[#10b981] group-hover:text-white group-hover:scale-110 group-hover:shadow-[0_4px_12px_rgba(16,185,129,0.35)]"
+                      ? "bg-emerald-600 text-white" 
+                      : "bg-[#FAF8FA] text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
                   }`}>
-                    <Vault className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
+                    <Vault className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-12" />
                   </div>
-                  <span className="text-[13px] font-semibold tracking-tight font-meta">Vault</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Vault</span>
                 </button>
 
                 <button 
                   onClick={() => { resetAllFeatures(); setActiveAction("pool"); handleOpenPool(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-3 px-3.5 rounded-2xl border transition-all duration-200 select-none cursor-pointer overflow-hidden ${
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "pool" 
-                      ? "bg-white border-[#06b6d4] text-[#06b6d4] font-bold shadow-[0_8px_24px_rgba(6,182,212,0.25)] ring-2 ring-[#06b6d4]/30 scale-[1.02]" 
-                      : "bg-white/80 hover:bg-white border-[#F7D1D7] text-[#2C1924] font-semibold shadow-2xs hover:border-[#06b6d4]/60 hover:text-[#06b6d4] hover:shadow-[0_8px_20px_rgba(6,182,212,0.16)] hover:-translate-y-0.5 active:scale-98"
+                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
-                  <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/50 to-transparent pointer-events-none rounded-t-2xl" />
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shadow-2xs shrink-0 ${
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
                     activeAction === "pool" 
-                      ? "bg-[#06b6d4] text-white" 
-                      : "bg-cyan-50 text-[#06b6d4] border border-[#F7D1D7] group-hover:bg-[#06b6d4] group-hover:text-white group-hover:scale-110 group-hover:shadow-[0_4px_12px_rgba(6,182,212,0.35)]"
+                      ? "bg-[#DF7AA7] text-white" 
+                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
                   }`}>
-                    <Waves className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                    <Waves className="w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110" />
                   </div>
-                  <span className="text-[13px] font-semibold tracking-tight font-meta">Pool</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Pool</span>
                 </button>
               </div>
 
               {/* Transaction Sub-menu */}
               {showTransactionMenu && (
-                <div className="mt-2 ml-0 sm:ml-14">
-                  <div className="bg-white/95 border border-[#F7D1D7] rounded-2xl p-4 shadow-sm backdrop-blur-xl max-w-full sm:max-w-[90%]">
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="border border-[#2C1924]/[0.08] rounded-2xl p-4 shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[90%]">
                     {/* Header & Close Button */}
-                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#F7D1D7]/60">
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#2C1924]/[0.07]">
                       <div className="flex items-center gap-2 text-xs font-bold text-[#2C1924] font-meta">
                         <ArrowRightLeft className="w-3.5 h-3.5 text-[#DF7AA7]" />
                         <span>Transaction Actions</span>
                       </div>
                       <button 
                         onClick={() => { setShowTransactionMenu(false); setActiveAction(null); }} 
-                        className="w-6 h-6 rounded-full bg-[#FDF4F2] border border-[#F7D1D7] flex items-center justify-center hover:bg-white text-[#2C1924]/60 hover:text-[#2C1924] transition-all cursor-pointer"
+                        className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer"
                         title="Close sub-menu"
                       >
                         <span className="text-xs font-bold">✕</span>
@@ -656,30 +683,30 @@ export const ProSwapper: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-meta">
                       <button 
                         onClick={() => handleSelectSubAction("deposit")} 
-                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100/80 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5 text-emerald-600 transition-transform group-hover:-translate-y-0.5" />
                         <span className="text-xs font-bold">Deposit</span>
                       </button>
                       <button 
                         onClick={() => handleSelectSubAction("withdraw")} 
-                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100/80 hover:border-amber-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-amber-200/80 bg-amber-50/70 text-amber-800 hover:bg-amber-100 hover:border-amber-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Upload className="w-3.5 h-3.5 text-amber-600 transition-transform group-hover:-translate-y-0.5" />
                         <span className="text-xs font-bold">Withdraw</span>
                       </button>
                       <button 
                         onClick={() => handleSelectSubAction("send")} 
-                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-[#F7D1D7] bg-pink-50/70 text-[#DF7AA7] hover:bg-pink-100/80 hover:border-[#DF7AA7] hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-pink-200/80 bg-pink-50/70 text-[#DF7AA7] hover:bg-pink-100 hover:border-[#DF7AA7] hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Send className="w-3.5 h-3.5 text-[#DF7AA7] transition-transform group-hover:translate-x-0.5" />
                         <span className="text-xs font-bold">Send</span>
                       </button>
                       <button 
                         onClick={() => handleSelectSubAction("receive")} 
-                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-cyan-200 bg-cyan-50/70 text-cyan-800 hover:bg-cyan-100/80 hover:border-cyan-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                        className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-purple-200/80 bg-purple-50/70 text-purple-800 hover:bg-purple-100 hover:border-purple-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
-                        <ArrowDownToLine className="w-3.5 h-3.5 text-cyan-600 transition-transform group-hover:translate-y-0.5" />
+                        <ArrowDownToLine className="w-3.5 h-3.5 text-purple-600 transition-transform group-hover:translate-y-0.5" />
                         <span className="text-xs font-bold">Receive</span>
                       </button>
                     </div>
@@ -690,30 +717,36 @@ export const ProSwapper: React.FC = () => {
               {/* Soka Action Message */}
               {sokaMessage && !isProcessing && (
                 <div className="flex items-end gap-3">
-                  <img src="/icon-chatbox.png" alt="Soka" className="w-11 h-11 object-contain shrink-0" />
-                  <div className="p-4 rounded-2xl bg-white/85 border border-[#F7D1D7] shadow-2xs max-w-[85%]">
-                    <div className="font-meta text-[10px] font-bold tracking-[0.1em] text-[#DF7AA7] mb-1">SOKA ★</div>
-                    <div className="text-[14px] font-medium text-[#2C1924]/85 whitespace-pre-line">{sokaMessage}</div>
+                  <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center shadow-2xs shrink-0">
+                    <img src="/icon-chatbox.png" alt="Soka" className="w-7 h-7 object-contain" />
+                  </div>
+                  <div className="p-4 sm:p-4.5 rounded-[22px] rounded-tl-[6px] bg-white border border-[#2C1924]/[0.08] shadow-[0_2px_12px_-2px_rgba(44,25,36,0.05)] max-w-[85%] relative overflow-hidden">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="font-meta text-[10px] font-bold tracking-[0.12em] text-[#DF7AA7] uppercase">SOKA AI</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#DF7AA7]" />
+                      <span className="font-meta text-[9px] font-semibold text-[#845D74]/80">Execution Agent</span>
+                    </div>
+                    <div className="text-[14px] font-medium text-[#2C1924] whitespace-pre-line leading-relaxed">{sokaMessage}</div>
                   </div>
                 </div>
               )}
 
-              {/* Borrow Card - Theme glassmorphism */}
+              {/* Borrow Card - Clean Soft Design */}
               {borrowStep !== "idle" && (
-                <div className="mt-2 ml-0 sm:ml-14">
-                  <div className="p-5 rounded-3xl bg-white/95 border border-[#F7D1D7] shadow-md max-w-full sm:max-w-[85%]">
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#2C1924]/[0.08] shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[85%]">
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#F7D1D7]/60">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2C1924]/[0.07]">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-[#F7D1D7] flex items-center justify-center shadow-2xs">
-                          <Landmark className="w-5 h-5 text-[#DF7AA7]" />
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Landmark className="w-4.5 h-4.5 text-[#DF7AA7]" />
                         </div>
                         <div>
-                          <h3 className="font-display text-[16px] font-bold text-[#2C1924]">Borrow</h3>
-                          <p className="font-meta text-[12px] text-[#2C1924]/50">{(borrowStep === "select_token" && "Select token") || (borrowStep === "enter_amount" && `Borrow ${borrowToken}`) || (borrowStep === "review" && "Review") || (borrowStep === "success" && "Done")}</p>
+                          <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Borrow</h3>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">{(borrowStep === "select_token" && "Select token") || (borrowStep === "enter_amount" && `Borrow ${borrowToken}`) || (borrowStep === "review" && "Review") || (borrowStep === "success" && "Done")}</p>
                         </div>
                       </div>
-                      <button onClick={() => { setBorrowStep("idle"); setActiveAction(null); }} className="w-7 h-7 rounded-full bg-[#FDF4F2] border border-[#F7D1D7] flex items-center justify-center hover:bg-white text-[#2C1924]/50 hover:text-[#2C1924] transition-all cursor-pointer">
+                      <button onClick={() => { setBorrowStep("idle"); setActiveAction(null); }} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
                         <span className="text-xs font-bold">✕</span>
                       </button>
                     </div>
@@ -721,12 +754,12 @@ export const ProSwapper: React.FC = () => {
                     {/* Step 1: Token Selection */}
                     {borrowStep === "select_token" && (
                       <div className="grid grid-cols-2 gap-3 font-meta">
-                        <button onClick={() => handleSelectBorrowToken("MUSD")} className="p-4 rounded-2xl border border-[#F7D1D7] bg-white/80 hover:bg-white hover:border-[#DF7AA7] hover:shadow-[0_8px_20px_rgba(223,122,167,0.18)] hover:-translate-y-0.5 transition-all duration-200 text-center cursor-pointer shadow-2xs">
-                          <div className="font-display text-[18px] font-bold text-[#2C1924]">MUSD</div>
+                        <button onClick={() => handleSelectBorrowToken("MUSD")} className="p-3.5 rounded-xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 text-center cursor-pointer shadow-2xs">
+                          <div className="font-display text-[17px] font-bold text-[#2C1924]">MUSD</div>
                           <div className="font-mono text-[11px] font-bold text-emerald-600 mt-1">4.5% APR</div>
                         </button>
-                        <button onClick={() => handleSelectBorrowToken("MUSDC")} className="p-4 rounded-2xl border border-[#F7D1D7] bg-white/80 hover:bg-white hover:border-[#DF7AA7] hover:shadow-[0_8px_20px_rgba(223,122,167,0.18)] hover:-translate-y-0.5 transition-all duration-200 text-center cursor-pointer shadow-2xs">
-                          <div className="font-display text-[18px] font-bold text-[#2C1924]">MUSDC</div>
+                        <button onClick={() => handleSelectBorrowToken("MUSDC")} className="p-3.5 rounded-xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 text-center cursor-pointer shadow-2xs">
+                          <div className="font-display text-[17px] font-bold text-[#2C1924]">MUSDC</div>
                           <div className="font-mono text-[11px] font-bold text-emerald-600 mt-1">3.8% APR</div>
                         </button>
                       </div>
@@ -736,63 +769,63 @@ export const ProSwapper: React.FC = () => {
                     {borrowStep === "enter_amount" && (
                       <>
                         <div className="mb-4">
-                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2 block">Collateral (BTC)</label>
-                          <input type="number" value={collateralAmount} onChange={(e) => setCollateralAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7] font-mono text-[18px] text-[#2C1924] outline-none placeholder:text-[#2C1924]/30 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Collateral (BTC)</label>
+                          <input type="number" value={collateralAmount} onChange={(e) => setCollateralAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
                           <div className="flex justify-between items-center mt-2">
-                            <span className="font-mono text-[11px] text-[#2C1924]/50">≈ ${collateralValueUsd.toFixed(2)}</span>
+                            <span className="font-mono text-[11px] text-[#845D74]">≈ ${collateralValueUsd.toFixed(2)}</span>
                             <div className="flex gap-1 font-mono">
                               {[25, 50, 75, 100].map(pct => (
-                                <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#F7D1D7] text-[10px] font-bold text-[#2C1924]/70 hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
+                                <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#2C1924]/10 text-[10px] font-bold text-[#845D74] hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
                               ))}
                             </div>
                           </div>
                         </div>
                         {collateralAmount && parseFloat(collateralAmount) > 0 && (
-                          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 mb-4">
+                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 mb-4">
                             <div className="font-mono text-[12px] text-emerald-800">Borrow up to <span className="font-bold">{borrowAmount.toFixed(2)} {borrowToken}</span></div>
                           </div>
                         )}
-                        <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0} className="w-full py-3 rounded-2xl font-bold text-[14px] text-white bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] hover:opacity-95 shadow-[0_4px_16px_rgba(223,122,167,0.3)] disabled:opacity-50 transition-all font-meta cursor-pointer">Review</button>
-                        <button onClick={() => setBorrowStep("select_token")} className="w-full py-2 mt-2 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Change token</button>
+                        <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Review</button>
+                        <button onClick={() => setBorrowStep("select_token")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Change token</button>
                       </>
                     )}
 
                     {/* Step 3: Review */}
                     {borrowStep === "review" && (
                       <>
-                        <div className="space-y-3 mb-4">
-                          <div className="flex justify-between items-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                            <span className="font-meta text-[13px] font-semibold text-[#2C1924]/70">Borrow</span>
-                            <span className="font-display text-[16px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</span>
+                        <div className="space-y-2.5 mb-4">
+                          <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                            <span className="font-meta text-[12px] font-semibold text-[#845D74]">Borrow</span>
+                            <span className="font-display text-[15px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</span>
                           </div>
-                          <div className="flex justify-between items-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                            <span className="font-meta text-[13px] font-semibold text-[#2C1924]/70">Collateral</span>
-                            <span className="font-display text-[16px] font-bold text-[#2C1924]">{collateralAmount} BTC</span>
+                          <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                            <span className="font-meta text-[12px] font-semibold text-[#845D74]">Collateral</span>
+                            <span className="font-display text-[15px] font-bold text-[#2C1924]">{collateralAmount} BTC</span>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                            <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/40">LTV</div>
-                              <div className="font-display text-[15px] font-bold text-[#10b981]">75%</div>
+                          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                            <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">LTV</div>
+                              <div className="font-display text-[14px] font-bold text-emerald-600">75%</div>
                             </div>
-                            <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/40">Rate</div>
-                              <div className="font-display text-[15px] font-bold text-[#2C1924]">{interestRate}%</div>
+                            <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Rate</div>
+                              <div className="font-display text-[14px] font-bold text-[#2C1924]">{interestRate}%</div>
                             </div>
-                            <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/40">Liq. Price</div>
-                              <div className="font-display text-[15px] font-bold text-[#ef4444]">${liquidationPrice.toFixed(4)}</div>
+                            <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Liq. Price</div>
+                              <div className="font-display text-[14px] font-bold text-[#ef4444]">${liquidationPrice.toFixed(4)}</div>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 p-3 rounded-2xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-4 select-none" onClick={() => setBorrowAcknowledged(!borrowAcknowledged)}>
-                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-colors ${borrowAcknowledged ? "bg-[#10b981] border-[#10b981]" : "bg-white border-amber-300"}`}>
+                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-4 select-none" onClick={() => setBorrowAcknowledged(!borrowAcknowledged)}>
+                          <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center transition-colors ${borrowAcknowledged ? "bg-emerald-600 border-emerald-600" : "bg-white border-amber-300"}`}>
                             {borrowAcknowledged && <Check className="w-3 h-3 text-white" />}
                           </div>
-                          <span className="font-meta text-[12px] font-semibold text-amber-900">I acknowledge the liquidation risk</span>
+                          <span className="font-meta text-[11.5px] font-semibold text-amber-900">I acknowledge the liquidation risk</span>
                         </div>
-                        <div className="flex gap-3 font-meta">
-                          <button onClick={handleBorrowCancel} className="flex-1 py-3 rounded-2xl border border-[#F7D1D7] bg-white font-bold text-[14px] text-[#2C1924]/70 hover:bg-[#FDF4F2] transition-all cursor-pointer">Cancel</button>
-                          <button onClick={handleBorrowConfirm} disabled={!borrowAcknowledged} className="flex-1 py-3 rounded-2xl font-bold text-[14px] text-white bg-[#10b981] hover:bg-[#10b981]/90 shadow-xs disabled:opacity-50 transition-all cursor-pointer">Confirm</button>
+                        <div className="flex gap-2.5 font-meta">
+                          <button onClick={handleBorrowCancel} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">Cancel</button>
+                          <button onClick={handleBorrowConfirm} disabled={!borrowAcknowledged} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all cursor-pointer">Confirm</button>
                         </div>
                       </>
                     )}
@@ -800,25 +833,25 @@ export const ProSwapper: React.FC = () => {
                     {/* Step 4: Success */}
                     {borrowStep === "success" && (
                       <div className="text-center py-4">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shadow-xs">
-                          <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
+                          <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                         </div>
-                        <div className="font-display text-[20px] font-bold text-[#2C1924] mb-1">Borrow Successful!</div>
-                        <div className="font-meta text-[14px] text-[#2C1924]/60 mb-4">Your position is now active on Mezo</div>
-                        <div className="p-4 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] inline-block mb-4 shadow-2xs">
+                        <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Borrow Successful!</div>
+                        <div className="font-meta text-[13px] text-[#845D74] mb-3">Your position is now active on Mezo</div>
+                        <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
                           <div className="grid grid-cols-2 gap-4 text-left">
                             <div>
-                              <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">Borrowed</div>
-                              <div className="font-display text-[16px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</div>
+                              <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Borrowed</div>
+                              <div className="font-display text-[15px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</div>
                             </div>
                             <div>
-                              <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">Collateral</div>
-                              <div className="font-display text-[16px] font-bold text-[#2C1924]">{collateralAmount} BTC</div>
+                              <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Collateral</div>
+                              <div className="font-display text-[15px] font-bold text-[#2C1924]">{collateralAmount} BTC</div>
                             </div>
                           </div>
                         </div>
                         <div className="flex gap-3 justify-center font-meta">
-                          <button onClick={handleBorrowCancel} className="px-6 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[13px] hover:bg-rose-100/80 transition-all cursor-pointer">Cancel Position</button>
+                          <button onClick={handleBorrowCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Cancel Position</button>
                         </div>
                       </div>
                     )}
@@ -826,22 +859,22 @@ export const ProSwapper: React.FC = () => {
                 </div>
               )}
 
-              {/* Vault Card - Theme glassmorphism */}
+              {/* Vault Card - Clean Soft Design */}
               {vaultStep !== "idle" && (
-                <div className="mt-2 ml-0 sm:ml-14">
-                  <div className="p-5 rounded-3xl bg-white/95 border border-[#F7D1D7] shadow-md max-w-full sm:max-w-[85%]">
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#2C1924]/[0.08] shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[85%]">
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#F7D1D7]/60">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2C1924]/[0.07]">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-[#F7D1D7] flex items-center justify-center shadow-2xs">
-                          <Vault className="w-5 h-5 text-[#DF7AA7]" />
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-2xs">
+                          <Vault className="w-4.5 h-4.5 text-emerald-600" />
                         </div>
                         <div>
-                          <h3 className="font-display text-[16px] font-bold text-[#2C1924]">Vaults</h3>
-                          <p className="font-meta text-[12px] text-[#2C1924]/50">{(vaultStep === "list" && "Your overview") || (vaultStep === "details" && "Vault details") || (vaultStep === "deposit" && "Deposit") || (vaultStep === "confirm" && "Confirm") || (vaultStep === "success" && "Done")}</p>
+                          <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Vaults</h3>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">{(vaultStep === "list" && "Your overview") || (vaultStep === "details" && "Vault details") || (vaultStep === "deposit" && "Deposit") || (vaultStep === "confirm" && "Confirm") || (vaultStep === "success" && "Done")}</p>
                         </div>
                       </div>
-                      <button onClick={() => { setVaultStep("idle"); setActiveAction(null); setSelectedVault(null); setDepositAmount(""); }} className="w-7 h-7 rounded-full bg-[#FDF4F2] border border-[#F7D1D7] flex items-center justify-center hover:bg-white text-[#2C1924]/50 hover:text-[#2C1924] transition-all cursor-pointer">
+                      <button onClick={() => { setVaultStep("idle"); setActiveAction(null); setSelectedVault(null); setDepositAmount(""); }} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
                         <span className="text-xs font-bold">✕</span>
                       </button>
                     </div>
@@ -850,35 +883,35 @@ export const ProSwapper: React.FC = () => {
                     {vaultStep === "list" && (
                       <>
                         {/* Balance Summary */}
-                        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 font-meta">
-                          <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/50">Total Deposited</div>
-                            <div className="font-display text-[15px] font-bold text-[#DF7AA7] mt-0.5">${vaultBalance.totalDeposited.toLocaleString()}</div>
+                        <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-3 font-meta">
+                          <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Total Deposited</div>
+                            <div className="font-display text-[14px] font-bold text-[#DF7AA7] mt-0.5">${vaultBalance.totalDeposited.toLocaleString()}</div>
                           </div>
-                          <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/50">Avg APR</div>
-                            <div className="font-display text-[15px] font-bold text-[#10b981] mt-0.5">{vaultBalance.avgApr}%</div>
+                          <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Avg APR</div>
+                            <div className="font-display text-[14px] font-bold text-emerald-600 mt-0.5">{vaultBalance.avgApr}%</div>
                           </div>
-                          <div className="text-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/50">Deposits</div>
-                            <div className="font-display text-[15px] font-bold text-[#2C1924] mt-0.5">{vaultBalance.deposits}</div>
+                          <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Deposits</div>
+                            <div className="font-display text-[14px] font-bold text-[#2C1924] mt-0.5">{vaultBalance.deposits}</div>
                           </div>
                         </div>
                         {/* Vault List */}
-                        <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2">Available Vaults</div>
+                        <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74] mb-2">Available Vaults</div>
                         <div className="space-y-2">
                           {vaults.map(vault => (
-                            <button key={vault.id} onClick={() => handleSelectVault(vault.id)} className={`w-full p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer shadow-2xs ${vault.featured ? "border-amber-300 bg-amber-50/80 hover:bg-amber-100/90 hover:shadow-md hover:-translate-y-0.5" : "border-[#F7D1D7] bg-white/80 hover:bg-white hover:border-[#DF7AA7] hover:shadow-md hover:-translate-y-0.5"}`}>
+                            <button key={vault.id} onClick={() => handleSelectVault(vault.id)} className={`w-full p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer shadow-2xs ${vault.featured ? "border-amber-300/80 bg-amber-50/70 hover:bg-amber-100/80" : "border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60"}`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  {vault.featured && <span className="px-2 py-0.5 rounded-lg bg-amber-200/80 text-amber-900 font-mono text-[8px] font-bold">FEATURED</span>}
-                                  <span className="font-display text-[14px] font-bold text-[#2C1924]">{vault.name}</span>
+                                  {vault.featured && <span className="px-1.5 py-0.5 rounded-md bg-amber-200/80 text-amber-900 font-mono text-[8px] font-bold">FEATURED</span>}
+                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{vault.name}</span>
                                 </div>
-                                <span className="font-display text-[14px] font-bold text-[#10b981]">{vault.apr}%</span>
+                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{vault.apr}%</span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 font-mono">
-                                <span className="text-[10px] text-[#2C1924]/60">TVL: ${(vault.tvl / 1000000).toFixed(1)}M</span>
-                                <span className="text-[10px] text-[#2C1924]/60">Fee: {vault.withdrawalFee}</span>
+                                <span className="text-[10px] text-[#845D74]">TVL: ${(vault.tvl / 1000000).toFixed(1)}M</span>
+                                <span className="text-[10px] text-[#845D74]">Fee: {vault.withdrawalFee}</span>
                               </div>
                             </button>
                           ))}
@@ -891,43 +924,39 @@ export const ProSwapper: React.FC = () => {
                       const vault = vaults.find(v => v.id === selectedVault);
                       return vault ? (
                         <>
-                          <div className="space-y-2 mb-4 font-meta">
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Vault Address</span>
+                          <div className="space-y-2 mb-3.5 font-meta">
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Vault Address</span>
                               <span className="font-mono text-[11px] font-bold text-[#2C1924]">{vault.address.slice(0, 8)}...{vault.address.slice(-6)}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Deposit Token</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{vault.depositToken}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Deposit Token</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{vault.depositToken}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Receipt Token</span>
-                              <span className="font-display text-[13px] font-bold text-[#DF7AA7]">{vault.receiptToken}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Receipt Token</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#DF7AA7]">{vault.receiptToken}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Operator</span>
-                              <span className="text-[12px] font-bold text-[#2C1924]">{vault.operator}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Operator</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.operator}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Withdrawal Fee</span>
-                              <span className="text-[12px] font-bold text-[#2C1924]">{vault.withdrawalFee}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Withdrawal Fee</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.withdrawalFee}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Time-lock</span>
-                              <span className="text-[12px] font-bold text-[#2C1924]">{vault.withdrawalTimelock}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Yield Asset</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.yieldAsset}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Yield Asset</span>
-                              <span className="text-[12px] font-bold text-[#2C1924]">{vault.yieldAsset}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-50 border border-emerald-200">
                               <span className="text-[11px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[16px] font-bold text-[#10b981]">{vault.apr}%</span>
+                              <span className="font-display text-[15px] font-bold text-emerald-600">{vault.apr}%</span>
                             </div>
                           </div>
-                          <div className="flex gap-3 font-meta">
-                            <button onClick={() => setVaultStep("list")} className="flex-1 py-3 rounded-2xl border border-[#F7D1D7] bg-white font-bold text-[14px] text-[#2C1924]/70 hover:bg-[#FDF4F2] transition-all cursor-pointer">← Back</button>
-                            <button onClick={handleDepositVault} className="flex-1 py-3 rounded-2xl font-bold text-[14px] text-white bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] hover:opacity-95 shadow-[0_4px_16px_rgba(223,122,167,0.3)] transition-all cursor-pointer">Deposit</button>
+                          <div className="flex gap-2.5 font-meta">
+                            <button onClick={() => setVaultStep("list")} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">← Back</button>
+                            <button onClick={handleDepositVault} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer">Deposit</button>
                           </div>
                         </>
                       ) : null;
@@ -939,16 +968,16 @@ export const ProSwapper: React.FC = () => {
                       return vault ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2 block">Amount ({vault.depositToken})</label>
-                            <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7] font-mono text-[18px] text-[#2C1924] outline-none placeholder:text-[#2C1924]/30 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount ({vault.depositToken})</label>
+                            <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-emerald-500 focus:bg-white transition-all" />
                           </div>
                           {depositAmount && parseFloat(depositAmount) > 0 && (
-                            <div className="p-3 rounded-2xl bg-pink-50 border border-[#F7D1D7] mb-4">
-                              <div className="font-meta text-[12px] text-[#2C1924]">You'll receive ~ <span className="font-bold text-[#DF7AA7]">{(parseFloat(depositAmount) * 0.98).toFixed(2)} {vault.receiptToken}</span></div>
+                            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 mb-3.5">
+                              <div className="font-meta text-[11.5px] text-emerald-900">You'll receive ~ <span className="font-bold text-emerald-700">{(parseFloat(depositAmount) * 0.98).toFixed(2)} {vault.receiptToken}</span></div>
                             </div>
                           )}
-                          <button onClick={handleDepositAmountSubmit} disabled={!depositAmount || parseFloat(depositAmount) <= 0} className="w-full py-3 rounded-2xl font-bold text-[14px] text-white bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] hover:opacity-95 shadow-[0_4px_16px_rgba(223,122,167,0.3)] disabled:opacity-50 transition-all font-meta cursor-pointer">Review Deposit</button>
-                          <button onClick={() => setVaultStep("details")} className="w-full py-2 mt-2 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
+                          <button onClick={handleDepositAmountSubmit} disabled={!depositAmount || parseFloat(depositAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Review Deposit</button>
+                          <button onClick={() => setVaultStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-emerald-700 hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
                     })()}
@@ -958,29 +987,29 @@ export const ProSwapper: React.FC = () => {
                       const vault = vaults.find(v => v.id === selectedVault);
                       return vault ? (
                         <>
-                          <div className="space-y-3 mb-4 font-meta">
-                            <div className="flex justify-between items-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[12px] font-semibold text-[#2C1924]/60">Deposit</span>
-                              <span className="font-display text-[15px] font-bold text-[#2C1924]">{depositAmount} {vault.depositToken}</span>
+                          <div className="space-y-2.5 mb-3.5 font-meta">
+                            <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[12px] font-semibold text-[#845D74]">Deposit</span>
+                              <span className="font-display text-[14px] font-bold text-[#2C1924]">{depositAmount} {vault.depositToken}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[12px] font-semibold text-[#2C1924]/60">Receive</span>
-                              <span className="font-display text-[15px] font-bold text-[#DF7AA7]">{(parseFloat(depositAmount || "0") * 0.98).toFixed(2)} {vault.receiptToken}</span>
+                            <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[12px] font-semibold text-[#845D74]">Receive</span>
+                              <span className="font-display text-[14px] font-bold text-emerald-700">{(parseFloat(depositAmount || "0") * 0.98).toFixed(2)} {vault.receiptToken}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
+                            <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
                               <span className="text-[12px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[15px] font-bold text-[#10b981]">{vault.apr}%</span>
+                              <span className="font-display text-[14px] font-bold text-emerald-600">{vault.apr}%</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 p-3 rounded-2xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-4 select-none" onClick={() => setVaultAcknowledged(!vaultAcknowledged)}>
-                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-colors ${vaultAcknowledged ? "bg-[#10b981] border-[#10b981]" : "bg-white border-amber-300"}`}>
+                          <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-3.5 select-none" onClick={() => setVaultAcknowledged(!vaultAcknowledged)}>
+                            <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center transition-colors ${vaultAcknowledged ? "bg-emerald-600 border-emerald-600" : "bg-white border-amber-300"}`}>
                               {vaultAcknowledged && <Check className="w-3 h-3 text-white" />}
                             </div>
-                            <span className="font-meta text-[12px] font-semibold text-amber-900">I acknowledge the deposit terms</span>
+                            <span className="font-meta text-[11.5px] font-semibold text-amber-900">I acknowledge the deposit terms</span>
                           </div>
-                          <div className="flex gap-3 font-meta">
-                            <button onClick={handleVaultCancel} className="flex-1 py-3 rounded-2xl border border-[#F7D1D7] bg-white font-bold text-[14px] text-[#2C1924]/70 hover:bg-[#FDF4F2] transition-all cursor-pointer">Cancel</button>
-                            <button onClick={handleVaultConfirm} disabled={!vaultAcknowledged} className="flex-1 py-3 rounded-2xl font-bold text-[14px] text-white bg-[#10b981] hover:bg-[#10b981]/90 shadow-xs disabled:opacity-50 transition-all cursor-pointer">Confirm</button>
+                          <div className="flex gap-2.5 font-meta">
+                            <button onClick={handleVaultCancel} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">Cancel</button>
+                            <button onClick={handleVaultConfirm} disabled={!vaultAcknowledged} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all cursor-pointer">Confirm</button>
                           </div>
                         </>
                       ) : null;
@@ -991,25 +1020,25 @@ export const ProSwapper: React.FC = () => {
                       const vault = vaults.find(v => v.id === selectedVault);
                       return vault ? (
                         <div className="text-center py-4">
-                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shadow-xs">
-                            <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
+                            <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                           </div>
-                          <div className="font-display text-[20px] font-bold text-[#2C1924] mb-1">Deposit Successful!</div>
-                          <div className="font-meta text-[14px] text-[#2C1924]/60 mb-4">Your deposit is now earning yield on Mezo</div>
-                          <div className="p-4 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] inline-block mb-4 shadow-2xs">
+                          <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Deposit Successful!</div>
+                          <div className="font-meta text-[13px] text-[#845D74] mb-3">Your deposit is now earning yield on Mezo</div>
+                          <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
                             <div className="grid grid-cols-2 gap-4 text-left">
                               <div>
-                                <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">Deposited</div>
-                                <div className="font-display text-[16px] font-bold text-[#DF7AA7]">{depositAmount} {vault.depositToken}</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Deposited</div>
+                                <div className="font-display text-[15px] font-bold text-emerald-700">{depositAmount} {vault.depositToken}</div>
                               </div>
                               <div>
-                                <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">APR</div>
-                                <div className="font-display text-[16px] font-bold text-[#10b981]">{vault.apr}%</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">APR</div>
+                                <div className="font-display text-[15px] font-bold text-emerald-600">{vault.apr}%</div>
                               </div>
                             </div>
                           </div>
                           <div className="flex gap-3 justify-center font-meta">
-                            <button onClick={handleVaultCancel} className="px-6 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[13px] hover:bg-rose-100/80 transition-all cursor-pointer">Withdraw</button>
+                            <button onClick={handleVaultCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Withdraw</button>
                           </div>
                         </div>
                       ) : null;
@@ -1018,22 +1047,22 @@ export const ProSwapper: React.FC = () => {
                 </div>
               )}
 
-              {/* Pool Card - Theme glassmorphism */}
+              {/* Pool Card - Clean Soft Design */}
               {poolStep !== "idle" && (
-                <div className="mt-2 ml-0 sm:ml-14">
-                  <div className="p-5 rounded-3xl bg-white/95 border border-[#F7D1D7] shadow-md max-w-full sm:max-w-[85%]">
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#2C1924]/[0.08] shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[85%]">
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#F7D1D7]/60">
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2C1924]/[0.07]">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-[#F7D1D7] flex items-center justify-center shadow-2xs">
-                          <Waves className="w-5 h-5 text-[#DF7AA7]" />
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Waves className="w-4.5 h-4.5 text-[#DF7AA7]" />
                         </div>
                         <div>
-                          <h3 className="font-display text-[16px] font-bold text-[#2C1924]">Pools</h3>
-                          <p className="font-meta text-[12px] text-[#2C1924]/50">{(poolStep === "list" && "Available pools") || (poolStep === "details" && "Pool details") || (poolStep === "addLiquidity" && "Add liquidity") || (poolStep === "success" && "Success")}</p>
+                          <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Pools</h3>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">{(poolStep === "list" && "Available pools") || (poolStep === "details" && "Pool details") || (poolStep === "addLiquidity" && "Add liquidity") || (poolStep === "success" && "Success")}</p>
                         </div>
                       </div>
-                      <button onClick={() => { setPoolStep("idle"); setActiveAction(null); setSelectedPool(null); setLiquidityAmount(""); }} className="w-7 h-7 rounded-full bg-[#FDF4F2] border border-[#F7D1D7] flex items-center justify-center hover:bg-white text-[#2C1924]/50 hover:text-[#2C1924] transition-all cursor-pointer">
+                      <button onClick={() => { setPoolStep("idle"); setActiveAction(null); setSelectedPool(null); setLiquidityAmount(""); }} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
                         <span className="text-xs font-bold">✕</span>
                       </button>
                     </div>
@@ -1043,17 +1072,17 @@ export const ProSwapper: React.FC = () => {
                       <>
                         <div className="space-y-2">
                           {pools.map(pool => (
-                            <button key={pool.id} onClick={() => handleSelectPool(pool.id)} className="w-full p-3.5 rounded-2xl border border-[#F7D1D7] bg-white/80 hover:bg-white hover:border-[#DF7AA7] text-left transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer shadow-2xs">
+                            <button key={pool.id} onClick={() => handleSelectPool(pool.id)} className="w-full p-3 rounded-xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60 text-left transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 cursor-pointer shadow-2xs">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-display text-[14px] font-bold text-[#2C1924]">{pool.name}</span>
-                                  <span className="px-2 py-0.5 rounded-lg bg-pink-100/70 text-[#DF7AA7] font-mono text-[9px] font-bold">{pool.type}</span>
+                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{pool.name}</span>
+                                  <span className="px-1.5 py-0.5 rounded-md bg-[#DF7AA7]/10 text-[#DF7AA7] font-mono text-[9px] font-bold">{pool.type}</span>
                                 </div>
-                                <span className="font-display text-[14px] font-bold text-[#10b981]">{pool.aprFormatted}</span>
+                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{pool.aprFormatted}</span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 font-mono">
-                                <span className="text-[10px] text-[#2C1924]/60">TVL: {pool.tvlFormatted}</span>
-                                <span className="text-[10px] text-[#2C1924]/60">Fee: {pool.feeFormatted}</span>
+                                <span className="text-[10px] text-[#845D74]">TVL: {pool.tvlFormatted}</span>
+                                <span className="text-[10px] text-[#845D74]">Fee: {pool.feeFormatted}</span>
                               </div>
                             </button>
                           ))}
@@ -1066,54 +1095,54 @@ export const ProSwapper: React.FC = () => {
                       const pool = pools.find(p => p.id === selectedPool);
                       return pool ? (
                         <>
-                          <div className="space-y-2 mb-4 font-meta">
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Pool</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.name}</span>
+                          <div className="space-y-2 mb-3.5 font-meta">
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Pool</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.name}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Type</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.type}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Type</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.type}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Fee Tier</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.feeFormatted}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Fee Tier</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.feeFormatted}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">TVL</span>
-                              <span className="font-display text-[14px] font-bold text-[#2C1924]">{pool.tvlFormatted}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">TVL</span>
+                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.tvlFormatted}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7]">
-                              <span className="text-[11px] font-semibold text-[#2C1924]/60">Volume</span>
-                              <span className="font-display text-[14px] font-bold text-[#2C1924]">{pool.volumeFormatted}</span>
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
+                              <span className="text-[11px] font-semibold text-[#845D74]">Volume</span>
+                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.volumeFormatted}</span>
                             </div>
-                            <div className="flex justify-between items-center p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                            <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-50 border border-emerald-200">
                               <span className="text-[11px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[16px] font-bold text-[#10b981]">{pool.aprFormatted}</span>
+                              <span className="font-display text-[15px] font-bold text-emerald-600">{pool.aprFormatted}</span>
                             </div>
                           </div>
-                          {/* Action Buttons - Soka Theme Style */}
+                          {/* Action Buttons */}
                           <div className="grid grid-cols-3 gap-2 font-meta">
-                            <button onClick={handleAddLiquidity} className="p-3 rounded-2xl bg-pink-50 border border-[#F7D1D7] hover:bg-pink-100/70 hover:border-[#DF7AA7] transition-all text-center group cursor-pointer shadow-2xs">
-                              <div className="w-8 h-8 mx-auto mb-1 rounded-xl bg-white border border-[#F7D1D7] flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Download className="w-4 h-4 text-[#DF7AA7]" />
+                            <button onClick={handleAddLiquidity} className="p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] hover:bg-white hover:border-[#DF7AA7]/60 transition-all text-center group cursor-pointer shadow-2xs">
+                              <div className="w-7 h-7 mx-auto mb-1 rounded-lg bg-white border border-[#2C1924]/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Download className="w-3.5 h-3.5 text-[#DF7AA7]" />
                               </div>
-                              <span className="text-[11px] font-bold text-[#DF7AA7]">Add Liquidity</span>
+                              <span className="text-[11px] font-bold text-[#2C1924] group-hover:text-[#DF7AA7]">Add Liquidity</span>
                             </button>
-                            <button onClick={handleAddIncentive} className="p-3 rounded-2xl bg-amber-50 border border-amber-200 hover:bg-amber-100/70 hover:border-amber-300 transition-all text-center group cursor-pointer shadow-2xs">
-                              <div className="w-8 h-8 mx-auto mb-1 rounded-xl bg-white border border-amber-200 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Sparkles className="w-4 h-4 text-amber-600" />
+                            <button onClick={handleAddIncentive} className="p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] hover:bg-white hover:border-amber-400 transition-all text-center group cursor-pointer shadow-2xs">
+                              <div className="w-7 h-7 mx-auto mb-1 rounded-lg bg-white border border-[#2C1924]/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                               </div>
-                              <span className="text-[11px] font-bold text-amber-700">Add Incentive</span>
+                              <span className="text-[11px] font-bold text-[#2C1924] group-hover:text-amber-700">Add Incentive</span>
                             </button>
-                            <button onClick={handleRemoveLiquidity} className="p-3 rounded-2xl bg-rose-50 border border-rose-200 hover:bg-rose-100/70 hover:border-rose-300 transition-all text-center group cursor-pointer shadow-2xs">
-                              <div className="w-8 h-8 mx-auto mb-1 rounded-xl bg-white border border-rose-200 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Upload className="w-4 h-4 text-rose-600" />
+                            <button onClick={handleRemoveLiquidity} className="p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] hover:bg-white hover:border-rose-400 transition-all text-center group cursor-pointer shadow-2xs">
+                              <div className="w-7 h-7 mx-auto mb-1 rounded-lg bg-white border border-[#2C1924]/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Upload className="w-3.5 h-3.5 text-rose-600" />
                               </div>
-                              <span className="text-[11px] font-bold text-rose-700">Remove</span>
+                              <span className="text-[11px] font-bold text-[#2C1924] group-hover:text-rose-700">Remove</span>
                             </button>
                           </div>
-                          <button onClick={() => setPoolStep("list")} className="w-full py-2 mt-3 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to pools</button>
+                          <button onClick={() => setPoolStep("list")} className="w-full py-1.5 mt-2.5 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to pools</button>
                         </>
                       ) : null;
                     })()}
@@ -1124,16 +1153,16 @@ export const ProSwapper: React.FC = () => {
                       return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2 block">Amount (USD)</label>
-                            <input type="number" value={liquidityAmount} onChange={(e) => setLiquidityAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7] font-mono text-[18px] text-[#2C1924] outline-none placeholder:text-[#2C1924]/30 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount (USD)</label>
+                            <input type="number" value={liquidityAmount} onChange={(e) => setLiquidityAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
                           </div>
                           {liquidityAmount && parseFloat(liquidityAmount) > 0 && (
-                            <div className="p-3 rounded-2xl bg-pink-50 border border-[#F7D1D7] mb-4">
-                              <div className="font-meta text-[12px] text-[#2C1924]">Est. APR: <span className="font-bold text-[#10b981]">{pool.aprFormatted}</span></div>
+                            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 mb-3.5">
+                              <div className="font-meta text-[11.5px] text-emerald-900">Est. APR: <span className="font-bold text-emerald-700">{pool.aprFormatted}</span></div>
                             </div>
                           )}
-                          <button onClick={handleLiquiditySubmit} disabled={!liquidityAmount || parseFloat(liquidityAmount) <= 0} className="w-full py-3 rounded-2xl font-bold text-[14px] text-white bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] hover:opacity-95 shadow-[0_4px_16px_rgba(223,122,167,0.3)] disabled:opacity-50 transition-all font-meta cursor-pointer">Add Liquidity</button>
-                          <button onClick={() => setPoolStep("details")} className="w-full py-2 mt-2 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
+                          <button onClick={handleLiquiditySubmit} disabled={!liquidityAmount || parseFloat(liquidityAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Add Liquidity</button>
+                          <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
                     })()}
@@ -1144,16 +1173,16 @@ export const ProSwapper: React.FC = () => {
                       return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2 block">Incentive Token Amount</label>
-                            <input type="number" value={incentiveAmount} onChange={(e) => setIncentiveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7] font-mono text-[18px] text-[#2C1924] outline-none placeholder:text-[#2C1924]/30 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Incentive Token Amount</label>
+                            <input type="number" value={incentiveAmount} onChange={(e) => setIncentiveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-amber-500 focus:bg-white transition-all" />
                           </div>
                           {incentiveAmount && parseFloat(incentiveAmount) > 0 && (
-                            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 mb-4">
-                              <div className="font-meta text-[12px] text-amber-800">Est. Reward APR: <span className="font-bold">{pool.aprFormatted}</span></div>
+                            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 mb-3.5">
+                              <div className="font-meta text-[11.5px] text-amber-800">Est. Reward APR: <span className="font-bold">{pool.aprFormatted}</span></div>
                             </div>
                           )}
-                          <button onClick={handleIncentiveSubmit} disabled={!incentiveAmount || parseFloat(incentiveAmount) <= 0} className="w-full py-3 rounded-2xl font-bold text-[14px] text-white bg-amber-500 hover:bg-amber-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Add Incentive</button>
-                          <button onClick={() => setPoolStep("details")} className="w-full py-2 mt-2 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
+                          <button onClick={handleIncentiveSubmit} disabled={!incentiveAmount || parseFloat(incentiveAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-amber-500 hover:bg-amber-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Add Incentive</button>
+                          <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-amber-700 hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
                     })()}
@@ -1164,16 +1193,16 @@ export const ProSwapper: React.FC = () => {
                       return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#2C1924]/50 mb-2 block">Amount to Remove (USD)</label>
-                            <input type="number" value={removeAmount} onChange={(e) => setRemoveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-3 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7] font-mono text-[18px] text-[#2C1924] outline-none placeholder:text-[#2C1924]/30 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount to Remove (USD)</label>
+                            <input type="number" value={removeAmount} onChange={(e) => setRemoveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-rose-400 focus:bg-white transition-all" />
                           </div>
                           {removeAmount && parseFloat(removeAmount) > 0 && (
-                            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 mb-4">
-                              <div className="font-meta text-[12px] text-rose-800">You will receive: <span className="font-bold">${removeAmount}</span></div>
+                            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 mb-3.5">
+                              <div className="font-meta text-[11.5px] text-rose-800">You will receive: <span className="font-bold">${removeAmount}</span></div>
                             </div>
                           )}
-                          <button onClick={handleRemoveSubmit} disabled={!removeAmount || parseFloat(removeAmount) <= 0} className="w-full py-3 rounded-2xl font-bold text-[14px] text-white bg-rose-500 hover:bg-rose-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Remove Liquidity</button>
-                          <button onClick={() => setPoolStep("details")} className="w-full py-2 mt-2 font-meta text-[12px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
+                          <button onClick={handleRemoveSubmit} disabled={!removeAmount || parseFloat(removeAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-rose-500 hover:bg-rose-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Remove Liquidity</button>
+                          <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-rose-700 hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
                     })()}
@@ -1183,26 +1212,26 @@ export const ProSwapper: React.FC = () => {
                       const pool = pools.find(p => p.id === selectedPool);
                       return pool ? (
                         <div className="text-center py-4">
-                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shadow-xs">
-                            <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
+                            <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                           </div>
-                          <div className="font-display text-[20px] font-bold text-[#2C1924] mb-1">Success!</div>
-                          <div className="font-meta text-[14px] text-[#2C1924]/60 mb-4">Action completed on {pool.name}</div>
-                          <div className="p-4 rounded-2xl bg-[#FDF4F2]/80 border border-[#F7D1D7] inline-block mb-4 shadow-2xs">
+                          <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Success!</div>
+                          <div className="font-meta text-[13px] text-[#845D74] mb-3">Action completed on {pool.name}</div>
+                          <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
                             <div className="grid grid-cols-2 gap-4 text-left">
                               <div>
-                                <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">Pool</div>
-                                <div className="font-display text-[16px] font-bold text-[#DF7AA7]">{pool.name}</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Pool</div>
+                                <div className="font-display text-[15px] font-bold text-[#DF7AA7]">{pool.name}</div>
                               </div>
                               <div>
-                                <div className="font-meta text-[10px] text-[#2C1924]/50 uppercase tracking-wider font-bold">APR</div>
-                                <div className="font-display text-[16px] font-bold text-[#10b981]">{pool.aprFormatted}</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">APR</div>
+                                <div className="font-display text-[15px] font-bold text-emerald-600">{pool.aprFormatted}</div>
                               </div>
                             </div>
                           </div>
-                          <div className="flex gap-3 justify-center font-meta">
-                            <button onClick={() => setPoolStep("details")} className="px-6 py-2.5 rounded-xl border border-[#F7D1D7] bg-white font-bold text-[13px] text-[#2C1924]/70 hover:bg-[#FDF4F2] transition-all cursor-pointer">View Pool</button>
-                            <button onClick={handlePoolCancel} className="px-6 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[13px] hover:bg-rose-100/80 transition-all cursor-pointer">Close</button>
+                          <div className="flex gap-2.5 justify-center font-meta">
+                            <button onClick={() => setPoolStep("details")} className="px-5 py-2 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-all cursor-pointer">View Pool</button>
+                            <button onClick={handlePoolCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Close</button>
                           </div>
                         </div>
                       ) : null;
@@ -1211,11 +1240,20 @@ export const ProSwapper: React.FC = () => {
                 </div>
               )}
 
-              {intentPrompt.trim() !== "" && (
-                <div className="flex justify-end">
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-[#DF7AA7]/15 to-[#EE97C2]/15 border border-[#DF7AA7]/30 text-[#2C1924] shadow-2xs max-w-[85%]">
-                    <div className="font-meta text-[10px] font-bold tracking-[0.1em] text-[#DF7AA7] mb-1 text-right">YOU ★</div>
-                    <div className="text-[15px] font-medium text-[#2C1924] break-words">{intentPrompt}</div>
+              {/* User Message Bubble */}
+              {(submittedUserPrompt || (intentPrompt.trim() !== "" && isProcessing)) && (
+                <div className="flex justify-end items-end gap-2.5">
+                  <div className="p-3.5 sm:p-4 rounded-[22px] rounded-tr-[6px] bg-[#DC759E] text-white shadow-[0_3px_14px_rgba(220,117,158,0.28)] max-w-[85%]">
+                    <div className="flex items-center justify-end gap-1.5 font-meta text-[10px] font-bold tracking-[0.1em] text-white/90 mb-1">
+                      <span>YOU</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                    </div>
+                    <div className="text-[14.5px] font-medium text-white break-words leading-relaxed">
+                      {submittedUserPrompt || intentPrompt}
+                    </div>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shrink-0 shadow-2xs text-[#DC759E]">
+                    <User className="w-4 h-4" />
                   </div>
                 </div>
               )}
@@ -1224,17 +1262,17 @@ export const ProSwapper: React.FC = () => {
               {!hasResult && !isProcessing && (tokenSuggestion || alternativeSource) && (
                 <div className="flex flex-col gap-3 w-full">
                   {tokenSuggestion && (
-                    <div className="p-4 rounded-2xl bg-white/95 border border-[#F7D1D7] shadow-sm">
+                    <div className="p-4 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs">
                       <div className="flex items-center gap-2 mb-2 font-meta">
                         <Info className="w-4 h-4 text-[#DF7AA7]" />
                         <span className="text-[12px] font-bold text-[#2C1924]">Pick the exact token</span>
                       </div>
-                      <p className="font-meta text-[12px] text-[#2C1924]/60 mb-3">{tokenSuggestion.message}</p>
+                      <p className="font-meta text-[12px] text-[#845D74] mb-3">{tokenSuggestion.message}</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {tokenSuggestion.candidates?.map((c: any, i: number) => (
-                          <button key={i} onClick={() => { if (c.retryPrompt) { setIntentPrompt(c.retryPrompt); handleProcessIntent(c.retryPrompt); } }} className="p-3 rounded-xl bg-[#FDF4F2]/80 hover:bg-white border border-[#F7D1D7] hover:border-[#DF7AA7] text-left transition-all cursor-pointer shadow-2xs">
+                          <button key={i} onClick={() => { if (c.retryPrompt) { setIntentPrompt(c.retryPrompt); handleProcessIntent(c.retryPrompt); } }} className="p-3 rounded-2xl bg-[#FAF8FA] hover:bg-white border border-[#2C1924]/[0.08] hover:border-[#DF7AA7] text-left transition-all cursor-pointer shadow-2xs">
                             <span className="block font-bold text-[#2C1924] font-display text-[13px]">{c.symbol} ({c.name})</span>
-                            <span className="text-[11px] text-[#2C1924]/50 break-all font-mono">{c.coinType.slice(0, 34)}…</span>
+                            <span className="text-[11px] text-[#845D74]/70 break-all font-mono">{c.coinType.slice(0, 34)}…</span>
                           </button>
                         ))}
                       </div>
@@ -1253,17 +1291,17 @@ export const ProSwapper: React.FC = () => {
                     <MiniStat label="Guardian" value={`${guardianScore}/100`} danger={!guardianSafe} />
                   </div>
                   {routeNodes.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap rounded-2xl border border-[#F7D1D7] bg-[#FDF4F2]/80 px-4 py-3 shadow-2xs">
-                      <span className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#2C1924]/40">Route</span>
+                    <div className="flex items-center gap-2 flex-wrap rounded-2xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] px-4 py-2.5 shadow-2xs">
+                      <span className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Route</span>
                       <span className="font-mono text-[12px] font-bold text-[#2C1924]">{tradeAmount} {sourceSymbol}</span>
-                      <span className="text-[#2C1924]/30">→</span>
+                      <span className="text-[#845D74]/40">→</span>
                       {routeNodes.slice(0, 3).map((n, i) => (
                         <span key={i} className="flex items-center gap-1">
-                          <span className="rounded-lg bg-pink-100/80 border border-[#F7D1D7] px-2 py-0.5 font-mono text-[10px] font-bold text-[#DF7AA7]">{n.dex}</span>
-                          {i < Math.min(routeNodes.length, 3) - 1 && <span className="text-[#2C1924]/30">→</span>}
+                          <span className="rounded-lg bg-white border border-[#2C1924]/[0.08] px-2 py-0.5 font-mono text-[10px] font-bold text-[#DF7AA7]">{n.dex}</span>
+                          {i < Math.min(routeNodes.length, 3) - 1 && <span className="text-[#845D74]/40">→</span>}
                         </span>
                       ))}
-                      <span className="text-[#2C1924]/30">→</span>
+                      <span className="text-[#845D74]/40">→</span>
                       <span className="font-mono text-[12px] font-bold text-[#10b981]">{expectedOutput} {destSymbol}</span>
                     </div>
                   )}
@@ -1292,10 +1330,10 @@ export const ProSwapper: React.FC = () => {
                     </div>
                   )}
                   <div className="flex items-stretch gap-2 font-meta">
-                    <button onClick={handleExecuteSwap} disabled={isExecuting || (!guardianSafe && !hasConfirmedSettings)} className={`flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all cursor-pointer ${!guardianSafe && !hasConfirmedSettings ? "bg-white/50 text-[#2C1924]/30 border border-[#F7D1D7] cursor-not-allowed" : "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99]"}`}>
+                    <button onClick={handleExecuteSwap} disabled={isExecuting || (!guardianSafe && !hasConfirmedSettings)} className={`flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all cursor-pointer ${!guardianSafe && !hasConfirmedSettings ? "bg-white/50 text-[#845D74]/50 border border-[#2C1924]/10 cursor-not-allowed" : "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99]"}`}>
                       {isExecuting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Signing...</> : !currentAccount ? <><Wallet className="w-4 h-4" /> Connect Wallet</> : !guardianSafe && !hasConfirmedSettings ? <span>Acknowledge Risk</span> : <><span>Execute ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-4 h-4" /></>}
                     </button>
-                    <button onClick={() => setShowDetails(v => !v)} className="px-4 py-3 rounded-2xl border border-[#F7D1D7] bg-white font-bold text-[12px] text-[#2C1924]/70 hover:bg-[#FDF4F2] transition-colors cursor-pointer shadow-2xs">{showDetails ? "Hide" : "Details"}</button>
+                    <button onClick={() => setShowDetails(v => !v)} className="px-4 py-3 rounded-2xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-colors cursor-pointer shadow-2xs">{showDetails ? "Hide" : "Details"}</button>
                     <button onClick={handleCancelSwap} className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs">Cancel</button>
                   </div>
                   {showDetails && (
@@ -1309,19 +1347,23 @@ export const ProSwapper: React.FC = () => {
 
               {cancelMsg && !isProcessing && !hasResult && (
                 <div className="flex items-end gap-3">
-                  <img src="/icon-chatbox.png" alt="Soka" className="w-11 h-11 object-contain shrink-0" />
-                  <div className="p-4 rounded-2xl bg-white/95 border border-[#F7D1D7] shadow-2xs max-w-[85%]">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center shadow-2xs shrink-0">
+                    <img src="/icon-chatbox.png" alt="Soka" className="w-7 h-7 object-contain" />
+                  </div>
+                  <div className="p-4 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs max-w-[85%]">
                     <div className="font-meta text-[10px] font-bold tracking-[0.1em] text-[#DF7AA7] mb-1">SOKA ★</div>
-                    <div className="text-[14px] font-medium text-[#2C1924]/85 leading-relaxed">{cancelMsg}</div>
+                    <div className="text-[14px] font-medium text-[#2C1924] leading-relaxed">{cancelMsg}</div>
                   </div>
                 </div>
               )}
 
               {isProcessing && (
                 <div className="flex items-end gap-3">
-                  <img src="/icon-chatbox.png" alt="Soka" className="w-11 h-11 object-contain shrink-0" />
-                  <div className="p-4 rounded-2xl bg-white/95 border border-[#F7D1D7] shadow-2xs">
-                    <div className="flex items-center gap-2 font-mono text-[13px] font-bold text-[#2C1924]/60">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center shadow-2xs shrink-0">
+                    <img src="/icon-chatbox.png" alt="Soka" className="w-7 h-7 object-contain" />
+                  </div>
+                  <div className="p-4 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs">
+                    <div className="flex items-center gap-2 font-mono text-[13px] font-bold text-[#845D74]">
                       <span className="w-2 h-2 rounded-full bg-[#DF7AA7] animate-pulse" />
                       <span className="w-2 h-2 rounded-full bg-[#EE97C2] animate-pulse" style={{ animationDelay: "0.15s" }} />
                       <span className="w-2 h-2 rounded-full bg-[#F7D1D7] animate-pulse" style={{ animationDelay: "0.3s" }} />
@@ -1334,7 +1376,7 @@ export const ProSwapper: React.FC = () => {
           </div>
 
           {/* Composer */}
-          <div className="px-5 pb-4 pt-3 shrink-0 border-t border-[#F7D1D7]/70 bg-white/60 backdrop-blur-md">
+          <div className="px-5 pb-4 pt-3.5 shrink-0 border-t border-[#2C1924]/[0.07] bg-white rounded-b-[26px] sm:rounded-b-[30px]">
             <form onSubmit={(e) => { e.preventDefault(); handleProcessIntent(); }} className="flex items-center gap-2.5">
               <div className="relative flex-1">
                 <input 
@@ -1342,9 +1384,9 @@ export const ProSwapper: React.FC = () => {
                   value={intentPrompt} 
                   onChange={(e) => setIntentPrompt(e.target.value)} 
                   placeholder={"Try \"Swap 0.05 BTC to MUSD, safest route\"\u2026"} 
-                  className="w-full px-5 py-3.5 sm:py-4 pr-12 rounded-2xl bg-white/90 border border-[#F7D1D7] focus:border-[#DF7AA7] focus:bg-white text-[#2C1924] font-medium text-[15px] outline-none placeholder:text-[#2C1924]/35 shadow-xs transition-all" 
+                  className="w-full px-4.5 py-3 sm:py-3.5 pr-10 rounded-xl bg-[#F8F7F8] border border-[#2C1924]/[0.08] focus:border-[#DF7AA7] focus:bg-white text-[#2C1924] font-medium text-[14.5px] outline-none placeholder:text-[#845D74]/60 shadow-2xs transition-all" 
                 />
-                <span className="absolute right-4 bottom-1/2 translate-y-1/2 text-[11px] font-mono text-[#2C1924]/30 pointer-events-none hidden sm:block">↵</span>
+                <span className="absolute right-3.5 bottom-1/2 translate-y-1/2 text-[11px] font-mono text-[#845D74]/60 pointer-events-none hidden sm:block">↵</span>
               </div>
               <button 
                 type="submit" 
@@ -1357,34 +1399,26 @@ export const ProSwapper: React.FC = () => {
                     handleProcessIntent(demoPrompt);
                   }
                 }}
-                className={`relative group w-12 h-12 sm:w-[52px] sm:h-[52px] shrink-0 rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-200 cursor-pointer select-none backdrop-blur-xl border border-[#F7D1D7] ${
-                  intentPrompt.trim()
-                    ? "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_14px_rgba(223,122,167,0.3)] hover:shadow-[0_6px_20px_rgba(223,122,167,0.4)] hover:scale-105 active:scale-95"
-                    : "bg-white/85 hover:bg-white text-[#DF7AA7] shadow-2xs hover:shadow-[0_4px_12px_rgba(223,122,167,0.2)] hover:scale-105 active:scale-95"
-                }`}
+                className={`relative group w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-200 cursor-pointer select-none bg-[#DF7AA7] hover:bg-[#D46A98] text-white shadow-[0_2px_10px_rgba(223,122,167,0.25)] hover:scale-105 active:scale-95 border-0`}
                 title={intentPrompt.trim() ? "Send Intent (Enter)" : "Click to test 'Swap 0.05 BTC to MUSD'"}
               >
-                <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent pointer-events-none rounded-t-2xl" />
-
                 {isProcessing ? (
-                  <RefreshCw className="w-5 h-5 animate-spin text-[#DF7AA7]" />
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
                 ) : (
                   <ArrowUp 
-                    className={`w-5 h-5 stroke-[2.5] transition-transform duration-200 group-hover:-translate-y-0.5 ${
-                      intentPrompt.trim() ? "text-white drop-shadow-2xs" : "text-[#DF7AA7]"
-                    }`} 
+                    className="w-4.5 h-4.5 stroke-[2.5] transition-transform duration-200 group-hover:-translate-y-0.5 text-white" 
                   />
                 )}
               </button>
             </form>
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-2.5">
               {quickPrompts.map((q) => (
                 <button 
                   key={q} 
                   type="button" 
                   disabled={isProcessing} 
                   onClick={() => { setIntentPrompt(q); handleProcessIntent(q); }} 
-                  className="text-[11px] font-bold font-meta text-[#2C1924]/70 bg-white/80 hover:bg-white hover:text-[#DF7AA7] hover:border-[#DF7AA7] border border-[#F7D1D7] rounded-full px-3.5 py-1.5 transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:opacity-50"
+                  className="text-[11px] font-semibold font-meta text-[#2C1924]/75 hover:text-[#DF7AA7] bg-[#FAF8FA] hover:bg-white border border-[#2C1924]/[0.08] hover:border-[#DF7AA7]/40 rounded-full px-3 py-1 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   {q}
                 </button>

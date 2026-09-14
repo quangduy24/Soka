@@ -54,7 +54,7 @@ export function GenerativeInkCanvas({ scrollProgress }: { scrollProgress?: numbe
     window.addEventListener('resize', handleResize, { passive: true });
 
     // Exact requested color palette (ZERO BLACK):
-    // Soft Cream White #FDF4F2, Pale Rose Blush #F7D1D7, Sweet Pink / Bubblegum #EE97C2,
+    // Soft Cream White #FDF2F2, Pale Rose Blush #F7D1D7, Sweet Pink / Bubblegum #EE97C2,
     // Rose Orchid #DF7AA7, Peach Coral #F8B6A5, Warm Apricot Mist #F5C5B7
     const plumes: Plume[] = [
       {
@@ -170,9 +170,9 @@ export function GenerativeInkCanvas({ scrollProgress }: { scrollProgress?: numbe
         : (window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight));
       currentScroll += (targetScroll - currentScroll) * 0.08;
 
-      // 1. Draw base ground in Soft Cream White (#FDF4F2) - zero black!
+      // 1. Draw base ground in Soft Cream White (#FDF2F2) - zero black!
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#FDF4F2';
+      ctx.fillStyle = '#FDF2F2';
       ctx.fillRect(0, 0, width, height);
 
       // Global fluid time parameter (visibly alive at 60fps)
@@ -308,7 +308,7 @@ export function GenerativeInkCanvas({ scrollProgress }: { scrollProgress?: numbe
   }, []);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#FDF4F2]">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#FDF2F2]">
       {/* 1. Hardware-accelerated dynamic canvas (Fluid Ink & Swirling Droplets at 60-120fps) */}
       <canvas
         ref={canvasRef}

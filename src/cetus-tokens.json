@@ -1,0 +1,184 @@
+[
+  {
+    "symbol": "SUI",
+    "name": "Sui",
+    "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/sui_c64ef5261d.svg"
+  },
+  {
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "coinType": "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    "decimals": 6,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/usdc_c86ec677b1.svg"
+  },
+  {
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "coinType": "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
+    "decimals": 6,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/usdt_798db45214.svg"
+  },
+  {
+    "symbol": "DEEP",
+    "name": "DeepBook Token",
+    "coinType": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+    "decimals": 6,
+    "logoUrl": "https://assets.coingecko.com/coins/images/39566/standard/deep.png"
+  },
+  {
+    "symbol": "WAL",
+    "name": "WAL Token",
+    "coinType": "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/39556/standard/walrus.png"
+  },
+  {
+    "symbol": "CETUS",
+    "name": "Cetus Protocol",
+    "coinType": "0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/cetus_16b9b1836a.svg"
+  },
+  {
+    "symbol": "WBTC",
+    "name": "Wrapped BTC",
+    "coinType": "0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN",
+    "decimals": 8,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/wbtc_7a1fae01bb.svg"
+  },
+  {
+    "symbol": "BTC",
+    "name": "Bitcoin (Mezo Wrapped)",
+    "coinType": "0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN",
+    "decimals": 8,
+    "logoUrl": "https://assets.coingecko.com/coins/images/1/standard/bitcoin.png"
+  },
+  {
+    "symbol": "WETH",
+    "name": "Wrapped Ether",
+    "coinType": "0xaf8cd5edc19c4512d47c82e8b1a2323b0884037167b201a304e716314f6974c9::coin::COIN",
+    "decimals": 8,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/weth_b28795c613.svg"
+  },
+  {
+    "symbol": "MUSD",
+    "name": "Mezo USD",
+    "coinType": "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC",
+    "decimals": 6,
+    "logoUrl": "https://assets.coingecko.com/coins/images/325/standard/Tether.png"
+  },
+  {
+    "symbol": "MEZO",
+    "name": "Mezo Network Token",
+    "coinType": "0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP",
+    "decimals": 6,
+    "logoUrl": "/public/soka-logo.png"
+  },
+  {
+    "symbol": "BUCK",
+    "name": "Bucket USD",
+    "coinType": "0xce7ff77a83ea0cb6fd39bd8748e2ec89a3f41e8efdc3f4eb123e0ca37b184db2::buck::BUCK",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/buck_b2ffbe456d.svg"
+  },
+  {
+    "symbol": "SCA",
+    "name": "Scallop",
+    "coinType": "0x7016aae72cfc67f2fadf55769c0a7ec54290a0003e4c5166caa3a082208074c9::sca::SCA",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/sca_8b7a42d99d.svg"
+  },
+  {
+    "symbol": "NAVX",
+    "name": "NAVI Protocol",
+    "coinType": "0xa99b8952d4f70677114674737084534f3ca4d2e5b7cd910b02e6d6286be62b66::navx::NAVX",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/navx_f1dbec91f6.svg"
+  },
+  {
+    "symbol": "TURBOS",
+    "name": "Turbos Finance",
+    "coinType": "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d257a93ab::turbos::TURBOS",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/30349/standard/Turbos_Finance.png"
+  },
+  {
+    "symbol": "HASUI",
+    "name": "Haedal Staked SUI",
+    "coinType": "0xbde4ba4c2e274a60ce15c1c0f9a942301b79494f85d677b767088964a2d10963::hasui::HASUI",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/hasui_9cbcf66418.svg"
+  },
+  {
+    "symbol": "AFSUI",
+    "name": "Aftermath Staked SUI",
+    "coinType": "0xf325ce1300e90e44042d8852482862428271a047253673700cb8a5e911f9b30a::afsui::AFSUI",
+    "decimals": 9,
+    "logoUrl": "https://strapi-dev.scallop.io/uploads/afsui_94bb3583be.svg"
+  },
+  {
+    "symbol": "BLUB",
+    "name": "BLUB",
+    "coinType": "0xfa7ac3951fdca92c5200d468d31a365eb03b2be9936fde615e69f0c1274ad3a0::BLUB::BLUB",
+    "decimals": 2,
+    "logoUrl": "https://assets.coingecko.com/coins/images/38600/standard/blub.png"
+  },
+  {
+    "symbol": "FUD",
+    "name": "FUD the Pug",
+    "coinType": "0x76c3a03e53c9f575ca1d9f829f73718294acd30edbc05564f32023722bda9599::fud::FUD",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/33924/standard/fud.png"
+  },
+  {
+    "symbol": "HIPPO",
+    "name": "Sudeng",
+    "coinType": "0x8993129d72e733985f7f1a00396cbd055bad6f817fee36576ce483c8bbb8b87b::sudeng::SUDENG",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/39943/standard/hippo.png"
+  },
+  {
+    "symbol": "LOFI",
+    "name": "LOFI Yeti",
+    "coinType": "0xf22da9a24ad027cccb5f2d496cbe91de953d363513db08a3a734d361c7c17503::LOFI::LOFI",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/40001/standard/lofi.png"
+  },
+  {
+    "symbol": "NS",
+    "name": "SuiNS Token",
+    "coinType": "0x5145494a5f5100e64540b1a69524583708630727d5315b2c53a61333726f2385::ns::NS",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/50700/standard/ns.png"
+  },
+  {
+    "symbol": "SEND",
+    "name": "Suiba Inu",
+    "coinType": "0xb9c43a1279d5e7a4d97e6888d3793081030e461b65851d45763914a243285db2::send::SEND",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/34320/standard/send.png"
+  },
+  {
+    "symbol": "SUIA",
+    "name": "Suia Token",
+    "coinType": "0x0093a0f193f30baa693433ab31655886162a4151468600c01a91e55098ffb4e4::suia::SUIA",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/30353/standard/suia.png"
+  },
+  {
+    "symbol": "KRIYA",
+    "name": "Kriya DEX",
+    "coinType": "0xa0eba10b173538c8fb30311a77755b607445c22bc5c1e2486f149b494361e9e7::kriya_token::KRIYA",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/34400/standard/kriya.png"
+  },
+  {
+    "symbol": "LIQ",
+    "name": "Liquidity Token",
+    "coinType": "0x8a927d377b5874de388bce9555cb524f2b934752c08ec22849e794356e79b908::liq::LIQ",
+    "decimals": 9,
+    "logoUrl": "https://assets.coingecko.com/coins/images/30350/standard/liq.png"
+  }
+]

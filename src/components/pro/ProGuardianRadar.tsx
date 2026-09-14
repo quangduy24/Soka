@@ -51,9 +51,9 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-white/85 border border-[#F7D1D7] shadow-sm flex flex-col gap-4">
+    <div className="p-5 rounded-2xl bg-white border border-[#2C1924]/[0.09] shadow-2xs flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#F7D1D7]/60 pb-3">
+      <div className="flex items-center justify-between border-b border-[#2C1924]/[0.07] pb-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-[#10b981]" />
           <span className="font-meta text-xs font-bold text-[#2C1924] tracking-wider uppercase">
@@ -61,20 +61,20 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-mono text-[#2C1924]/50">Zero External APIs</span>
+          <span className="text-[10px] font-mono text-[#845D74]">Zero External APIs</span>
           <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
         </div>
       </div>
 
       {/* Score and Safety Tier Badge */}
-      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7]">
+      <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
         <div className="flex flex-col">
-          <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">Deterministic Safety Score</span>
+          <span className="text-[10px] font-meta text-[#845D74] uppercase">Deterministic Safety Score</span>
           <div className="flex items-baseline gap-2 mt-0.5">
             <span className={`text-2xl font-mono font-extrabold ${score >= 80 ? 'text-[#10b981]' : score >= 60 ? 'text-[#06b6d4]' : score >= 30 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
               {score}
             </span>
-            <span className="text-xs font-mono text-[#2C1924]/50">/ 100</span>
+            <span className="text-xs font-mono text-[#845D74]">/ 100</span>
           </div>
         </div>
 
@@ -101,21 +101,21 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
       </div>
 
       {/* Expandable 7-Point Audit Drawer */}
-      <div className="border-t border-[#F7D1D7]/60 pt-3">
+      <div className="border-t border-[#2C1924]/[0.07] pt-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between py-1 text-xs font-meta text-[#2C1924]/70 hover:text-[#DF7AA7] transition-colors"
+          className="w-full flex items-center justify-between py-1 text-xs font-meta text-[#845D74] hover:text-[#DF7AA7] transition-colors cursor-pointer"
         >
           <span>7-Point On-Chain Audit Details ({checks.length || 7} checks)</span>
-          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#2C1924]" />}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#845D74]" />}
         </button>
 
         {isExpanded && (
-          <div className="flex flex-col gap-2 mt-3 pt-2 border-t border-[#F7D1D7]/60">
+          <div className="flex flex-col gap-2 mt-3 pt-2 border-t border-[#2C1924]/[0.07]">
             {checks.map((chk, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-2xl bg-white border border-[#F7D1D7] flex flex-col gap-1 text-xs font-mono shadow-2xs"
+                className="p-3 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] flex flex-col gap-1 text-xs font-mono shadow-2xs"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
                   </span>
                 </div>
 
-                <p className="text-[11px] text-[#2C1924]/60 leading-relaxed pl-5">
+                <p className="text-[11px] text-[#845D74] leading-relaxed pl-5">
                   {chk.message}
                 </p>
 

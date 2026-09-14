@@ -154,7 +154,7 @@ export const RATE_LIMIT = {
 
 // ─── Server Configuration ──────────────────────────────────────
 
-export const SERVER_PORT = parseInt(process.env.PORT || '3000', 10);
+export const SERVER_PORT = 3000;
 export const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 export const NODE_ENV = process.env.NODE_ENV || 'development';
 

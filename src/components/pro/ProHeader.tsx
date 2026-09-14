@@ -23,7 +23,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
   };
 
   return (
-    <header className="w-full z-40 border-b border-[#F7D1D7]/80 bg-[#FDF4F2]/90 backdrop-blur-2xl shadow-[0_4px_24px_-4px_rgba(44,25,36,0.04)] sticky top-0 transition-colors">
+    <header className="w-full z-40 border-b border-[#DF7AA7]/30 backdrop-blur-2xl sticky top-0 transition-colors bg-[#F4E1E9]/90 shadow-[0_4px_24px_-4px_rgba(44,25,36,0.06)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand & Navigation */}
         <div className="flex items-center gap-6">
@@ -34,13 +34,13 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
             SOKA
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl bg-white/70 border border-[#F7D1D7]/80 shadow-2xs">
+          <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl border border-[#DF7AA7]/30 bg-white/85 shadow-2xs">
             <Link 
               to="/" 
               className={`px-3.5 py-1.5 rounded-lg text-xs transition-all font-meta ${
                 !isApp 
                   ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs' 
-                  : 'text-[#2C1924]/70 font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
+                  : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
               }`}
             >
               Overview
@@ -50,7 +50,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
               className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all font-meta ${
                 isApp 
                   ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs' 
-                  : 'text-[#2C1924]/70 font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
+                  : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
               }`}
             >
               <Terminal className="w-3.5 h-3.5 text-[#DF7AA7]" />

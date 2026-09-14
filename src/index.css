@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-canvas: #FDF4F2;
+  --color-canvas: #FDF2F2;
   --color-surface: rgba(255, 255, 255, 0.85);
   --color-surface-strong: rgba(255, 255, 255, 0.95);
   --color-border: rgba(223, 122, 167, 0.25);
@@ -11,13 +11,13 @@
   --color-text-secondary: rgba(44, 25, 36, 0.70);
   --color-text-muted: rgba(44, 25, 36, 0.45);
   --color-accent: #EE97C2;
-  --color-soft-cream: #FDF4F2;
+  --color-soft-cream: #FDF2F2;
   --color-pale-rose: #F7D1D7;
   --color-sweet-pink: #EE97C2;
   --color-rose-orchid: #DF7AA7;
   --color-peach-coral: #F8B6A5;
   --color-warm-apricot: #F5C5B7;
-  --color-ground: #FDF4F2;
+  --color-ground: #FDF2F2;
   --font-display: "Archivo", "Space Grotesk", sans-serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -101,6 +101,31 @@
     0 16px 32px -4px rgba(15, 23, 42, 0.04);
   border: 1px solid rgba(241, 245, 249, 0.9);
   border-radius: 24px;
+}
+
+.chatbox-3d-glass {
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid rgba(44, 25, 36, 0.08);
+  box-shadow: 
+    0 2px 8px rgba(44, 25, 36, 0.03),
+    0 16px 44px -8px rgba(44, 25, 36, 0.07),
+    0 24px 64px -16px rgba(44, 25, 36, 0.04);
+}
+
+@media (min-width: 640px) {
+  .chatbox-3d-glass {
+    border-radius: 32px;
+  }
+}
+
+.chatbox-3d-glass-inner {
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid rgba(44, 25, 36, 0.08);
+  box-shadow: 
+    0 2px 8px -2px rgba(44, 25, 36, 0.03),
+    0 6px 18px -4px rgba(44, 25, 36, 0.05);
 }
 
 /* Background mesh - clean, neutral canvas with minimal cool-slate undertones (no pink tint) */
@@ -1130,12 +1155,16 @@
   height: min(72vh, 680px);
   min-height: 480px;
   border-radius: 1.75rem;
-  background: rgba(253, 244, 242, 0.96);
+  background: #FFFFFF;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(247, 209, 215, 0.85);
-  /* Top shadow to cast depth over previous card underneath as it slides over, plus bottom elevation */
-  box-shadow: 0 -14px 40px rgba(223, 122, 167, 0.14), 0 24px 60px rgba(44, 25, 36, 0.08);
+  border: 2px solid #D979A2;
+  /* Multi-level elevation shadow matching chatbox, plus top depth for stacking deck */
+  box-shadow: 
+    0 -12px 36px rgba(223, 122, 167, 0.12),
+    0 24px 64px -12px rgba(44, 25, 36, 0.20),
+    0 12px 32px -6px rgba(223, 122, 167, 0.25),
+    0 0 0 1px rgba(217, 121, 162, 0.30);
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
   will-change: transform;
   overflow-y: auto;
@@ -1172,8 +1201,12 @@
 }
 
 .stack-card:hover {
-  border-color: rgba(223, 122, 167, 0.5);
-  box-shadow: 0 -16px 45px rgba(223, 122, 167, 0.18), 0 28px 70px rgba(44, 25, 36, 0.1);
+  border-color: #DF7AA7;
+  box-shadow: 
+    0 -16px 45px rgba(223, 122, 167, 0.18),
+    0 28px 70px -10px rgba(44, 25, 36, 0.24),
+    0 16px 36px -4px rgba(223, 122, 167, 0.32),
+    0 0 0 1px rgba(223, 122, 167, 0.40);
 }
 
 

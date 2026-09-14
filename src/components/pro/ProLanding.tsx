@@ -53,7 +53,7 @@ export function ProLanding() {
   ];
 
   return (
-    <div className="editorial-root relative min-h-screen w-full bg-[#FDF4F2] text-[#2C1924] selection:bg-[#EE97C2] selection:text-white">
+    <div className="editorial-root relative min-h-screen w-full bg-[#FDF2F2] text-[#2C1924] selection:bg-[#EE97C2] selection:text-white">
       
       {/* ═══ 1. GENERATIVE INK BACKGROUND (ZERO BLACK - Luminous Soft Cream & Watercolor Plumes) ═══ */}
       <GenerativeInkCanvas />
@@ -65,13 +65,13 @@ export function ProLanding() {
         style={{
           top: 0,
           left: 0,
-          background: 'radial-gradient(circle, #EE97C2 0%, rgba(253,244,242,0) 70%)',
+          background: 'radial-gradient(circle, #EE97C2 0%, rgba(253,242,242,0) 70%)',
           willChange: 'transform'
         }}
       />
 
       {/* ═══ 3. FIXED TRANSPARENT NAVIGATION ═══ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 sm:px-12 py-3.5 bg-[#FDF4F2]/90 backdrop-blur-md border-b border-[#F7D1D7]/50 shadow-[0_4px_20px_rgba(223,122,167,0.06)]">
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 sm:px-12 py-3.5 bg-[#FDF2F2]/90 backdrop-blur-md border-b border-[#F7D1D7]/50 shadow-[0_4px_20px_rgba(223,122,167,0.06)]">
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="font-grotesk-125 text-xl tracking-tight text-[#2C1924] cursor-pointer hover:text-[#DF7AA7] transition-colors"
@@ -110,7 +110,7 @@ export function ProLanding() {
           className="stack-card stack-card-1 z-[10] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT I // THE PROLOGUE</span>
@@ -123,7 +123,7 @@ export function ProLanding() {
 
           {/* Card Main Body */}
           <div className="my-auto flex flex-col items-center text-center py-4 sm:py-6">
-            <div className="scroll-reveal inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#F7D1D7] bg-white/85 mb-5 font-meta text-[0.66rem] text-[#2C1924]/80 shadow-xs">
+            <div className="scroll-reveal inline-flex items-center gap-2 px-4 py-1.5 rounded-full border-2 border-[#EAAEC0] bg-white mb-5 font-meta text-[0.66rem] text-[#2C1924]/80 shadow-xs">
               <Sparkles className="w-3 h-3 text-[#DF7AA7]" />
               <span>THE FIRST BITCOIN INTENT PROTOCOL ON MEZO</span>
             </div>
@@ -145,7 +145,7 @@ export function ProLanding() {
 
             <button
               onClick={handleLaunch}
-              className="scroll-reveal scroll-reveal-delay-3 inline-flex items-center gap-2.5 px-8 py-3 rounded-full border border-[#DF7AA7] bg-white/95 hover:bg-[#DF7AA7] hover:text-white transition-all duration-300 font-meta text-[0.7rem] cursor-pointer shadow-[0_8px_25px_rgba(223,122,167,0.22)] text-[#2C1924] hover:shadow-[0_12px_32px_rgba(223,122,167,0.35)] hover:-translate-y-0.5"
+              className="scroll-reveal scroll-reveal-delay-3 inline-flex items-center gap-2.5 px-8 py-3 rounded-full border-2 border-[#D979A2] bg-white hover:bg-[#DF7AA7] hover:text-white transition-all duration-300 font-meta text-[0.7rem] cursor-pointer shadow-[0_8px_25px_rgba(223,122,167,0.22)] text-[#2C1924] hover:shadow-[0_12px_32px_rgba(223,122,167,0.35)] hover:-translate-y-0.5"
             >
               <span>ENTER THE TERMINAL</span>
               <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
@@ -153,7 +153,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer Hint */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>SCROLL DOWN TO REVEAL NEXT DECK CARD</span>
             <span className="text-[#DF7AA7] font-bold">↓ THE SHIFT</span>
           </div>
@@ -168,7 +168,7 @@ export function ProLanding() {
           className="stack-card stack-card-2 z-[20] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#F8B6A5]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT II // THE SHIFT</span>
@@ -195,7 +195,7 @@ export function ProLanding() {
 
             {/* Right Column: Story Conflict Card */}
             <div className="lg:col-span-6 scroll-reveal scroll-reveal-delay-2">
-              <div className="rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] p-5 sm:p-6 shadow-[0_8px_25px_rgba(223,122,167,0.08)] hover:border-[#DF7AA7] hover:shadow-[0_12px_32px_rgba(223,122,167,0.14)] transition-all duration-300">
+              <div className="rounded-2xl bg-white border-2 border-[#EAAEC0] p-5 sm:p-6 shadow-[0_8px_25px_rgba(223,122,167,0.10)] hover:border-[#D979A2] hover:shadow-[0_12px_32px_rgba(223,122,167,0.18)] transition-all duration-300">
                 <h3 className="font-grotesk-90 text-base sm:text-lg text-[#2C1924] mb-2">
                   DeFi made you do the work of a computer.
                 </h3>
@@ -224,7 +224,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer Hint */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>PREVIOUS: ACT I PROLOGUE</span>
             <span className="text-[#DF7AA7] font-bold">NEXT: ACT III THE JOURNEY ↓</span>
           </div>
@@ -239,7 +239,7 @@ export function ProLanding() {
           className="stack-card stack-card-3 z-[30] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT III // THE JOURNEY</span>
@@ -266,7 +266,7 @@ export function ProLanding() {
             <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Step 1 */}
-              <div className="story-step-card scroll-reveal scroll-reveal-delay-1 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-1 relative rounded-2xl bg-white border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#EE97C2]" />
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
@@ -278,7 +278,7 @@ export function ProLanding() {
                     "Swap 0.05 BTC for the safest route into MUSD." Our natural engine decompiles your intention into strict mathematical parameters in under 84ms.
                   </p>
                 </div>
-                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                <div className="relative z-10 pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem]">
                   <span className="text-[#2C1924]/60">INPUT</span>
                   <span className="text-[#DF7AA7] font-bold">NATURAL LANGUAGE</span>
                 </div>
@@ -288,7 +288,7 @@ export function ProLanding() {
               </div>
 
               {/* Step 2 */}
-              <div className="story-step-card scroll-reveal scroll-reveal-delay-2 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-2 relative rounded-2xl bg-white border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#DF7AA7]" />
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
@@ -300,7 +300,7 @@ export function ProLanding() {
                     The protocol fragments and routes liquidity across Mezo Pools concentrated ticks, finding the most capital-efficient path through MUSD or MEZO.
                   </p>
                 </div>
-                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                <div className="relative z-10 pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem]">
                   <span className="text-[#2C1924]/60">POOLS</span>
                   <span className="text-[#DF7AA7] font-bold">MEZO POOLS LIQUIDITY</span>
                 </div>
@@ -310,7 +310,7 @@ export function ProLanding() {
               </div>
 
               {/* Step 3 */}
-              <div className="story-step-card scroll-reveal scroll-reveal-delay-3 relative rounded-2xl bg-white/90 backdrop-blur-md border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
+              <div className="story-step-card scroll-reveal scroll-reveal-delay-3 relative rounded-2xl bg-white border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#F8B6A5]" />
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
@@ -322,7 +322,7 @@ export function ProLanding() {
                     An 8-point Risk Guardian evaluates live Skip + Pyth oracles and tBTC proof-of-reserves. Mezo executes via gasless meta-transactions: full settlement or zero loss.
                   </p>
                 </div>
-                <div className="relative z-10 pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem]">
+                <div className="relative z-10 pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem]">
                   <span className="text-[#2C1924]/60">ASSURANCE</span>
                   <span className="text-[#DF7AA7] font-bold">META-TX RELAY</span>
                 </div>
@@ -335,7 +335,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>PREVIOUS: ACT II THE SHIFT</span>
             <span className="text-[#DF7AA7] font-bold">NEXT: ACT IV THE CREED ↓</span>
           </div>
@@ -350,7 +350,7 @@ export function ProLanding() {
           className="stack-card stack-card-4 z-[40] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#EE97C2]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT IV // THE CREED</span>
@@ -390,7 +390,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>PREVIOUS: ACT III THE JOURNEY</span>
             <span className="text-[#DF7AA7] font-bold">NEXT: ACT V THE PROOF ↓</span>
           </div>
@@ -405,7 +405,7 @@ export function ProLanding() {
           className="stack-card stack-card-5 z-[50] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#F5C5B7]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT V // THE PROOF</span>
@@ -440,7 +440,7 @@ export function ProLanding() {
               </p>
             </div>
 
-            <div className="lg:col-span-7 flex flex-col border-t border-[#F7D1D7] scroll-reveal scroll-reveal-delay-2">
+            <div className="lg:col-span-7 flex flex-col border-t border-[#EAAEC0] scroll-reveal scroll-reveal-delay-2">
               {[
                 { 
                   title: 'ZERO MEV VULNERABILITY', 
@@ -469,7 +469,7 @@ export function ProLanding() {
               ].map((row, i) => (
                 <div 
                   key={i}
-                  className="row-hover-fill py-2 px-2.5 border-b border-[#F7D1D7] flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3 cursor-pointer"
+                  className="row-hover-fill py-2 px-2.5 border-b border-[#EAAEC0] flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3 cursor-pointer"
                 >
                   <div className="relative z-10 flex items-baseline gap-2.5">
                     <span className="font-meta text-[#2C1924]/40 text-[0.62rem]">0{i + 1}</span>
@@ -487,7 +487,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>PREVIOUS: ACT IV THE CREED</span>
             <span className="text-[#DF7AA7] font-bold">NEXT: ACT VI THE ARCHITECTURE ↓</span>
           </div>
@@ -502,7 +502,7 @@ export function ProLanding() {
           className="stack-card stack-card-6 z-[60] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT VI // THE ARCHITECTURE</span>
@@ -527,7 +527,7 @@ export function ProLanding() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Pillar 1: Cognitive */}
-              <div className="pillar-card scroll-reveal scroll-reveal-delay-1 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-1 flex flex-col rounded-2xl bg-white p-4 sm:p-5 border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] cursor-default">
                 <div className="flex items-center gap-2 mb-2.5">
                   <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#EE97C2]/20 flex items-center justify-center text-[#DF7AA7]">
                     <Sparkles className="w-3 h-3" />
@@ -540,14 +540,14 @@ export function ProLanding() {
                 <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
                   Translates human intent into structured Mezo on-chain orders. Normalizes amounts into 18-decimal BTC and validates confirmed vs. pending tBTC bridge balances.
                 </p>
-                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                <div className="mt-auto pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
                   <span>LATENCY: &lt; 84MS</span>
                   <span className="text-[#DF7AA7] font-bold">INTENT DECOMPILE</span>
                 </div>
               </div>
 
               {/* Pillar 2: Liquidity */}
-              <div className="pillar-card scroll-reveal scroll-reveal-delay-2 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-2 flex flex-col rounded-2xl bg-white p-4 sm:p-5 border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] cursor-default">
                 <div className="flex items-center gap-2 mb-2.5">
                   <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#F8B6A5]/25 flex items-center justify-center text-[#DF7AA7]">
                     <Compass className="w-3 h-3" />
@@ -560,14 +560,14 @@ export function ProLanding() {
                 <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
                   Taps Mezo Pools concentrated-liquidity AMM with multi-hop paths across BTC, MUSD, and MEZO, reserving native BTC gas before calculating tradeable volume.
                 </p>
-                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                <div className="mt-auto pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
                   <span>INTEGRATION: MEZO POOLS</span>
                   <span className="text-[#DF7AA7] font-bold">CONCENTRATED AMM</span>
                 </div>
               </div>
 
               {/* Pillar 3: Guardian */}
-              <div className="pillar-card scroll-reveal scroll-reveal-delay-3 flex flex-col rounded-2xl bg-white/85 backdrop-blur-md p-4 sm:p-5 border border-[#F7D1D7] shadow-[0_6px_20px_rgba(223,122,167,0.06)] cursor-default">
+              <div className="pillar-card scroll-reveal scroll-reveal-delay-3 flex flex-col rounded-2xl bg-white p-4 sm:p-5 border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] cursor-default">
                 <div className="flex items-center gap-2 mb-2.5">
                   <div className="pillar-icon-box w-6 h-6 rounded-full bg-[#DF7AA7]/20 flex items-center justify-center text-[#DF7AA7]">
                     <ShieldCheck className="w-3 h-3" />
@@ -580,7 +580,7 @@ export function ProLanding() {
                 <p className="font-sans text-xs text-[#2C1924]/75 leading-relaxed mb-3.5">
                   Cross-checks Skip oracle (BTC/USD) with Pyth, monitors tBTC bridge proof-of-reserves, and validates pool depth before signing or gasless relay.
                 </p>
-                <div className="mt-auto pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
+                <div className="mt-auto pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.6rem] text-[#2C1924]/60">
                   <span>AUDIT: 8/8 CHECKS</span>
                   <span className="text-[#DF7AA7] font-bold">SKIP + PYTH ORACLES</span>
                 </div>
@@ -590,7 +590,7 @@ export function ProLanding() {
           </div>
 
           {/* Card Footer */}
-          <div className="pt-2.5 border-t border-[#F7D1D7]/50 flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
+          <div className="pt-2.5 border-t border-[#EAAEC0] flex items-center justify-between font-meta text-[0.62rem] text-[#2C1924]/50">
             <span>PREVIOUS: ACT V THE PROOF</span>
             <span className="text-[#DF7AA7] font-bold">NEXT: ACT VII THE HORIZON ↓</span>
           </div>
@@ -605,7 +605,7 @@ export function ProLanding() {
           className="stack-card stack-card-7 z-[70] mb-16 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
           {/* Card Top Tab */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#F7D1D7]/60 font-meta text-[0.66rem] text-[#2C1924]/60">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAAEC0] font-meta text-[0.66rem] text-[#2C1924]/70">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#DF7AA7]" />
               <span className="font-bold tracking-wider text-[#2C1924]">ACT VII // THE HORIZON</span>
@@ -634,7 +634,7 @@ export function ProLanding() {
 
             <button
               onClick={handleLaunch}
-              className="scroll-reveal scroll-reveal-delay-3 close-pill-btn px-8 py-3.5 border border-[#DF7AA7] bg-white/95 text-[#2C1924] font-meta text-[0.75rem] tracking-wider uppercase mb-6 cursor-pointer group shadow-[0_10px_35px_rgba(223,122,167,0.22)] hover:border-[#EE97C2]"
+              className="scroll-reveal scroll-reveal-delay-3 close-pill-btn px-8 py-3.5 border-2 border-[#D979A2] bg-white text-[#2C1924] font-meta text-[0.75rem] tracking-wider uppercase mb-6 cursor-pointer group shadow-[0_10px_35px_rgba(223,122,167,0.22)] hover:border-[#DF7AA7]"
             >
               <div className="btn-fill" />
               <div className="relative z-10 flex items-center gap-2.5">
@@ -666,7 +666,7 @@ export function ProLanding() {
       {/* ═══════════════════════════════════════════════════════════════
           FOOTER (Reveals cleanly below the finished card deck)
           ═══════════════════════════════════════════════════════════════ */}
-      <footer className="relative w-full border-t border-[#F7D1D7] px-6 sm:px-14 py-6 bg-gradient-to-b from-transparent to-[#FDF4F2] flex flex-col sm:flex-row items-center justify-between gap-4 z-20">
+      <footer className="relative w-full border-t border-[#F7D1D7] px-6 sm:px-14 py-6 bg-gradient-to-b from-transparent to-[#FDF2F2] flex flex-col sm:flex-row items-center justify-between gap-4 z-20">
         <div className="flex items-center gap-4">
           <span className="font-grotesk-125 text-xl tracking-tight text-[#2C1924]">
             SOKA

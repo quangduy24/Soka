@@ -40,9 +40,9 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-white/85 border border-[#F7D1D7] shadow-sm flex flex-col gap-4">
+    <div className="p-5 rounded-2xl bg-white border border-[#2C1924]/[0.09] shadow-2xs flex flex-col gap-4">
       {/* Card Header */}
-      <div className="flex items-center justify-between border-b border-[#F7D1D7]/60 pb-3">
+      <div className="flex items-center justify-between border-b border-[#2C1924]/[0.07] pb-3">
         <div className="flex items-center gap-2">
           <Layers className="w-4 h-4 text-[#DF7AA7]" />
           <span className="font-meta text-xs font-bold text-[#2C1924] tracking-wider uppercase">
@@ -50,16 +50,16 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-[#2C1924]/50">Hops: {routeNodes.length || 1}</span>
+          <span className="font-mono text-[10px] text-[#845D74]">Hops: {routeNodes.length || 1}</span>
           <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
         </div>
       </div>
 
       {/* Input / Output Summary Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-[#FDF4F2]/70 border border-[#F7D1D7]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
         {/* In */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white border border-[#F7D1D7] flex items-center justify-center font-mono font-bold text-xs text-[#2C1924] shrink-0 overflow-hidden shadow-2xs">
+          <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center font-mono font-bold text-xs text-[#2C1924] shrink-0 overflow-hidden shadow-2xs">
             {sourceLogo ? (
               <img src={sourceLogo} alt={sourceSymbol} className="w-full h-full object-cover" />
             ) : (
@@ -67,7 +67,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
             )}
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">You Pay</span>
+            <span className="text-[10px] font-meta text-[#845D74] uppercase">You Pay</span>
             <span className="text-sm font-mono font-bold text-[#2C1924]">
               {amount} <span className="text-[#DF7AA7]">{sourceSymbol}</span>
             </span>
@@ -75,8 +75,8 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
         </div>
 
         {/* Out */}
-        <div className="flex items-center gap-3 sm:border-l sm:border-[#F7D1D7] sm:pl-3">
-          <div className="w-9 h-9 rounded-xl bg-white border border-[#F7D1D7] flex items-center justify-center font-mono font-bold text-xs text-[#2C1924] shrink-0 overflow-hidden shadow-2xs">
+        <div className="flex items-center gap-3 sm:border-l sm:border-[#2C1924]/[0.08] sm:pl-3">
+          <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center font-mono font-bold text-xs text-[#2C1924] shrink-0 overflow-hidden shadow-2xs">
             {destLogo ? (
               <img src={destLogo} alt={destSymbol} className="w-full h-full object-cover" />
             ) : (
@@ -84,7 +84,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
             )}
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">Expected Return</span>
+            <span className="text-[10px] font-meta text-[#845D74] uppercase">Expected Return</span>
             <span className="text-sm font-mono font-bold text-[#10b981]">
               {expectedOutput} <span className="text-[#2C1924]">{destSymbol}</span>
             </span>
@@ -94,12 +94,12 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
 
       {/* Multi-hop Route Graph */}
       <div className="flex flex-col gap-2 pt-1">
-        <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase tracking-wider">
+        <span className="text-[10px] font-meta text-[#845D74] uppercase tracking-wider">
           Execution Path & Pools
         </span>
 
         {routeNodes.length === 0 ? (
-          <div className="p-4 rounded-2xl bg-white/60 border border-dashed border-[#F7D1D7] text-center font-mono text-xs text-[#2C1924]/50">
+          <div className="p-4 rounded-xl bg-[#FAF8FA] border border-dashed border-[#2C1924]/15 text-center font-mono text-xs text-[#845D74]">
             Direct swap path simulated
           </div>
         ) : (
@@ -109,7 +109,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
               return (
                 <div
                   key={i}
-                  className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-white hover:bg-pink-50/40 border border-[#F7D1D7] transition-colors shadow-2xs"
+                  className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-white hover:bg-[#FAF8FA] border border-[#2C1924]/[0.08] transition-colors shadow-2xs"
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-5 h-5 rounded-full bg-[#DF7AA7]/15 border border-[#DF7AA7]/30 text-[#DF7AA7] font-mono text-[10px] font-bold flex items-center justify-center">
@@ -120,7 +120,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
                         <span className="font-mono text-xs font-bold text-[#2C1924]">
                           {node.dex || 'Mezo Pools'}
                         </span>
-                        <span className="text-[10px] font-meta text-[#2C1924]/60 bg-white border border-[#F7D1D7] px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-meta text-[#845D74] bg-[#FAF8FA] border border-[#2C1924]/10 px-2 py-0.5 rounded-full">
                           Split: {node.ratio || 100}%
                         </span>
                       </div>
@@ -140,11 +140,11 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
 
                   <div className="flex items-center gap-4 text-right font-mono text-xs">
                     <div>
-                      <span className="text-[10px] text-[#2C1924]/50 block">Fee Rate</span>
+                      <span className="text-[10px] text-[#845D74] block">Fee Rate</span>
                       <span className="text-[#2C1924] font-bold">{node.fee || '0.25'}%</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-[#2C1924]/50 block">Depth</span>
+                      <span className="text-[10px] text-[#845D74] block">Depth</span>
                       <span className="text-[#2C1924] font-bold">{formatUsd(node.liquidityUsd)}</span>
                     </div>
                   </div>
@@ -156,9 +156,9 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
       </div>
 
       {/* Metrics Row: Slippage, Impact */}
-      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[#F7D1D7]/60">
-        <div className="p-3 rounded-2xl bg-white border border-[#F7D1D7] flex flex-col shadow-2xs">
-          <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">Price Impact</span>
+      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[#2C1924]/[0.07]">
+        <div className="p-3 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] flex flex-col shadow-2xs">
+          <span className="text-[10px] font-meta text-[#845D74] uppercase">Price Impact</span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${getImpactColor(executionImpact)}`}>
               {executionImpact || '0.05%'}
@@ -166,10 +166,10 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
           </div>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white border border-[#F7D1D7] flex flex-col shadow-2xs">
-          <span className="text-[10px] font-meta text-[#2C1924]/50 uppercase">Optimal Slippage</span>
+        <div className="p-3 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] flex flex-col shadow-2xs">
+          <span className="text-[10px] font-meta text-[#845D74] uppercase">Optimal Slippage</span>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-xs font-mono font-bold text-[#2C1924] bg-pink-50 border border-[#F7D1D7] px-2 py-0.5 rounded-lg">
+            <span className="text-xs font-mono font-bold text-[#2C1924] bg-white border border-[#2C1924]/10 px-2 py-0.5 rounded-lg">
               {slippage || '0.50%'}
             </span>
           </div>
