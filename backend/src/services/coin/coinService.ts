@@ -1,137 +1,120 @@
 /**
- * DIEPS Intent Engine — Coin Service
- * Handles balance queries, coin selection, and merge logic for Sui Mainnet.
+ * Soka Intent Engine — Coin & Balance Service
+ * Handles native Bitcoin and ERC-20 token balance queries for Mezo Testnet.
  */
 
-import { getBalance as rpcGetBalance, getAllCoins, getCoinMetadata } from '../../utils/suiClient.js';
+import { formatUnits, type Address } from 'viem';
+import { ZERO_ADDRESS, TOKEN_WHITELIST } from '../../config/constant.js';
+import { getNativeBalance } from '../../utils/mezoClient.js';
+import { getBalanceOf } from '../../utils/erc20Utils.js';
 import { resolveToken, getTokenDecimalsAsync } from './tokenResolver.js';
 import { logger } from '../../utils/logger.js';
-import type { CoinData, BalanceResult } from '../../types/index.js';
+import type { BalanceResult } from '../../types/index.js';
 
 /**
- * Get the formatted balance of a token for an address.
- * Returns balance as a human-readable string (divided by decimals).
+ * Retrieves the formatted balance of a token for a given wallet address.
  */
 export async function getFormattedBalance(
-  address: string,
-  symbol: string
+  walletAddress: string,
+  symbolOrAddress: string
 ): Promise<string> {
-  const token = resolveToken(symbol);
-  const coinType = token?.address || symbol;
-  const decimals = token?.decimals ?? await getTokenDecimalsAsync(symbol);
+  const token = resolveToken(symbolOrAddress);
+  const isNative =
+    !token ||
+    token.symbol.toUpperCase() === 'BTC' ||
+    token.address.toLowerCase() === ZERO_ADDRESS.toLowerCase();
 
   try {
-    const result = await rpcGetBalance(address, coinType);
-    const balance = Number(result.totalBalance) / Math.pow(10, decimals);
-    return balance.toString();
-  } catch (err: any) {
-    logger.error(`Failed to get balance for ${symbol}`, {
-      address: address.slice(0, 10) + '...',
-      error: err.message,
+    const addr = walletAddress as Address;
+    if (isNative) {
+      const rawBalance = await getNativeBalance(addr);
+      return formatUnits(rawBalance, 18);
+    }
+
+    const tokenAddress = token.address as Address;
+    const decimals = token.decimals ?? (await getTokenDecimalsAsync(tokenAddress));
+    const rawBalance = await getBalanceOf(tokenAddress, addr);
+    return formatUnits(rawBalance, decimals);
+  } catch (err) {
+    logger.error(`Failed to fetch balance for ${symbolOrAddress}`, {
+      address: walletAddress.slice(0, 10) + '...',
+      error: (err as Error).message,
     });
     return '0';
   }
 }
 
 /**
- * Get detailed balance info including coin count.
+ * Retrieves detailed balance information for a specific token.
  */
 export async function getDetailedBalance(
-  address: string,
-  coinType: string
+  walletAddress: string,
+  tokenAddress: string
 ): Promise<BalanceResult> {
+  const token = resolveToken(tokenAddress);
+  const isNative =
+    !token ||
+    token.symbol.toUpperCase() === 'BTC' ||
+    token.address.toLowerCase() === ZERO_ADDRESS.toLowerCase();
+
   try {
-    const result = await rpcGetBalance(address, coinType);
+    const addr = walletAddress as Address;
+    const decimals = isNative ? 18 : token?.decimals ?? 18;
+    const rawBalance = isNative
+      ? await getNativeBalance(addr)
+      : await getBalanceOf(token!.address as Address, addr);
+
     return {
-      coinType,
-      totalBalance: result.totalBalance,
-      coinObjectCount: result.coinObjectCount,
+      tokenAddress: token?.address || tokenAddress,
+      symbol: token?.symbol || 'UNKNOWN',
+      decimals,
+      rawBalance: rawBalance.toString(),
+      formattedBalance: formatUnits(rawBalance, decimals),
     };
-  } catch (err: any) {
-    logger.error('Failed to get detailed balance', { error: err.message });
-    return { coinType, totalBalance: '0', coinObjectCount: 0 };
+  } catch (err) {
+    logger.error('Failed to get detailed balance', { error: (err as Error).message });
+    return {
+      tokenAddress,
+      symbol: token?.symbol || 'UNKNOWN',
+      decimals: 18,
+      rawBalance: '0',
+      formattedBalance: '0',
+    };
   }
 }
 
 /**
- * Get all coin objects for dynamic coin selection.
- * Used when building PTBs to select and merge coins.
+ * Fetches balances for all verified Mezo Testnet whitelist tokens for a wallet.
  */
-export async function getCoinsForSelection(
-  address: string,
-  coinType: string
-): Promise<CoinData[]> {
-  try {
-    const coins = await getAllCoins(address, coinType);
-    return coins.map(c => ({
-      coinObjectId: c.coinObjectId,
-      version: c.version,
-      digest: c.digest,
-      balance: c.balance,
-      coinType: c.coinType,
-    }));
-  } catch (err: any) {
-    logger.error('Failed to get coins for selection', { error: err.message });
-    return [];
-  }
-}
+export async function getAllBalances(walletAddress: string): Promise<BalanceResult[]> {
+  const addr = walletAddress as Address;
+  const balancePromises = TOKEN_WHITELIST.map(async (token) => {
+    try {
+      const isNative =
+        token.symbol.toUpperCase() === 'BTC' ||
+        token.address.toLowerCase() === ZERO_ADDRESS.toLowerCase();
 
-/**
- * Select coins that cover the required amount.
- * Returns the coin IDs to use and whether merging is needed.
- */
-export function selectCoinsForAmount(
-  coins: CoinData[],
-  requiredAmountMist: bigint
-): {
-  selectedCoins: CoinData[];
-  needsMerge: boolean;
-  totalSelected: bigint;
-  surplus: bigint;
-} {
-  // Sort coins by balance descending — prefer using fewer coins
-  const sorted = [...coins].sort((a, b) => {
-    const balA = BigInt(a.balance);
-    const balB = BigInt(b.balance);
-    return balB > balA ? 1 : balB < balA ? -1 : 0;
+      const rawBalance = isNative
+        ? await getNativeBalance(addr)
+        : await getBalanceOf(token.address as Address, addr);
+
+      return {
+        tokenAddress: token.address,
+        symbol: token.symbol,
+        decimals: token.decimals,
+        rawBalance: rawBalance.toString(),
+        formattedBalance: formatUnits(rawBalance, token.decimals),
+      };
+    } catch {
+      return {
+        tokenAddress: token.address,
+        symbol: token.symbol,
+        decimals: token.decimals,
+        rawBalance: '0',
+        formattedBalance: '0',
+      };
+    }
   });
 
-  // Check if a single coin covers the amount
-  const singleCoin = sorted.find(c => BigInt(c.balance) >= requiredAmountMist);
-  if (singleCoin) {
-    return {
-      selectedCoins: [singleCoin],
-      needsMerge: false,
-      totalSelected: BigInt(singleCoin.balance),
-      surplus: BigInt(singleCoin.balance) - requiredAmountMist,
-    };
-  }
-
-  // Need to merge multiple coins
-  const selected: CoinData[] = [];
-  let total = 0n;
-
-  for (const coin of sorted) {
-    selected.push(coin);
-    total += BigInt(coin.balance);
-    if (total >= requiredAmountMist) break;
-  }
-
-  return {
-    selectedCoins: selected,
-    needsMerge: selected.length > 1,
-    totalSelected: total,
-    surplus: total >= requiredAmountMist ? total - requiredAmountMist : 0n,
-  };
-}
-
-/**
- * Get token metadata from chain (decimals, symbol, name).
- */
-export async function getTokenMetadata(coinType: string): Promise<{
-  decimals: number;
-  symbol: string;
-  name: string;
-} | null> {
-  return getCoinMetadata(coinType);
+  return Promise.all(balancePromises);
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useCurrentAccount, useDAppKit, useCurrentClient } from '@mysten/dapp-kit-react';
+import { useAccount, useDisconnect, useSendTransaction, usePublicClient } from 'wagmi';
 import { TokenSelectorModal } from '../TokenSelectorModal';
 import { SwapperHeader } from './SwapperHeader';
 import { ConversationPanel } from './chat/ConversationPanel';
@@ -12,9 +12,7 @@ import { TOKENS, getTokenInfo, shortContract } from '../../constants';
 import type { RiskCheck, PtbStep, RouteNode } from '../../types/shared';
 
 /**
- * Turn a raw backend/RPC error into a short, user-friendly message — stripping
- * contract addresses, owner addresses and raw base-unit amounts that only
- * confuse users. The full error is still logged to the console for debugging.
+ * Turn a raw backend/RPC error into a short, user-friendly message.
  */
 function formatSwapError(raw: string | undefined, ctx: { amount?: string; sourceToken?: string }): string {
   const msg = (raw || '').toLowerCase();
@@ -22,27 +20,25 @@ function formatSwapError(raw: string | undefined, ctx: { amount?: string; source
   const amt = ctx.amount;
 
   if (msg.includes('insufficient') && msg.includes('balance')) {
-    const isSuiCoin = msg.includes('::sui::sui') || msg.includes('0x2::sui');
-    if (isSuiCoin && sym && sym.toUpperCase() !== 'SUI') {
-      return 'Not enough SUI in your wallet to cover gas fees.';
+    if (sym && sym.toUpperCase() !== 'BTC') {
+      return 'Not enough BTC in your wallet to cover gas fees.';
     }
     if (amt && sym) return `You don't have enough ${sym} in your wallet (need ${amt}).`;
     return 'Your wallet balance is not enough for this swap.';
   }
   if (msg.includes('no viable') || msg.includes('no route') || msg.includes('liquidity')) {
-    return 'No swap route found — not enough liquidity for this pair.';
+    return 'No swap route found — not enough liquidity for this pair on Mezo Swap.';
   }
   if (msg.includes('slippage')) {
     return 'Price moved beyond your slippage limit. Please try again.';
   }
   if (msg.includes('gas')) {
-    return 'Not enough SUI in your wallet to cover gas fees.';
+    return 'Not enough BTC in your wallet to cover gas fees.';
   }
   if (msg.includes('unknown_token')) {
     return 'Could not recognize that token. Please pick one from the list.';
   }
 
-  // Fallback: strip coin types / long hex addresses and trim length.
   let cleaned = (raw || 'Something went wrong.')
     .replace(/0x[0-9a-fA-F]{6,}(::[^\s,).]+)*/g, '')
     .replace(/\s{2,}/g, ' ')
@@ -52,13 +48,13 @@ function formatSwapError(raw: string | undefined, ctx: { amount?: string; source
 }
 
 export const SwapperSection: React.FC = () => {
-  const currentAccount = useCurrentAccount();
-  const dAppKit = useDAppKit();
-  const suiClient = useCurrentClient();
-  const disconnect = () => dAppKit.disconnectWallet();
-  const walletAddress = currentAccount?.address || null;
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { sendTransactionAsync } = useSendTransaction();
+  const publicClient = usePublicClient();
+  const walletAddress = isConnected && address ? address : null;
 
-  const [intentInput, setIntentInput] = useState("Swap 1000 SUI to USDC");
+  const [intentInput, setIntentInput] = useState("Swap 0.05 BTC to mUSDC");
   const [appState, setAppState] = useState<'idle' | 'processing' | 'done'>('idle');
   const [processStep, setProcessStep] = useState(0);
   const [submittedIntent, setSubmittedIntent] = useState("");
@@ -522,6 +518,7 @@ export const SwapperSection: React.FC = () => {
     setExecutionState('signing');
     try {
       let finalTransactionBytes = transactionBytes;
+      let executeData: any = null;
 
       // Ensure PTB has been built using the connected wallet's real balance
       if (!finalTransactionBytes) {
@@ -537,7 +534,7 @@ export const SwapperSection: React.FC = () => {
           })
         });
 
-        const executeData = await executeRes.json();
+        executeData = await executeRes.json();
 
         if (executeData.error || executeData.simulation?.error) {
           throw new Error(executeData.error || executeData.simulation?.error || "Please check your wallet balance and try again.");
@@ -545,85 +542,61 @@ export const SwapperSection: React.FC = () => {
 
         finalTransactionBytes = executeData.transactionBytes;
 
-        if (!finalTransactionBytes) {
+        if (!finalTransactionBytes && !executeData.data) {
           throw new Error("Unable to build transaction. Your wallet balance is insufficient.");
         }
       }
 
-      const { Transaction } = await import('@mysten/sui/transactions');
-      const tx = Transaction.from(finalTransactionBytes);
+      let targetContract = (executeData?.to || executeData?.target) as `0x${string}`;
+      let txData = (executeData?.data || "0x") as `0x${string}`;
+      let txValue = BigInt(executeData?.value || "0");
+      let gasLimit = executeData?.gasLimit ? BigInt(executeData.gasLimit) : undefined;
+
+      if (finalTransactionBytes) {
+        try {
+          const decoded = Buffer.from(finalTransactionBytes, 'base64').toString('utf8');
+          const parsed = JSON.parse(decoded);
+          if (parsed.to) targetContract = parsed.to;
+          if (parsed.data) txData = parsed.data;
+          if (parsed.value) txValue = BigInt(parsed.value);
+          if (parsed.gasLimit) gasLimit = BigInt(parsed.gasLimit);
+        } catch {
+          // fallback
+        }
+      }
+
+      setExecutionState('signing');
 
       // 1. Ask wallet to sign and execute the transaction
-      const response = await dAppKit.signAndExecuteTransaction({
-        transaction: tx,
+      const hash = await sendTransactionAsync({
+        to: targetContract,
+        data: txData,
+        value: txValue,
+        gas: gasLimit,
       });
+
+      if (!hash) {
+        throw new Error("Execution failed: No transaction hash returned from wallet.");
+      }
 
       setExecutionState('executing');
 
-      const digest = (response as any).digest || (response as any).Transaction?.digest || (response as any).effects?.transactionDigest;
-      if (!digest) {
-        throw new Error("Execution failed: No digest returned from wallet.");
+      // 2. Wait for Mezo block confirmation
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
       }
 
-      // 2. Wait for fullnode to index the transaction
-      const txResult = await suiClient.waitForTransaction({ 
-        digest
-      });
+      setExecutionState('success');
+      setTxHash(hash);
+      setReceivedAmount(estOutput);
 
-      const data = { result: (txResult as any).Transaction || txResult };
-
-      if (data.result && data.result.digest) {
-        // Extract the actual amount of the destination token credited to the sender.
-        try {
-          // Normalize coin types so 0x2::sui::SUI matches 0x000…02::sui::SUI.
-          const normCoinType = (ct: string) => {
-            const [addr, ...rest] = (ct || '').split('::');
-            return [addr.replace(/^0x0*/, '0x'), ...rest].join('::').toLowerCase();
-          };
-          const wantType = normCoinType(destAddress);
-          const changes = data.result.balanceChanges || [];
-          const destChange = changes.find((c: any) =>
-            normCoinType(c.coinType) === wantType && Number(c.amount) > 0
-          );
-          if (destChange) {
-            const human = Number(destChange.amount) / Math.pow(10, destDecimals);
-            setReceivedAmount(human.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }));
-          } else {
-            setReceivedAmount(estOutput); // fall back to the quoted output
-          }
-        } catch {
-          setReceivedAmount(estOutput);
-        }
-        setExecutionState('success');
-        setTxHash(data.result.digest);
-
-        // Update the session snapshot with execution result.
-        if (currentSessionId.current) {
-          let receivedVal: string | null = null;
-          try {
-            const normCoinType = (ct: string) => {
-              const [addr, ...rest] = (ct || '').split('::');
-              return [addr.replace(/^0x0*/, '0x'), ...rest].join('::').toLowerCase();
-            };
-            const wantType = normCoinType(destAddress);
-            const destChange = (data.result.balanceChanges || []).find((c: any) =>
-              normCoinType(c.coinType) === wantType && Number(c.amount) > 0
-            );
-            if (destChange) {
-              receivedVal = (Number(destChange.amount) / Math.pow(10, destDecimals))
-                .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-            }
-          } catch {
-            // leave null
-          }
-          updateSession(currentSessionId.current, {
-            status: 'executed',
-            txHash: data.result.digest,
-            received: receivedVal || estOutput,
-          });
-        }
-      } else {
-        throw new Error("RPC execution failed to return digest");
+      // Update the session snapshot with execution result.
+      if (currentSessionId.current) {
+        updateSession(currentSessionId.current, {
+          status: 'executed',
+          txHash: hash,
+          received: estOutput,
+        });
       }
     } catch (err: any) {
       console.error("Execution failed", err);

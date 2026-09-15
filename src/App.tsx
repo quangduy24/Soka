@@ -3,7 +3,7 @@ import { ProLanding } from './components/pro/ProLanding';
 import { ProSwapper } from './components/pro/ProSwapper';
 
 /**
- * DIEPS Pro Studio — single-version app (no Toon playground).
+ * Soka Pro Studio — single-version app (no Toon playground).
  *   /       → Pro landing
  *   /app    → Pro terminal (chat-style swap console)
  *   /pro*   → legacy aliases, redirect to the canonical routes

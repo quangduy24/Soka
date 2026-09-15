@@ -104,7 +104,7 @@
   <g transform="translate(40, 22)">
     <rect width="280" height="24" rx="12" fill="rgba(5,16,36,0.62)" stroke="rgba(56,152,255,0.22)" stroke-width="0.8"/>
     <circle cx="15" cy="12" r="4" fill="#10B981"><animate attributeName="opacity" values="0.4;1;0.4" dur="1.6s" repeatCount="indefinite"/></circle>
-    <text class="hdr-title" x="30" y="15.5">DIEPS · TECHNICAL FLOW</text>
+    <text class="hdr-title" x="30" y="15.5">SOKA · TECHNICAL FLOW</text>
   </g>
 
   <!-- Base connectors -->

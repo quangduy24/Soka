@@ -4,6 +4,9 @@ import { suiscanUrl, shortenRef } from '../../../utils/explorer';
 
 const REF_ICON: Record<RiskReference['type'], string> = {
   coin: 'toll',
+  token: 'toll',
+  contract: 'code',
+  pool: 'waves',
   object: 'database',
   tx: 'receipt_long',
   account: 'account_balance_wallet',

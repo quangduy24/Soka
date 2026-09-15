@@ -54,12 +54,12 @@ export function ProLanding() {
 
   return (
     <div className="editorial-root relative min-h-screen w-full bg-[#FDF2F2] text-[#2C1924] selection:bg-[#EE97C2] selection:text-white">
-      
+
       {/* ═══ 1. GENERATIVE INK BACKGROUND (ZERO BLACK - Luminous Soft Cream & Watercolor Plumes) ═══ */}
       <GenerativeInkCanvas />
 
       {/* ═══ 2. CURSOR DYE BLOOM (Hardware-accelerated DOM transform, zero re-renders) ═══ */}
-      <div 
+      <div
         ref={bloomRef}
         className="fixed pointer-events-none z-10 w-[480px] h-[480px] rounded-full mix-blend-multiply opacity-40 blur-3xl transition-transform duration-100 ease-out hidden md:block"
         style={{
@@ -105,7 +105,7 @@ export function ProLanding() {
             CARD 1 (ACT I): THE PROLOGUE (Cover)
             Vertically centered card with stacking cards behavior
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="cover"
           className="stack-card stack-card-1 z-[10] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -163,7 +163,7 @@ export function ProLanding() {
             CARD 2 (ACT II): THE SHIFT (The Conflict)
             Slides over Card 1 as user scrolls
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="argument"
           className="stack-card stack-card-2 z-[20] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -181,7 +181,7 @@ export function ProLanding() {
 
           {/* Card Main Body: 2-Column Story */}
           <div className="my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center py-2">
-            
+
             {/* Left Column: Compact Headline */}
             <div className="lg:col-span-6 scroll-reveal scroll-reveal-delay-1">
               <h2 className="font-grotesk-125 text-[clamp(2.2rem,4.8vw,4.2rem)] leading-[0.9] text-[#2C1924] mb-3.5">
@@ -210,7 +210,7 @@ export function ProLanding() {
                     'OPTIMAL LIQUIDITY SPLIT',
                     'VERIFIED BY CODE'
                   ].map((chip) => (
-                    <span 
+                    <span
                       key={chip}
                       className="pill-invert-chip font-meta px-3.5 py-1.5 rounded-full cursor-default text-[0.62rem]"
                     >
@@ -234,7 +234,7 @@ export function ProLanding() {
             CARD 3 (ACT III): THE JOURNEY (The 3 Phases)
             Slides over Card 2
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="offer"
           className="stack-card stack-card-3 z-[30] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -264,7 +264,7 @@ export function ProLanding() {
             </div>
 
             <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4">
-              
+
               {/* Step 1 */}
               <div className="story-step-card scroll-reveal scroll-reveal-delay-1 relative rounded-2xl bg-white border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] p-4 sm:p-5 flex flex-col justify-between overflow-hidden cursor-default">
                 <div className="absolute top-0 left-0 right-0 h-[3px] bg-[#EE97C2]" />
@@ -345,7 +345,7 @@ export function ProLanding() {
             CARD 4 (ACT IV): THE CREED (The Manifesto)
             Slides over Card 3
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="position"
           className="stack-card stack-card-4 z-[40] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -372,11 +372,10 @@ export function ProLanding() {
               {manifestoWords.map((word, idx) => {
                 const isAccentWord = word === "DETERMINISTIC" || word === "PROOFS";
                 return (
-                  <span 
+                  <span
                     key={idx}
-                    className={`font-grotesk-125 text-[clamp(1.6rem,3.8vw,3.2rem)] leading-[1] inline-block ${
-                      isAccentWord ? 'text-[#DF7AA7] drop-shadow-[0_2px_15px_rgba(223,122,167,0.25)]' : 'text-[#2C1924]'
-                    }`}
+                    className={`font-grotesk-125 text-[clamp(1.6rem,3.8vw,3.2rem)] leading-[1] inline-block ${isAccentWord ? 'text-[#DF7AA7] drop-shadow-[0_2px_15px_rgba(223,122,167,0.25)]' : 'text-[#2C1924]'
+                      }`}
                   >
                     {word}
                   </span>
@@ -400,7 +399,7 @@ export function ProLanding() {
             CARD 5 (ACT V): THE PROOF (Real-Time Telemetry & Outcomes)
             Slides over Card 4
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="index"
           className="stack-card stack-card-5 z-[50] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -418,7 +417,7 @@ export function ProLanding() {
 
           {/* Card Main Body */}
           <div className="my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center py-2">
-            
+
             <div className="lg:col-span-5 flex flex-col items-start scroll-reveal scroll-reveal-delay-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className="relative flex h-2 w-2">
@@ -442,32 +441,32 @@ export function ProLanding() {
 
             <div className="lg:col-span-7 flex flex-col border-t border-[#EAAEC0] scroll-reveal scroll-reveal-delay-2">
               {[
-                { 
-                  title: 'ZERO MEV VULNERABILITY', 
-                  desc: 'Protected by Mezo Risk Guardian & oracle validation so predatory bots cannot front-run your trade.' 
+                {
+                  title: 'ZERO MEV VULNERABILITY',
+                  desc: 'Protected by Mezo Risk Guardian & oracle validation so predatory bots cannot front-run your trade.'
                 },
-                { 
-                  title: 'CONVERSATIONAL PRECISION', 
-                  desc: 'State amounts, limits, or strategies in your own everyday words (BTC, sats, MUSD).' 
+                {
+                  title: 'CONVERSATIONAL PRECISION',
+                  desc: 'State amounts, limits, or strategies in your own everyday words (BTC, sats, MUSD).'
                 },
-                { 
-                  title: 'HYPER-OPTIMAL FILL', 
-                  desc: 'Mezo Pools concentrated liquidity ticks automatically balanced for minimal price impact.' 
+                {
+                  title: 'HYPER-OPTIMAL FILL',
+                  desc: 'Mezo Pools concentrated liquidity ticks automatically balanced for minimal price impact.'
                 },
-                { 
-                  title: 'PRE-FLIGHT GUARDIAN', 
-                  desc: 'Eight automated safety checks verify Skip + Pyth oracles, pool depth, and tBTC bridge health.' 
+                {
+                  title: 'PRE-FLIGHT GUARDIAN',
+                  desc: 'Eight automated safety checks verify Skip + Pyth oracles, pool depth, and tBTC bridge health.'
                 },
-                { 
-                  title: 'GASLESS META-TRANSACTIONS', 
-                  desc: 'Sponsor execution via permit + relay when users have no native BTC on hand.' 
+                {
+                  title: 'GASLESS META-TRANSACTIONS',
+                  desc: 'Sponsor execution via permit + relay when users have no native BTC on hand.'
                 },
-                { 
-                  title: 'NON-CUSTODIAL PURITY', 
-                  desc: 'Your private keys never leave your custody. You interact directly with the blockchain.' 
+                {
+                  title: 'NON-CUSTODIAL PURITY',
+                  desc: 'Your private keys never leave your custody. You interact directly with the blockchain.'
                 },
               ].map((row, i) => (
-                <div 
+                <div
                   key={i}
                   className="row-hover-fill py-2 px-2.5 border-b border-[#EAAEC0] flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3 cursor-pointer"
                 >
@@ -497,7 +496,7 @@ export function ProLanding() {
             CARD 6 (ACT VI): THE PILLARS (Architecture)
             Slides over Card 5
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="spec"
           className="stack-card stack-card-6 z-[60] mb-28 sm:mb-36 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -525,7 +524,7 @@ export function ProLanding() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
+
               {/* Pillar 1: Cognitive */}
               <div className="pillar-card scroll-reveal scroll-reveal-delay-1 flex flex-col rounded-2xl bg-white p-4 sm:p-5 border-2 border-[#EAAEC0] shadow-[0_6px_20px_rgba(223,122,167,0.08)] cursor-default">
                 <div className="flex items-center gap-2 mb-2.5">
@@ -600,7 +599,7 @@ export function ProLanding() {
             CARD 7 (ACT VII): THE HORIZON (The Terminal CTA)
             The final card in the deck, slides over Card 6
             ═══════════════════════════════════════════════════════════════ */}
-        <section 
+        <section
           id="close"
           className="stack-card stack-card-7 z-[70] mb-16 p-5 sm:p-8 lg:p-10 flex flex-col justify-between"
         >
@@ -673,7 +672,7 @@ export function ProLanding() {
           </span>
           <span className="hidden sm:inline-block w-px h-3 bg-[#F7D1D7]" />
           <span className="font-meta text-[0.62rem] text-[#2C1924]/60">
-            AI-POWERED BITCOIN INTENT PROTOCOL ON MEZO (CHAIN ID 31612)
+            AI-POWERED BITCOIN INTENT PROTOCOL ON MEZO
           </span>
         </div>
 

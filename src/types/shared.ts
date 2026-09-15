@@ -1,17 +1,11 @@
 /**
  * Shared types — mirror of backend/src/types/index.ts interfaces.
- * Used by frontend components to get compile-time field checking,
- * preventing mismatches like step.type vs step.command.
+ * Used by frontend components for compile-time safety on Mezo Testnet.
  */
 
-/**
- * On-chain proof reference — points a risk check at the exact object,
- * token, contract, transaction, or account it was derived from, so the UI can
- * link out to Mezo Explorer for independent verification.
- */
 export interface RiskReference {
   label: string;
-  type: 'coin' | 'object' | 'tx' | 'account';
+  type: 'token' | 'coin' | 'object' | 'tx' | 'account' | 'contract' | 'pool';
   value: string;
 }
 
@@ -33,22 +27,30 @@ export interface RouteNode {
   poolAddress?: string;
   liquidityUsd?: number;
   onChainLiquidityDepth?: number;
+  stable?: boolean;
 }
 
-export interface PtbStep {
+export interface TxStep {
   index: number;
-  command: string;
-  target?: string;
+  action?: 'APPROVE' | 'SWAP' | 'BRIDGE_OUT' | string;
+  to?: string;
   description: string;
+  data?: string;
+  value?: string;
+  command?: string; // legacy alias
+  target?: string;
 }
 
-/** One executed swap stored in history — the full result snapshot of a prompt. */
+export type PtbStep = TxStep;
+
+/** One executed swap or bridge operation stored in history. */
 export interface SwapSnapshot {
   id: string;
   prompt: string;
   status: 'SIMULATED' | 'CONFIRMED' | 'FAILED';
   createdAt: number;
-  txDigest?: string;
+  txHash?: string;
+  txDigest?: string; // legacy alias
   // Intent / trade params
   amount?: string;
   sourceSymbol?: string;
@@ -64,5 +66,6 @@ export interface SwapSnapshot {
   // Detail blocks
   routeNodes: RouteNode[];
   checks: RiskCheck[];
+  txSteps?: TxStep[];
   ptbSteps: PtbStep[];
 }

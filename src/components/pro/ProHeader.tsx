@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
-import { ConnectModal } from '@mysten/dapp-kit-react/ui';
+import { useAccount, useDisconnect } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { Terminal, Wallet } from 'lucide-react';
-import { WalletMenu } from './WalletMenu';
+import { WalletMenu } from './WalletMenu.js';
 
 interface ProHeaderProps {
   onOpenWalletModal?: () => void;
   gasPrice?: string;
 }
 
-export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPrice = '750 MIST' }) => {
-  const currentAccount = useCurrentAccount();
-  const dAppKit = useDAppKit();
+export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPrice = '0.0001 BTC' }) => {
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
   const location = useLocation();
   const isApp = location.pathname.includes('/app');
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   const handleConnect = () => {
     if (onOpenWalletModal) onOpenWalletModal();
-    else setIsWalletModalOpen(true);
+    else if (openConnectModal) openConnectModal();
   };
 
   return (
@@ -27,29 +27,29 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand & Navigation */}
         <div className="flex items-center gap-6">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="font-grotesk-125 text-xl tracking-tight text-[#2C1924] cursor-pointer hover:text-[#DF7AA7] transition-colors"
           >
             SOKA
           </Link>
 
           <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl border border-[#DF7AA7]/30 bg-white/85 shadow-2xs">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className={`px-3.5 py-1.5 rounded-lg text-xs transition-all font-meta ${
-                !isApp 
-                  ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs' 
+                !isApp
+                  ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs'
                   : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
               }`}
             >
               Overview
             </Link>
-            <Link 
-              to="/app" 
+            <Link
+              to="/app"
               className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all font-meta ${
-                isApp 
-                  ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs' 
+                isApp
+                  ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs'
                   : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
               }`}
             >
@@ -59,23 +59,21 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
           </nav>
         </div>
 
-        {/* Action Controls - Only shown when in Terminal/App interface */}
+        {/* Action Controls */}
         {isApp && (
           <div className="flex items-center gap-3">
-            {currentAccount ? (
-              <WalletMenu walletAddress={currentAccount.address} onDisconnect={() => dAppKit.disconnectWallet()} />
+            {isConnected && address ? (
+              <WalletMenu walletAddress={address} onDisconnect={() => disconnect()} />
             ) : (
-              <button 
-                onClick={handleConnect} 
+              <button
+                onClick={handleConnect}
                 className="relative group overflow-hidden bg-gradient-to-r from-[#DF7AA7] via-[#EE97C2] to-[#DF7AA7] hover:opacity-95 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-[0_2px_12px_rgba(223,122,167,0.3)] hover:shadow-[0_4px_16px_rgba(223,122,167,0.4)] transition-all flex items-center gap-2 active:scale-95 border border-white/60 backdrop-blur-md cursor-pointer select-none font-meta"
               >
                 <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent pointer-events-none rounded-t-xl" />
                 <Wallet className="w-3.5 h-3.5 text-white/95 group-hover:scale-110 transition-transform drop-shadow-2xs" />
-                <span className="tracking-wide drop-shadow-2xs">Connect Wallet</span>
+                <span className="tracking-wide drop-shadow-2xs">Connect Mezo Wallet</span>
               </button>
             )}
-            {/* @ts-expect-error DAppKitConnectModal lit-react component prop types */}
-            <ConnectModal open={isWalletModalOpen} onOpenChange={(isOpen: boolean) => setIsWalletModalOpen(isOpen)} />
           </div>
         )}
       </div>

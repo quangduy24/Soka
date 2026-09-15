@@ -1,5 +1,5 @@
 /**
- * DIEPS Intent Engine — Winston Logger
+ * Soka Intent Engine — Winston Logger
  * Structured logging with configurable levels and request timing.
  */
 

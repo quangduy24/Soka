@@ -1,35 +1,50 @@
 import { useState } from 'react';
+import { mezoApi } from '../../services/mezoApi.js';
 
-/* Shared wallet/token helpers used by the header WalletMenu. */
+export const HIDE_KEY = 'soka:hide-balance';
 
-export const DECIMALS: Record<string, number> = {
-  SUI: 9, USDC: 6, USDT: 6, DEEP: 6, BLUB: 2, WAL: 9, CETUS: 9, ETH: 8, WBTC: 8,
-};
-
-export const HIDE_KEY = 'adidahood:hide-balance';
-
-/** Static USD estimate for well-known tokens (client has no oracle). */
+/** Approximate USD estimate for well-known Mezo tokens. */
 export const USD_EST: Record<string, number> = {
-  SUI: 3.4, USDC: 1, USDT: 1, DEEP: 0.28, WAL: 0.35, CETUS: 0.22,
-  ETH: 2600, WBTC: 61000, BLUB: 0.000005, HIPPO: 0.00002, LOFI: 0.0003,
+  BTC: 95000,
+  wBTC: 95000,
+  MEZO: 2.5,
+  mUSDC: 1.0,
+  mUSDT: 1.0,
+  mDAI: 1.0,
+  mUSDe: 1.0,
+  mcbBTC: 95000,
+  mFBTC: 95000,
+  mSolvBTC: 95000,
+  mswBTC: 95000,
+  mT: 0.025,
 };
-
-export function symbolOf(coinType: string): string {
-  const tail = (coinType || '').split('::').pop() || 'TOKEN';
-  return tail.toUpperCase();
-}
-
-export function decimalsOf(coinType: string, symbol: string): number {
-  if (coinType.includes('::sui::SUI') || symbol === 'SUI') return 9;
-  return DECIMALS[symbol] ?? 9;
-}
 
 export function loadHidden(): boolean {
-  try { return localStorage.getItem(HIDE_KEY) === '1'; } catch { return false; }
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 export function saveHidden(v: boolean) {
-  try { localStorage.setItem(HIDE_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(HIDE_KEY, v ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function useHiddenPref(): [boolean, () => void] {
+  const [hidden, setHidden] = useState<boolean>(loadHidden);
+  const toggle = () => {
+    setHidden((prev) => {
+      const next = !prev;
+      saveHidden(next);
+      return next;
+    });
+  };
+  return [hidden, toggle];
 }
 
 export function fmt(n: number, maxDec = 4): string {
@@ -48,29 +63,24 @@ export interface WalletToken {
   usd?: number;
 }
 
-export async function fetchWalletTokens(client: any, walletAddress: string): Promise<WalletToken[]> {
-  const res: any = await (client as any).listBalances({ owner: walletAddress });
-  const list: any[] = Array.isArray(res) ? res : (res?.balances || res?.data || []);
-  return list
-    .map((b) => {
-      const sym = symbolOf(b.coinType || '');
-      const dec = decimalsOf(b.coinType || '', sym);
-      const human = Number(b.totalBalance || b.balance || '0') / Math.pow(10, dec);
-      const price = USD_EST[sym];
-      return { sym, coinType: b.coinType, human, decimals: dec, usd: price ? human * price : undefined };
-    })
-    .filter((x) => x.human > 0)
-    .sort((a, b) => (b.usd ?? b.human) - (a.usd ?? a.human));
-}
-
-/** Hides overflow with a mask — used when the user toggles hidden balances. */
-export const useHiddenPref = (): [boolean, () => void] => {
-  const [hidden, setHidden] = useState<boolean>(loadHidden);
-  const toggle = () => {
-    setHidden((h) => {
-      saveHidden(!h);
-      return !h;
+export async function fetchWalletTokens(
+  _client: any,
+  walletAddress: string
+): Promise<WalletToken[]> {
+  try {
+    const balances = await mezoApi.getBalances(walletAddress);
+    return balances.map((b) => {
+      const human = parseFloat(b.formattedBalance) || 0;
+      const price = USD_EST[b.symbol] ?? 1.0;
+      return {
+        sym: b.symbol,
+        coinType: b.tokenAddress,
+        human,
+        decimals: b.decimals,
+        usd: human * price,
+      };
     });
-  };
-  return [hidden, toggle];
-};
+  } catch {
+    return [];
+  }
+}

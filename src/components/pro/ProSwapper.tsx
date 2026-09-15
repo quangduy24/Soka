@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useCurrentAccount, useDAppKit, useCurrentClient } from '@mysten/dapp-kit-react';
+import { useAccount, useSendTransaction, usePublicClient } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp, User } from 'lucide-react';
 import { ProHeader } from './ProHeader';
 import { ProRouteVisualizer } from './ProRouteVisualizer';
@@ -9,7 +10,6 @@ import { HistoryPanel } from './HistoryPanel';
 import { GenerativeInkCanvas } from './GenerativeInkCanvas';
 import type { RiskCheck, RouteNode, PtbStep, SwapSnapshot } from '../../types/shared';
 import { makeHistoryId } from '../../utils/explorer';
-import { ConnectModal } from '@mysten/dapp-kit-react/ui';
 
 const HISTORY_KEY = 'soka:swap-history';
 const LEGACY_HISTORY_KEY = 'adidahood:swap-history';
@@ -81,11 +81,11 @@ function loadHistory(): SwapSnapshot[] {
 
 export const ProSwapper: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const currentAccount = useCurrentAccount();
-  const dAppKit = useDAppKit();
-  const suiClient = useCurrentClient();
-  const walletAddress = currentAccount?.address || null;
+  const { address, isConnected } = useAccount();
+  const { sendTransactionAsync } = useSendTransaction();
+  const publicClient = usePublicClient();
+  const { openConnectModal } = useConnectModal();
+  const walletAddress = isConnected && address ? address : null;
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [intentPrompt, setIntentPrompt] = useState<string>(searchParams.get("intent") || "");
   const [submittedUserPrompt, setSubmittedUserPrompt] = useState<string | null>(searchParams.get("intent") || null);
@@ -494,24 +494,73 @@ export const ProSwapper: React.FC = () => {
   };
 
   const handleExecuteSwap = async () => {
-    if (!currentAccount) { setIsWalletModalOpen(true); return; }
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      else setIsWalletModalOpen(true);
+      return;
+    }
     if (isExecuting) return;
-    setIsExecuting(true); setErrorMessage(null);
+    setIsExecuting(true);
+    setErrorMessage(null);
     try {
-      const res = await fetch("/api/execute-swap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ senderAddress: currentAccount.address, sourceSymbol, destSymbol, amount: tradeAmount, slippage: parseFloat(optimalSlippage.replace("%", "")) || 0.5 }) });
+      const res = await fetch("/api/execute-swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderAddress: walletAddress,
+          sourceSymbol,
+          destSymbol,
+          amount: tradeAmount,
+          slippage: parseFloat(optimalSlippage.replace("%", "")) || 0.5,
+        }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to build transaction");
-      if (data.transactionBytes) {
-        const { Transaction } = await import("@mysten/sui/transactions");
-        const tx = Transaction.from(data.transactionBytes);
-        const result = await dAppKit.signAndExecuteTransaction({ transaction: tx });
-        const digest = (result as any).digest || (result as any).Transaction?.digest || (result as any).effects?.transactionDigest;
-        if (!digest) throw new Error("No digest returned.");
-        setTxDigest(digest);
-        if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "CONFIRMED", txDigest: digest });
-      } else throw new Error("No transaction bytes compiled.");
-    } catch (err: any) { setErrorMessage(err.message || "Swap failed."); if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "FAILED" }); }
-    finally { setIsExecuting(false); }
+
+      let target = (data.to || data.target) as `0x${string}`;
+      let txData = (data.data || "0x") as `0x${string}`;
+      let txVal = BigInt(data.value || "0");
+      let gasLim = data.gasLimit ? BigInt(data.gasLimit) : undefined;
+
+      if (data.transactionData) {
+        try {
+          const parsed = JSON.parse(data.transactionData);
+          if (parsed.to) target = parsed.to;
+          if (parsed.data) txData = parsed.data;
+          if (parsed.value) txVal = BigInt(parsed.value);
+          if (parsed.gasLimit) gasLim = BigInt(parsed.gasLimit);
+        } catch {
+          // fallback
+        }
+      }
+
+      const hash = await sendTransactionAsync({
+        to: target,
+        data: txData,
+        value: txVal,
+        gas: gasLim,
+      });
+
+      if (!hash) throw new Error("No transaction hash returned from wallet.");
+      setTxDigest(hash);
+
+      if (publicClient) {
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+
+      if (activeSwapRef.current) {
+        upsertHistory(activeSwapRef.current.id, {
+          status: "CONFIRMED",
+          txDigest: hash,
+          txHash: hash,
+        });
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Swap failed.");
+      if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "FAILED" });
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   const quickPrompts = ["Swap 0.05 BTC to MUSD", "Borrow MUSD with BTC", "Mezo Pools TVL", "Gasless Meta-Tx"];
@@ -1331,7 +1380,7 @@ export const ProSwapper: React.FC = () => {
                   )}
                   <div className="flex items-stretch gap-2 font-meta">
                     <button onClick={handleExecuteSwap} disabled={isExecuting || (!guardianSafe && !hasConfirmedSettings)} className={`flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all cursor-pointer ${!guardianSafe && !hasConfirmedSettings ? "bg-white/50 text-[#845D74]/50 border border-[#2C1924]/10 cursor-not-allowed" : "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99]"}`}>
-                      {isExecuting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Signing...</> : !currentAccount ? <><Wallet className="w-4 h-4" /> Connect Wallet</> : !guardianSafe && !hasConfirmedSettings ? <span>Acknowledge Risk</span> : <><span>Execute ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-4 h-4" /></>}
+                      {isExecuting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Signing...</> : !address ? <><Wallet className="w-4 h-4" /> Connect Wallet</> : !guardianSafe && !hasConfirmedSettings ? <span>Acknowledge Risk</span> : <><span>Execute ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-4 h-4" /></>}
                     </button>
                     <button onClick={() => setShowDetails(v => !v)} className="px-4 py-3 rounded-2xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-colors cursor-pointer shadow-2xs">{showDetails ? "Hide" : "Details"}</button>
                     <button onClick={handleCancelSwap} className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs">Cancel</button>
@@ -1429,8 +1478,6 @@ export const ProSwapper: React.FC = () => {
       </main>
 
       {historyOpen && <HistoryPanel history={history} expandedId={expandedHistory} onToggle={(id) => setExpandedHistory(expandedHistory === id ? null : id)} onRerun={(snap) => { setIntentPrompt(snap.prompt); setHistoryOpen(false); handleProcessIntent(snap.prompt); }} onDelete={deleteHistoryEntry} onClear={clearHistory} onClose={() => setHistoryOpen(false)} />}
-      {/* @ts-expect-error DAppKitConnectModal lit-react component prop types */}
-      <ConnectModal open={isWalletModalOpen} onOpenChange={(isOpen: boolean) => setIsWalletModalOpen(isOpen)} />
     </div>
   );
 };

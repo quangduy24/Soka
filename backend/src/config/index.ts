@@ -1,74 +1,66 @@
 /**
- * DIEPS Intent Engine — Configuration
- * All constants, endpoints, thresholds, and token whitelist for Sui Mainnet.
+ * Soka Intent Engine — Configuration
+ * All constants, endpoints, thresholds, and token whitelist for Mezo Testnet.
+ * All values are configurable via environment variables without hardcoded restrictions.
  */
 
 import dotenv from 'dotenv';
+import { getAddress } from 'viem';
 
-// The dev server (tsx watch server.ts) must always boot in development mode
-// regardless of a stray NODE_ENV=production inherited from the host shell —
-// production mode expects built dist assets and would refuse to start without
-// OPENROUTER_API_KEY. Override happens BEFORE dotenv.config() so .env can
-// still override it explicitly (dotenv never overwrites existing vars).
+// Ensure the dev server runs in development mode regardless of host shell environment.
 if (process.env.NODE_ENV === 'production' && process.argv[1]?.includes('server.ts')) {
   process.env.NODE_ENV = 'development';
 }
 dotenv.config();
 
-// ─── Network Configuration ────────────────────────────────────
+// ─── Network Configuration (Mezo Testnet) ──────────────────────
 
-export const SUI_MAINNET_RPC = process.env.SUI_RPC_ENDPOINT || 'https://fullnode.mainnet.sui.io:443';
-export const SUI_MAINNET_GRAPHQL = 'https://graphql.mainnet.sui.io/graphql';
-export const SUI_API_KEY = process.env.SUI_API_KEY || '';
+export const MEZO_TESTNET_RPC = process.env.MEZO_RPC_ENDPOINT || process.env.MEZO_RPC_URL || 'https://rpc.test.mezo.org';
+export const MEZO_WS_RPC = process.env.MEZO_WS_RPC || 'wss://rpc-ws.test.mezo.org';
+export const MEZO_CHAIN_ID = parseInt(process.env.MEZO_CHAIN_ID || '31611', 10);
+export const MEZO_EXPLORER_URL = process.env.MEZO_EXPLORER_URL || 'https://explorer.test.mezo.org';
 
-// ─── Cetus Aggregator V3 ──────────────────────────────────────
+// Mezo Swap DEX (Solidly / Aerodrome fork)
+export const MEZO_SWAP_ROUTER = getAddress(process.env.MEZO_ROUTER_ADDRESS || '0x16a76d3cd3c1e3ce843c6680d6b37e9116b5c706');
+export const MEZO_SWAP_FACTORY = getAddress(process.env.MEZO_FACTORY_ADDRESS || '0xf07474472d8e54a18d1612eb5711c29665b62bec');
 
-export const CETUS_SUPPORTED_DEXES = [
-  'cetus', 'deepbook', 'deepbookv3', 'kriya', 'flowx', 'aftermath', 'turbos', 'bluefin',
-];
+// ─── LLM Configuration (OpenRouter) ───────────────────────────
 
-// ─── LLM Configuration (Gemini & OpenRouter) ───────────────────────────
-
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
-export const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free';
+export const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 
 /**
- * Ordered fallback models tried (after OPENROUTER_MODEL) when the primary model
- * is rate-limited, unavailable, or returns unparseable output. Paid but cheap
- * and JSON-reliable — chosen so intent parsing does not fail during demos.
- * Override via OPENROUTER_FALLBACK_MODELS (comma-separated).
+ * Ordered fallback models tried when the primary model is unavailable.
  */
 export const OPENROUTER_FALLBACK_MODELS: string[] = (
   process.env.OPENROUTER_FALLBACK_MODELS ||
-  'nvidia/nemotron-3.5-content-safety:free, nvidia/nemotron-3-ultra-550b-a55b:free'
+  'poolside/laguna-s-2.1:free, inclusionai/ling-3.0-flash-fin:free'
 )
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
 
-/** Full ordered candidate list (primary first, de-duplicated). */
+/** Full candidate list (primary first, de-duplicated). */
 export const OPENROUTER_MODEL_CANDIDATES: string[] = [
   ...new Set([OPENROUTER_MODEL, ...OPENROUTER_FALLBACK_MODELS].filter(Boolean)),
 ];
-
 
 // ─── Risk Thresholds ───────────────────────────────────────────
 
 export const RISK_THRESHOLDS = {
   /** Price impact thresholds (%) */
   priceImpact: {
-    warn: 1.0,
-    recommendSplit: 3.0,
-    reject: 5.0,
+    warn: parseFloat(process.env.RISK_PRICE_IMPACT_WARN || '1.0'),
+    recommendSplit: parseFloat(process.env.RISK_PRICE_IMPACT_SPLIT || '3.0'),
+    reject: parseFloat(process.env.RISK_PRICE_IMPACT_REJECT || '5.0'),
   },
   /** Minimum pool liquidity in USD */
   minLiquidity: {
-    stablePair: 50_000,
-    volatilePair: 10_000,
+    stablePair: parseFloat(process.env.RISK_MIN_LIQUIDITY_STABLE || '50000'),
+    volatilePair: parseFloat(process.env.RISK_MIN_LIQUIDITY_VOLATILE || '10000'),
   },
-  /** Liquidity health tiers (USD) — used by PoolSafety.checkLiquidityHealth */
+  /** Liquidity health tiers (USD) */
   liquidityHealth: {
     stablePair: {
       danger: 50_000,
@@ -81,66 +73,63 @@ export const RISK_THRESHOLDS = {
       neutral: 50_000,
     },
   },
-  /** Pool age thresholds (days) — used by PoolSafety.checkPoolAge */
+  /** Pool age thresholds (days) */
   poolAge: {
     danger: 7,
     warn: 3,
   },
-  /** Pool age minimum (days) — legacy alias for poolAge.danger */
   poolMinAge: 7,
   /** Top holder concentration threshold (%) */
   holderConcentration: {
     warn: 50,
     reject: 80,
   },
-  /** Liquidity risk (trade impact ratio) — used by LiquidityRiskGuardian.checkLiquidityRisk */
+  /** Liquidity risk (trade impact ratio) */
   liquidityImpact: {
     danger: 0.20,
     warn: 0.05,
   },
-  /** Supply concentration (% of total supply in pool) — used by LiquidityRiskGuardian.checkSupplyConcentration */
+  /** Supply concentration (% of total supply in pool) */
   supplyConcentration: {
     danger: 0.05,
     warn: 1.0,
   },
-  /** Liquidity depth thresholds — used by LiquidityRiskGuardian.checkLiquidityDepth */
+  /** Liquidity depth thresholds */
   liquidityDepth: {
     maxHops: 3,
     poolUtilizationWarn: 0.3,
   },
-  /** Risk score deductions per check status — used by calculateFinalAssessment */
+  /** Risk score deductions per check status */
   scoreDeductions: {
     DANGER: 25,
     WARNING: 10,
   },
-  /** Risk level boundaries (score thresholds) — used by calculateFinalAssessment */
+  /** Risk level boundaries */
   riskLevel: {
     low: 80,
     medium: 60,
     high: 30,
   },
-  /** Minimum score for safe execution — used by calculateFinalAssessment */
+  /** Minimum score for safe execution */
   minSafeScore: 30,
-  /** Cetus Aggregator V3 endpoint */
-  cetusEndpoint: process.env.CETUS_AGGREGATOR_ENDPOINT || 'https://api-sui.cetus.zone/router_v3',
-  /** Optimal slippage calculation params — used by calculateOptimalSlippage() */
+  /** Optimal slippage calculation params */
   slippage: {
-    base: 0.1,             // minimum buffer for normal price movement (%)
-    impactMultiplier: 1.5, // buffer above simulated price impact (× impact%)
-    liquidityFactor: 2.0,  // tradeUsd/minLiquidity multiplier for shallow pools
-    hopCost: 0.15,         // slippage added per route hop (%)
-    min: 0.1,              // floor (%)
-    max: 15,               // ceiling (%)
+    base: 0.1,             // Minimum buffer for normal price movement (%)
+    impactMultiplier: 1.5, // Buffer above simulated price impact
+    liquidityFactor: 2.0,  // Multiplier for shallow pools
+    hopCost: 0.15,         // Slippage added per route hop (%)
+    min: 0.1,              // Floor (%)
+    max: 15,               // Ceiling (%)
   },
-  /** Router estimation params — used by cetusRouter */
+  /** Router estimation params */
   router: {
-    tvlCapUsd: 10_000_000,   // cap effective TVL to avoid inflating deep-pool estimates
-    defaultFeeRate: 0.003,   // fallback fee rate when SDK omits it (0.3%)
-    gasReserveSui: 0.1,      // SUI reserved for gas when swapping ALL SUI
-    gasEstimateMist: 5_000_000, // gas estimate in MIST for swap transactions
+    tvlCapUsd: 10_000_000,
+    defaultFeeRate: 0.003,      // 0.3% fee rate
+    gasReserveBtc: 0.0005,      // BTC reserved for gas when swapping full native balance
+    gasEstimateUnits: 250_000n, // Estimated gas units for swap
   },
-  /** Suiscan explorer base URL */
-  explorerUrl: 'https://suiscan.xyz/mainnet/tx',
+  /** Explorer base URL */
+  explorerUrl: process.env.MEZO_EXPLORER_URL || 'https://explorer.test.mezo.org/tx',
 };
 
 export * from './constant.js';
@@ -148,13 +137,13 @@ export * from './constant.js';
 // ─── Rate Limiting ─────────────────────────────────────────────
 
 export const RATE_LIMIT = {
-  windowMs: 60_000,       // 1 minute window
-  maxRequests: 60,        // max 60 requests per window per IP
+  windowMs: 60_000,
+  maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '60', 10),
 };
 
 // ─── Server Configuration ──────────────────────────────────────
 
-export const SERVER_PORT = 3000;
+export const SERVER_PORT = parseInt(process.env.PORT || '3000', 10);
 export const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 export const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -162,17 +151,12 @@ export const NODE_ENV = process.env.NODE_ENV || 'development';
 
 /**
  * Validate required environment configuration at startup.
- * Uses GEMINI_API_KEY or OPENROUTER_API_KEY for LLM parsing, with deterministic fallbacks.
  */
 export function validateConfig(): void {
-  const hasAiKey = Boolean(GEMINI_API_KEY || OPENROUTER_API_KEY);
+  const hasAiKey = Boolean(OPENROUTER_API_KEY);
   if (!hasAiKey && NODE_ENV === 'production') {
-    // Log a warning if no API key is set, but permit deterministic parser fallbacks
     console.warn(
-      'Warning: Neither GEMINI_API_KEY nor OPENROUTER_API_KEY is configured. Deterministic intent parsing will be used.'
+      'Warning: OPENROUTER_API_KEY is not configured. Deterministic intent parsing will be used.'
     );
   }
 }
-
-
-

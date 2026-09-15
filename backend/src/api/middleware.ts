@@ -1,5 +1,5 @@
 /**
- * DIEPS Intent Engine — API Middleware
+ * Soka Intent Engine — API Middleware
  * Request validation, error handling, rate limiting, and logging.
  */
 

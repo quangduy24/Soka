@@ -2,5 +2,5 @@
   "name": "SOKA — AI-Powered Bitcoin Intent Protocol",
   "description": "AI-orchestrated intent execution layer for Mezo, the Bitcoin-secured network for self-service Bitcoin banking.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

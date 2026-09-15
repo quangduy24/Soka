@@ -1,9 +1,11 @@
 /**
- * DIEPS Intent Engine — Core Type Definitions & Zod Schemas
- * All domain types for the Sui Mainnet Intent Engine backend.
+ * Soka Intent Engine — Core Type Definitions & Zod Schemas
+ * All domain types for the Mezo Testnet Intent Engine backend.
+ * Uses standard EVM types and English terminology.
  */
 
 import { z } from 'zod';
+import type { Address } from 'viem';
 
 // ─── Intent Types ──────────────────────────────────────────────
 
@@ -11,7 +13,7 @@ import { z } from 'zod';
 export type PriorityMode = 'SAFE' | 'FAST' | 'MAX_OUTPUT';
 
 /** Supported action types */
-export type ActionType = 'SWAP' | 'TRANSFER' | 'BRIDGE';
+export type ActionType = 'SWAP' | 'TRANSFER' | 'BRIDGE' | 'BRIDGE_OUT' | 'BRIDGE_IN';
 
 /** User constraint extracted from natural language */
 export interface UserConstraint {
@@ -45,39 +47,55 @@ export interface IntentParseResult {
 export interface TokenInfo {
   symbol: string;
   name: string;
-  address: string;       // Full coin type (e.g., "0x2::sui::SUI")
+  address: string; // EVM address hex
   decimals: number;
   logoUrl?: string;
   isWhitelisted: boolean;
 }
 
-/** Individual coin object from suix_getCoins */
-export interface CoinData {
-  coinObjectId: string;
-  version: string;
-  digest: string;
-  balance: string;       // in MIST / smallest unit
-  coinType: string;
-}
-
-/** Balance result */
+/** Balance query result */
 export interface BalanceResult {
-  coinType: string;
-  totalBalance: string;  // raw MIST
-  coinObjectCount: number;
+  tokenAddress: string;
+  symbol: string;
+  decimals: number;
+  rawBalance: string;
+  formattedBalance: string;
+  usdValue?: string;
 }
 
 // ─── Route Types ───────────────────────────────────────────────
+
+/** Single route hop in a swap path */
+export interface RouteHop {
+  from: Address;
+  to: Address;
+  stable: boolean;
+  poolAddress?: Address;
+}
 
 /** Single route node (DEX pool hop) */
 export interface RouteNode {
   dex: string;
   ratio: number;        // % of trade routed through this path
   fee: number;          // fee in %
-  weight: number;       // graph weight for Bellman-Ford
+  weight: number;       // graph weight
   poolAddress?: string;
   liquidityUsd?: number;
   onChainLiquidityDepth?: number;
+  stable?: boolean;
+}
+
+/** Pool details */
+export interface PoolDetails {
+  dex: string;
+  address: string;
+  baseToken: { address: string; symbol: string; name: string };
+  quoteToken: { address: string; symbol: string; name: string };
+  priceUsd: string;
+  liquidity: number;
+  volume24h: number;
+  stable: boolean;
+  pairCreatedAt?: number;
 }
 
 /** Full route result returned to frontend */
@@ -90,39 +108,28 @@ export interface RouteResult {
   route_confidence: number;
   dynamicPoolUsed: boolean;
   poolDetails: PoolDetails | null;
-  /** Cetus aggregator raw route data for PTB building */
-  routerData?: any;
-}
-
-/** Pool details from DexScreener or Cetus */
-export interface PoolDetails {
-  dex: string;
-  address: string;
-  baseToken: { address: string; symbol: string; name: string };
-  quoteToken: { address: string; symbol: string; name: string };
-  priceUsd: string;
-  liquidity: number;
-  volume24h: number;
-  pairCreatedAt?: number; // Unix timestamp
+  /** Router data for EVM transaction building */
+  routerData?: {
+    routes: RouteHop[];
+    amountIn: string;
+    amountOut: string;
+    tokenIn: Address;
+    tokenOut: Address;
+    isNativeIn: boolean;
+    isNativeOut: boolean;
+  };
 }
 
 // ─── Risk Types ────────────────────────────────────────────────
 
-/** Risk severity level */
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-/**
- * On-chain proof reference — points a risk check at the exact object,
- * coin type, transaction, or account it was derived from, so the frontend
- * can link out to Suiscan for independent verification.
- */
 export interface RiskReference {
   label: string;
-  type: 'coin' | 'object' | 'tx' | 'account';
+  type: 'token' | 'contract' | 'tx' | 'account' | 'pool';
   value: string;
 }
 
-/** Individual risk check result */
 export interface RiskCheck {
   name: string;
   status: 'SAFE' | 'NEUTRAL' | 'WARNING' | 'DANGER';
@@ -133,10 +140,9 @@ export interface RiskCheck {
   references?: RiskReference[];
 }
 
-/** Complete risk assessment for a route */
 export interface RiskAssessment {
   safe: boolean;
-  score: number;                    // 0-100 (100 = safest)
+  score: number; // 0-100
   riskLevel: RiskLevel;
   slippagePercent: number;
   priceDeviationPercent: number;
@@ -145,7 +151,6 @@ export interface RiskAssessment {
   checks: RiskCheck[];
 }
 
-/** Guardian response to frontend (backward-compatible) */
 export interface GuardianRiskResponse {
   risk_probability: number;
   risk_level: RiskLevel;
@@ -156,23 +161,42 @@ export interface GuardianRiskResponse {
     stale_pool: 'SAFE' | 'WARNING' | 'DANGER';
     black_swan: 'SAFE' | 'WARNING' | 'DANGER';
   };
-  /** Enhanced risk assessment data */
   riskAssessment?: RiskAssessment;
 }
 
-// ─── PTB / Execution Types ─────────────────────────────────────
+// ─── EVM Transaction Execution Types ───────────────────────────
 
-/** Serialized PTB for wallet signing */
+export interface TxStep {
+  index: number;
+  action: 'APPROVE' | 'SWAP' | 'BRIDGE_OUT';
+  to: string;
+  description: string;
+  data?: string;
+  value?: string;
+}
+
 export interface ExecuteSwapResult {
-  /** Base64-encoded transaction bytes for wallet signing */
-  transactionBytes: string;
-  /** Human-readable PTB steps */
-  ptbSteps: PtbStep[];
+  /** Target contract address */
+  to: `0x${string}`;
+  /** Calldata in hex format */
+  data: `0x${string}`;
+  /** Native currency value in wei */
+  value: string;
+  /** Gas limit estimation */
+  gasLimit?: string;
+  /** Transaction execution steps */
+  txSteps: TxStep[];
+  /** Legacy alias for UI */
+  ptbSteps?: TxStep[];
+  /** Serialized transaction data */
+  transactionData: string;
+  /** Legacy alias */
+  transactionBytes?: string;
   /** Simulation result */
   simulation: {
     success: boolean;
     gasUsed: string;
-    balanceChanges: any[];
+    balanceChanges?: any[];
     error?: string;
   };
   /** Route summary */
@@ -185,14 +209,27 @@ export interface ExecuteSwapResult {
   };
 }
 
-/** Individual PTB command step */
-export interface PtbStep {
-  index: number;
-  command: string;      // SplitCoins, MoveCall, TransferObjects
-  target?: string;      // Move function target
-  description: string;
+// ─── Bridge Types ──────────────────────────────────────────────
+
+export interface BridgeOutParams {
+  tokenAddress: `0x${string}`;
+  amount: string;
+  destinationChain: number;
+  recipient: string;
+  senderAddress: `0x${string}`;
 }
 
+export interface BridgeTokenMapping {
+  sourceToken: `0x${string}`;
+  mezoToken: `0x${string}`;
+}
+
+export interface BridgeInfoResult {
+  enabledChains: number[];
+  tokenMappings: BridgeTokenMapping[];
+  outflowCapacities: Record<string, string>;
+  minBridgeOutAmounts: Record<string, string>;
+}
 
 // ─── Zod Schemas for Request Validation ────────────────────────
 
@@ -205,7 +242,7 @@ export const CalculateRouteSchema = z.object({
   destAddress: z.string().min(1),
   sourceSymbol: z.string().min(1),
   destSymbol: z.string().min(1),
-  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
 });
 
 export const EvaluateGuardianSchema = z.object({
@@ -223,7 +260,7 @@ export const RiskAdviceSchema = z.object({
 
 export const BalanceSchema = z.object({
   address: z.string().min(1, 'Address is required'),
-  symbol: z.string().min(1, 'Symbol is required'),
+  symbol: z.string().optional(),
 });
 
 export const ExecuteSwapSchema = z.object({
@@ -232,7 +269,7 @@ export const ExecuteSwapSchema = z.object({
   destSymbol: z.string().min(1),
   sourceAddress: z.string().optional(),
   destAddress: z.string().optional(),
-  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
   slippage: z.number().min(0).max(50).optional().default(0.5),
   routerData: z.any().optional(),
 });
@@ -240,7 +277,7 @@ export const ExecuteSwapSchema = z.object({
 export const RiskSummarySchema = z.object({
   sourceToken: z.string().min(1),
   destToken: z.string().min(1),
-  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
   guardianChecks: z.array(z.any()),
   routeNodes: z.array(z.any()).optional().default([]),
 });
@@ -249,6 +286,14 @@ export const ProcessIntentSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
   senderAddress: z.string().min(1, 'Sender address is required'),
   slippage: z.number().min(0).max(50).optional().default(0.5),
+});
+
+export const BridgeOutSchema = z.object({
+  senderAddress: z.string().min(1, 'Sender address is required'),
+  tokenAddress: z.string().min(1, 'Token address is required'),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  destinationChain: z.number().int().min(0).max(1),
+  recipient: z.string().min(1, 'Recipient address is required'),
 });
 
 export interface ProcessIntentResult {
@@ -260,5 +305,5 @@ export interface ProcessIntentResult {
     riskLevel: RiskLevel;
     checks: RiskCheck[];
   };
-  ptb: ExecuteSwapResult;
+  ptb: ExecuteSwapResult; // named ptb for backward compatibility with frontend
 }

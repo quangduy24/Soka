@@ -1,114 +1,145 @@
 /**
- * DIEPS Intent Engine — Core Token Whitelist
- *
- * Purpose of this file:
- *   - Provide verified on-chain addresses + correct decimals for the 5 most
- *     important tokens: SUI, USDC, USDT, DEEP, WAL.
- *   - All other tokens (900+ coins) are resolved from /src/cetus-tokens.json
- *     at runtime by tokenResolver.ts.
- *
- * Rules for adding a token here:
- *   1. It has a non-standard decimal count (≠ 9), OR
- *   2. It needs a stable fuzzy alias that LLM intent parsing must recognise, OR
- *   3. Its address in cetus-tokens.json is known to be wrong/outdated.
+ * Soka Intent Engine — Mezo Testnet Constants & Token Whitelist
+ * Defines verified precompile addresses, testnet tokens, and configuration.
+ * All addresses and options are configurable via environment variables.
  */
 
 export interface WhitelistToken {
   symbol: string;
   name: string;
-  /** Full Sui coin type, e.g. 0x2::sui::SUI */
-  address: string;
+  /** EVM contract address in hex (0x...) */
+  address: `0x${string}`;
   decimals: number;
   isStable: boolean;
-  /** Lower-case strings the LLM or user might say instead of the symbol */
+  /** Lower-case aliases recognized by user prompts and intent parsers */
   aliases: string[];
+  /** Optional logo URL or icon path */
+  logoUrl?: string;
 }
 
+export const ZERO_ADDRESS: `0x${string}` = '0x0000000000000000000000000000000000000000';
+
+// ─── Mezo Precompiled Contract Addresses ───────────────────────
+
+export const MEZO_PRECOMPILES = {
+  btcToken: (process.env.MEZO_PRECOMPILE_BTC || '0x7b7c000000000000000000000000000000000000') as `0x${string}`,
+  mezoToken: (process.env.MEZO_PRECOMPILE_MEZO || '0x7b7c000000000000000000000000000000000001') as `0x${string}`,
+  validatorPool: (process.env.MEZO_PRECOMPILE_VALIDATOR_POOL || '0x7b7c000000000000000000000000000000000011') as `0x${string}`,
+  assetsBridge: (process.env.MEZO_PRECOMPILE_ASSETS_BRIDGE || '0x7b7c000000000000000000000000000000000012') as `0x${string}`,
+  maintenance: (process.env.MEZO_PRECOMPILE_MAINTENANCE || '0x7b7c000000000000000000000000000000000013') as `0x${string}`,
+  upgrade: (process.env.MEZO_PRECOMPILE_UPGRADE || '0x7b7c000000000000000000000000000000000014') as `0x${string}`,
+  priceOracle: (process.env.MEZO_PRECOMPILE_PRICE_ORACLE || '0x7b7c000000000000000000000000000000000015') as `0x${string}`,
+};
+
+// ─── Bridge Destination Chains ─────────────────────────────────
+
+export enum BridgeDestinationChain {
+  ETHEREUM = 0,
+  BITCOIN = 1,
+}
+
+// ─── Verified Token Whitelist ──────────────────────────────────
+
 export const TOKEN_WHITELIST: WhitelistToken[] = [
-  // ─── Native gas token ────────────────────────────────────────────────────
+  // Native Gas Token (Bitcoin on Mezo)
   {
-    symbol: 'SUI',
-    name: 'Sui',
-    address: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    decimals: 9,
+    symbol: 'BTC',
+    name: 'Bitcoin',
+    address: (process.env.TOKEN_BTC_ADDRESS || ZERO_ADDRESS) as `0x${string}`,
+    decimals: 18,
     isStable: false,
-    aliases: ['sui'],
+    aliases: ['btc', 'bitcoin', 'sat', 'sats'],
   },
-
-  // ─── Stablecoins (decimals = 6) ──────────────────────────────────────────
+  // BTC ERC-20 Precompiled Wrapper
   {
-    symbol: 'USDC',
-    name: 'USD Coin',
-    // Native Sui USDC (Circle bridge)
-    address: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    symbol: 'wBTC',
+    name: 'Wrapped BTC (Precompile)',
+    address: MEZO_PRECOMPILES.btcToken,
+    decimals: 18,
+    isStable: false,
+    aliases: ['wbtc', 'wrapped btc', 'btc token'],
+  },
+  // MEZO Governance Token
+  {
+    symbol: 'MEZO',
+    name: 'Mezo Token',
+    address: MEZO_PRECOMPILES.mezoToken,
+    decimals: 18,
+    isStable: false,
+    aliases: ['mezo', 'mzo'],
+  },
+  // Stablecoins
+  {
+    symbol: 'mUSDC',
+    name: 'Mezo USD Coin',
+    address: (process.env.TOKEN_MUSDC_ADDRESS || '0xe1a26db653708A2AD8F824E92Db9852410e33A59') as `0x${string}`,
     decimals: 6,
     isStable: true,
-    aliases: ['usdc', 'usd coin', 'dollar', 'usd'],
+    aliases: ['musdc', 'usdc', 'usd coin', 'dollar', 'usd'],
   },
   {
-    symbol: 'USDT',
-    name: 'Tether USD',
-    address: '0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN',
+    symbol: 'mUSDT',
+    name: 'Mezo Tether USD',
+    address: (process.env.TOKEN_MUSDT_ADDRESS || '0x629320719a6190bd145C277226fd45e7648F950A') as `0x${string}`,
     decimals: 6,
     isStable: true,
-    aliases: ['usdt', 'tether'],
-  },
-
-  // ─── DeepBook governance token (decimals = 6) ───────────────────────────
-  {
-    symbol: 'DEEP',
-    name: 'DeepBook',
-    address: '0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP',
-    decimals: 6,
-    isStable: false,
-    aliases: ['deep', 'deepbook'],
-  },
-
-  // ─── Walrus storage token (decimals = 9, verified address) ───────────────
-  // cetus-tokens.json may contain an older WAL address — this entry takes
-  // priority because TOKEN_WHITELIST is checked first in tokenResolver.ts.
-  {
-    symbol: 'WAL',
-    name: 'WAL Token',
-    address: '0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59::wal::WAL',
-    decimals: 9,
-    isStable: false,
-    aliases: ['wal', 'walrus'],
-  },
-
-  // ─── Non-standard decimal tokens (must be here for correct amount math) ──
-  {
-    symbol: 'BLUB',
-    name: 'BLUB',
-    address: '0xfa7ac3951fdca92c5200d468d31a365eb03b2be9936fde615e69f0c1274ad3a0::BLUB::BLUB',
-    decimals: 2,
-    isStable: false,
-    aliases: ['blub'],
+    aliases: ['musdt', 'usdt', 'tether'],
   },
   {
-    symbol: 'CETUS',
-    name: 'Cetus Protocol',
-    address: '0x06864a6f921804860930db6ddbe2e16acdf8504495ea7481637a1c8b9a8fe54b::cetus::CETUS',
-    decimals: 9,
-    isStable: false,
-    aliases: ['cetus'],
-  },
-  
-  // ─── Community Whitelisted Tokens ──────────────────────────────────────────
-  {
-    symbol: 'HIPPO',
-    name: 'Sudeng',
-    address: '0x8993129d72e733985f7f1a00396cbd055bad6f817fee36576ce483c8bbb8b87b::sudeng::SUDENG',
-    decimals: 9,
-    isStable: false,
-    aliases: ['hippo', 'sudeng'],
+    symbol: 'mDAI',
+    name: 'Mezo DAI',
+    address: (process.env.TOKEN_MDAI_ADDRESS || '0x367c502008004dCc0c08a55aD46670248EA9Ab76') as `0x${string}`,
+    decimals: 18,
+    isStable: true,
+    aliases: ['mdai', 'dai'],
   },
   {
-    symbol: 'LOFI',
-    name: 'LOFI Yeti',
-    address: '0xf22da9a24ad027cccb5f2d496cbe91de953d363513db08a3a734d361c7c17503::LOFI::LOFI',
-    decimals: 9,
+    symbol: 'mUSDe',
+    name: 'Mezo USDe',
+    address: (process.env.TOKEN_MUSDE_ADDRESS || '0x32BE1eAb30cCF66779CB67B92cD275F25870A925') as `0x${string}`,
+    decimals: 18,
+    isStable: true,
+    aliases: ['musde', 'usde', 'ethena'],
+  },
+  // Bitcoin Variants
+  {
+    symbol: 'mcbBTC',
+    name: 'Mezo Coinbase BTC',
+    address: (process.env.TOKEN_MCBBTC_ADDRESS || '0x2278CAAE0009E8a325a346feA573eF23C5756DbF') as `0x${string}`,
+    decimals: 18,
     isStable: false,
-    aliases: ['lofi', 'yeti'],
+    aliases: ['mcbbtc', 'cbbtc', 'coinbase btc'],
+  },
+  {
+    symbol: 'mFBTC',
+    name: 'Mezo Firelight BTC',
+    address: (process.env.TOKEN_MFBTC_ADDRESS || '0x88aa5b66211177b499206968a4ab5E44635D3533') as `0x${string}`,
+    decimals: 18,
+    isStable: false,
+    aliases: ['mfbtc', 'fbtc'],
+  },
+  {
+    symbol: 'mSolvBTC',
+    name: 'Mezo Solv BTC',
+    address: (process.env.TOKEN_MSOLVBTC_ADDRESS || '0xCE7b4CfA6060Fd4B8d5E200CE3F3144E3036E3D2') as `0x${string}`,
+    decimals: 18,
+    isStable: false,
+    aliases: ['msolvbtc', 'solvbtc'],
+  },
+  {
+    symbol: 'mswBTC',
+    name: 'Mezo Swell BTC',
+    address: (process.env.TOKEN_MSWBTC_ADDRESS || '0x438e2A4D97916DBF86882a17b4Eb5b71E73988d9') as `0x${string}`,
+    decimals: 18,
+    isStable: false,
+    aliases: ['mswbtc', 'swbtc', 'swell btc'],
+  },
+  {
+    symbol: 'mT',
+    name: 'Mezo Threshold T',
+    address: (process.env.TOKEN_MT_ADDRESS || '0xdd8Bf5ACa0579bEE7e6cd20AC7683E279a5f7d48') as `0x${string}`,
+    decimals: 18,
+    isStable: false,
+    aliases: ['mt', 'threshold', 't token'],
   },
 ];

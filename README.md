@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Stack](https://img.shields.io/badge/Stack-React_19_%7C_Vite_%7C_Express_%7C_Tailwind_v4-212121?style=for-the-badge)](https://react.dev/)
-[![AI Engine](https://img.shields.io/badge/AI_Engine-Gemini_Flash_%2B_Deterministic-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/)
+[![AI Engine](https://img.shields.io/badge/AI_Engine-OpenRouter_%2B_Deterministic-6366F1?style=for-the-badge)](https://openrouter.ai/)
 [![Status](https://img.shields.io/badge/Status-Beta_v2.0-8A2BE2?style=for-the-badge)](#)
 
 **SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine. Users express what they want to trade in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"*, or *"Trade ALL SUI for USDC"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, searches optimal liquidity paths across concentrated AMMs, runs every route through a **7-Layer On-Chain Risk Guardian**, and synthesizes an atomic transaction block ready for signature — with zero manual slippage math, no token address hunting, and complete protection against sandwich attacks.
@@ -31,7 +31,7 @@ SOKA executes trades through an end-to-end 5-stage pipeline orchestrated by `/ap
 ```mermaid
 flowchart TD
     A[User Natural Language Prompt] --> B[1. Multi-Tier Intent Parser]
-    B -->|Gemini Flash / OpenRouter / Rule Fallback| C{Parsed Intent}
+    B -->|OpenRouter / Rule Fallback| C{Parsed Intent}
     
     C -->|Unknown / Non-whitelisted Token| D[Token Resolver & Disambiguation]
     D -->|User Selects Verified Contract| C
@@ -83,9 +83,8 @@ SOKA features a fail-safe, 3-tier parsing architecture that guarantees zero serv
 
 | Tier | Engine | Implementation | When Used |
 |---|---|---|---|
-| **Tier 1** | **Google Gemini Flash** (`gemini-3.8-flash` / `2.5`) | `@google/genai` TypeScript SDK | Primary parser when `GEMINI_API_KEY` is configured. Latency < 1.5s with strict JSON schema. |
-| **Tier 2** | **OpenRouter LLM Pool** | Multi-model candidate retry chain | Active when `OPENROUTER_API_KEY` is present. Handles model fallback automatically. |
-| **Tier 3** | **Deterministic Rule Parser** | Offline RegEx & semantic extraction | Always available. Guarantees 100% uptime with zero external API dependencies. |
+| **Tier 1** | **OpenRouter LLM Pool** | Native fetch REST API | Primary parser when `OPENROUTER_API_KEY` is configured. Multi-model fallback chain. |
+| **Tier 2** | **Deterministic Rule Parser** | Offline RegEx & semantic extraction | Always available. Guarantees 100% uptime with zero external dependencies. |
 
 ### Example Prompts Understood:
 - *"Swap 0.05 BTC to MUSD, safest route"* → Amount: `0.05`, Source: `BTC`, Dest: `MUSD`, Priority: `SAFE`
@@ -258,7 +257,7 @@ Assembles signed transaction bytes for the final swap PTB.
 │   │   │   └── constant.ts       # Core Token Whitelist
 │   │   ├── services/
 │   │   │   ├── llm/
-│   │   │   │   ├── intentParser.ts  # Gemini + OpenRouter + Rule parser
+│   │   │   │   ├── intentParser.ts  # OpenRouter + Rule parser
 │   │   │   │   ├── riskAdvisor.ts   # Risk synthesis & summaries
 │   │   │   │   └── tokenAdvisor.ts  # Fuzzy match & candidate advisor
 │   │   │   ├── router/
@@ -315,8 +314,8 @@ cp .env.example .env
 Configure your environment variables:
 ```env
 # AI Model Configuration (Optional but recommended)
-GEMINI_API_KEY=your_gemini_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=openai/gpt-4o-mini
 
 # Network & RPC
 SUI_RPC_ENDPOINT=https://fullnode.mainnet.sui.io:443

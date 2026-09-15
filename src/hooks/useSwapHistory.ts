@@ -28,12 +28,12 @@ export interface SwapSession {
   destLogo?: string | null;
 }
 
-const STORAGE_KEY = 'dieps:swap-history';
+const STORAGE_KEY = 'soka:swap-history';
 const MAX_SESSIONS = 50;
 
 function loadSessions(): SwapSession[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('dieps:swap-history');
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -92,7 +92,7 @@ export function useSwapHistory() {
       const next = [session, ...prev].slice(0, MAX_SESSIONS);
       const success = persistSessions(next);
       if (!success) {
-        window.dispatchEvent(new CustomEvent('dieps:history-quota-exceeded'));
+        window.dispatchEvent(new CustomEvent('soka:history-quota-exceeded'));
       }
       return next;
     });
@@ -103,7 +103,7 @@ export function useSwapHistory() {
       const next = prev.map(s => (s.id === id ? { ...s, ...patch } : s));
       const success = persistSessions(next);
       if (!success) {
-        window.dispatchEvent(new CustomEvent('dieps:history-quota-exceeded'));
+        window.dispatchEvent(new CustomEvent('soka:history-quota-exceeded'));
       }
       return next;
     });
