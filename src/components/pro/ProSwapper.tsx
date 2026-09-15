@@ -86,7 +86,6 @@ export const ProSwapper: React.FC = () => {
   const publicClient = usePublicClient();
   const { openConnectModal } = useConnectModal();
   const walletAddress = isConnected && address ? address : null;
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [intentPrompt, setIntentPrompt] = useState<string>(searchParams.get("intent") || "");
   const [submittedUserPrompt, setSubmittedUserPrompt] = useState<string | null>(searchParams.get("intent") || null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -496,7 +495,6 @@ export const ProSwapper: React.FC = () => {
   const handleExecuteSwap = async () => {
     if (!walletAddress) {
       if (openConnectModal) openConnectModal();
-      else setIsWalletModalOpen(true);
       return;
     }
     if (isExecuting) return;
@@ -584,7 +582,7 @@ export const ProSwapper: React.FC = () => {
         }}
       />
 
-      <ProHeader onOpenWalletModal={() => setIsWalletModalOpen(true)} />
+      <ProHeader />
 
       <main className="flex-1 min-h-0 w-full max-w-5xl mx-auto px-4 sm:px-6 py-3.5 sm:py-5 relative z-10 flex flex-col">
         {/* Main Chat Card - Crisp, Soft & Clean Redesign */}
