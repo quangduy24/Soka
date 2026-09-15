@@ -37,21 +37,19 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
           <nav className="hidden md:flex items-center gap-1.5 p-1 rounded-xl border border-[#DF7AA7]/30 bg-white/85 shadow-2xs">
             <Link
               to="/"
-              className={`px-3.5 py-1.5 rounded-lg text-xs transition-all font-meta ${
-                !isApp
+              className={`px-3.5 py-1.5 rounded-lg text-xs transition-all font-meta ${!isApp
                   ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs'
                   : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
-              }`}
+                }`}
             >
               Overview
             </Link>
             <Link
               to="/app"
-              className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all font-meta ${
-                isApp
+              className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all font-meta ${isApp
                   ? 'bg-white text-[#DF7AA7] font-bold border border-[#F7D1D7] shadow-xs'
                   : 'text-[#2C1924] font-semibold hover:text-[#DF7AA7] hover:bg-white/60'
-              }`}
+                }`}
             >
               <Terminal className="w-3.5 h-3.5 text-[#DF7AA7]" />
               Launch App
@@ -71,7 +69,7 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
               >
                 <span className="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent pointer-events-none rounded-t-xl" />
                 <Wallet className="w-3.5 h-3.5 text-white/95 group-hover:scale-110 transition-transform drop-shadow-2xs" />
-                <span className="tracking-wide drop-shadow-2xs">Connect Mezo Wallet</span>
+                <span className="tracking-wide drop-shadow-2xs">Connect Wallet</span>
               </button>
             )}
           </div>
