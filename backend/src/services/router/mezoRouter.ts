@@ -10,11 +10,11 @@ import {
   MEZO_SWAP_FACTORY,
   MEZO_PRECOMPILES,
   RISK_THRESHOLDS,
-  TOKEN_WHITELIST,
   ZERO_ADDRESS,
 } from '../../config/index.js';
 import { getPublicClient } from '../../utils/mezoClient.js';
 import { getDecimals, getSymbol } from '../../utils/erc20Utils.js';
+import { getTokenUsdPrice } from '../prices/priceService.js';
 import { logger } from '../../utils/logger.js';
 import type { RouteResult, RouteNode, PoolDetails, RouteHop } from '../../types/index.js';
 import routerAbi from '../../abi/mezoSwapRouter.json' with { type: 'json' };
@@ -70,21 +70,28 @@ export async function findOptimalRoute(
 
   logger.info(`Calculating Mezo route: ${tokenIn} -> ${tokenOut} (${amountInFormatted})`);
 
-  // Build candidate paths (direct volatile, direct stable, and multi-hop via hubs)
+  // Build candidate paths (direct volatile, direct stable, and multi-hop via hubs).
+  // Tigris routes carry the factory address on every hop.
+  const mkHop = (from: Address, to: Address, stable: boolean): RouteHop => ({
+    from,
+    to,
+    stable,
+    factory: MEZO_SWAP_FACTORY,
+  });
   const candidatePaths: RouteHop[][] = [
-    [{ from: tokenIn, to: tokenOut, stable: false }],
-    [{ from: tokenIn, to: tokenOut, stable: true }],
+    [mkHop(tokenIn, tokenOut, false)],
+    [mkHop(tokenIn, tokenOut, true)],
   ];
 
   for (const hub of HUB_TOKENS) {
     if (hub.toLowerCase() !== tokenIn.toLowerCase() && hub.toLowerCase() !== tokenOut.toLowerCase()) {
       candidatePaths.push([
-        { from: tokenIn, to: hub, stable: false },
-        { from: hub, to: tokenOut, stable: false },
+        mkHop(tokenIn, hub, false),
+        mkHop(hub, tokenOut, false),
       ]);
       candidatePaths.push([
-        { from: tokenIn, to: hub, stable: true },
-        { from: hub, to: tokenOut, stable: false },
+        mkHop(tokenIn, hub, true),
+        mkHop(hub, tokenOut, false),
       ]);
     }
   }
@@ -105,6 +112,7 @@ export async function findOptimalRoute(
             from: h.from,
             to: h.to,
             stable: h.stable,
+            factory: h.factory,
           })),
         ],
       } as any)) as bigint[];
@@ -118,12 +126,14 @@ export async function findOptimalRoute(
             executionImpact: calculateSimulatedPriceImpact(hops.length, parsedAmountIn),
             poolDetails: {
               dex: 'Mezo Swap',
-              address: hops[0].poolAddress || MEZO_SWAP_ROUTER,
+              address: MEZO_SWAP_ROUTER,
               baseToken: { address: tokenIn, symbol: await getSymbol(tokenIn).catch(() => 'SRC'), name: 'Source Token' },
               quoteToken: { address: tokenOut, symbol: await getSymbol(tokenOut).catch(() => 'DEST'), name: 'Dest Token' },
-              priceUsd: '1.0',
-              liquidity: 500_000,
-              volume24h: 120_000,
+              // Valued after the best route is selected; empty means unknown.
+              priceUsd: '',
+              liquidity: null,
+              // 24h volume is not observable on-chain; 0 means unknown.
+              volume24h: 0,
               stable: hops[0].stable,
             },
           };
@@ -135,16 +145,74 @@ export async function findOptimalRoute(
     }
   }
 
-  // If on-chain reserves are not deployed yet on testnet, generate deterministic fallback route
+  // No on-chain quote: fail loudly instead of inventing a route.
   if (!bestRoute || bestRoute.amountOut === 0n) {
-    logger.warn('Mezo router returned no active pool quote; applying testnet pricing fallback.');
-    bestRoute = buildTestnetFallbackRoute(
-      tokenIn,
-      tokenOut,
-      parsedAmountIn,
-      sourceDecimals,
-      destDecimals
+    throw new Error(
+      'NO_LIQUIDITY: Mezo Swap router returned no active pool quote for this pair. ' +
+        'The pools may be undeployed or lack liquidity on testnet.'
     );
+  }
+
+  // Resolve the real pair and value its reserves on-chain (null when unknowable)
+  const firstHop = bestRoute.hops[0];
+  let pairAddress: Address = MEZO_SWAP_ROUTER;
+  let liquidityUsd: number | null = null;
+  let feePct: number | null = null;
+  try {
+    const resolved = await client
+      .readContract({
+        address: MEZO_SWAP_FACTORY,
+        abi: factoryAbi,
+        functionName: 'getPool',
+        args: [tokenIn, tokenOut, firstHop.stable],
+      } as any)
+      .catch(() => null);
+    if (typeof resolved === 'string' && resolved.startsWith('0x') && resolved.length === 42) {
+      pairAddress = resolved as Address;
+    }
+    const reserves = (await client
+      .readContract({
+        address: MEZO_SWAP_ROUTER,
+        abi: routerAbi,
+        functionName: 'getReserves',
+        args: [tokenIn, tokenOut, firstHop.stable, MEZO_SWAP_FACTORY],
+      } as any)
+      .catch(() => null)) as readonly [bigint, bigint] | null;
+    if (reserves) {
+      const [priceIn, priceOut] = await Promise.all([
+        getTokenUsdPrice(tokenIn),
+        getTokenUsdPrice(tokenOut),
+      ]);
+      const decIn = sourceDecimals;
+      const decOut = destDecimals;
+      if (priceIn.priceUsd != null && priceOut.priceUsd != null) {
+        const vIn = Number(formatUnits(reserves[0], decIn)) * priceIn.priceUsd;
+        const vOut = Number(formatUnits(reserves[1], decOut)) * priceOut.priceUsd;
+        if (Number.isFinite(vIn) && Number.isFinite(vOut)) liquidityUsd = vIn + vOut;
+      }
+    }
+  } catch (err) {
+    logger.warn(`Failed to value route reserves: ${(err as Error).message}`);
+  }
+
+  // Real pool fee from the factory (basis points-ish units resolved on-chain)
+  try {
+    if (pairAddress !== MEZO_SWAP_ROUTER) {
+      const feeRaw = (await client
+        .readContract({
+          address: MEZO_SWAP_FACTORY,
+          abi: factoryAbi,
+          functionName: 'getFee',
+          args: [pairAddress, firstHop.stable],
+        } as any)
+        .catch(() => null)) as bigint | number | null;
+      if (feeRaw != null) {
+        const bps = Number(feeRaw);
+        if (Number.isFinite(bps) && bps >= 0) feePct = bps / 100;
+      }
+    }
+  } catch (err) {
+    logger.warn(`Failed to read pool fee: ${(err as Error).message}`);
   }
 
   const expectedOutputFormatted = Number(formatUnits(bestRoute.amountOut, destDecimals));
@@ -153,11 +221,11 @@ export async function findOptimalRoute(
   const routeNodes: RouteNode[] = bestRoute.hops.map((hop, index) => ({
     dex: 'Mezo Swap',
     ratio: 100,
-    fee: hop.stable ? 0.05 : 0.3,
+    // Fee resolved on-chain above; omitted when unknown instead of guessed.
+    ...(feePct != null ? { fee: feePct } : {}),
     weight: index + 1,
-    poolAddress: hop.poolAddress || MEZO_SWAP_ROUTER,
-    liquidityUsd: 250_000,
-    onChainLiquidityDepth: 500_000,
+    poolAddress: index === 0 ? pairAddress : hop.poolAddress,
+    ...(liquidityUsd != null ? { liquidityUsd } : {}),
     stable: hop.stable,
   }));
 
@@ -167,9 +235,12 @@ export async function findOptimalRoute(
     expected_output: expectedOutputFormatted,
     minimum_output: minOutputFormatted,
     execution_impact: `${bestRoute.executionImpact.toFixed(2)}%`,
-    route_confidence: 0.95,
-    dynamicPoolUsed: true,
-    poolDetails: bestRoute.poolDetails,
+    // Confidence reflects a live on-chain quote (no synthetic fallback exists).
+    route_confidence: 1.0,
+    dynamicPoolUsed: false,
+    poolDetails: bestRoute.poolDetails
+      ? { ...bestRoute.poolDetails, address: pairAddress, liquidity: liquidityUsd }
+      : null,
     routerData: {
       routes: bestRoute.hops,
       amountIn: parsedAmountIn.toString(),
@@ -188,61 +259,4 @@ export async function findOptimalRoute(
 function calculateSimulatedPriceImpact(hopsCount: number, amountIn: bigint): number {
   const baseImpact = 0.05 * hopsCount;
   return Math.min(baseImpact, 1.5);
-}
-
-/**
- * Fallback pricing model for testnet demonstration when pools are newly created.
- */
-function buildTestnetFallbackRoute(
-  tokenIn: Address,
-  tokenOut: Address,
-  amountIn: bigint,
-  sourceDecimals: number,
-  destDecimals: number
-): RouteCandidate {
-  const inputNumber = Number(formatUnits(amountIn, sourceDecimals));
-
-  // Determine approximate rate relative to USD
-  const inUsdPrice = estimateTokenUsd(tokenIn);
-  const outUsdPrice = estimateTokenUsd(tokenOut);
-
-  const totalUsdValue = inputNumber * inUsdPrice;
-  const feeMultiplier = 0.997; // 0.3% fee
-  const outputNumber = (totalUsdValue / outUsdPrice) * feeMultiplier;
-
-  const parsedAmountOut = parseUnits(outputNumber.toFixed(Math.min(destDecimals, 8)), destDecimals);
-
-  return {
-    hops: [{ from: tokenIn, to: tokenOut, stable: false }],
-    amountOut: parsedAmountOut,
-    executionImpact: 0.12,
-    poolDetails: {
-      dex: 'Mezo Swap (Tigris)',
-      address: MEZO_SWAP_ROUTER,
-      baseToken: { address: tokenIn, symbol: 'SRC', name: 'Source Token' },
-      quoteToken: { address: tokenOut, symbol: 'DEST', name: 'Dest Token' },
-      priceUsd: inUsdPrice.toString(),
-      liquidity: 350_000,
-      volume24h: 85_000,
-      stable: false,
-    },
-  };
-}
-
-/**
- * Approximate USD exchange rate for common Mezo testnet tokens.
- */
-function estimateTokenUsd(address: Address): number {
-  const lower = address.toLowerCase();
-  if (lower === MEZO_PRECOMPILES.btcToken.toLowerCase()) return 95_000;
-  if (lower === MEZO_PRECOMPILES.mezoToken.toLowerCase()) return 2.5;
-
-  // Check known whitelist symbols
-  const found = TOKEN_WHITELIST.find((t) => t.address.toLowerCase() === lower);
-  if (found) {
-    if (found.isStable) return 1.0;
-    if (found.symbol.includes('BTC')) return 95_000;
-  }
-
-  return 1.0;
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layers, ArrowRight, ExternalLink, Zap, Percent, Shield, AlertTriangle } from 'lucide-react';
 import type { RouteNode } from '../../types/shared';
+import { addressExplorerUrl } from '../../utils/explorer';
 
 interface ProRouteVisualizerProps {
   sourceSymbol: string;
@@ -25,8 +26,8 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
   sourceLogo,
   destLogo,
 }) => {
-  const formatUsd = (val?: number) => {
-    if (!val) return 'Deep Pool';
+  const formatUsd = (val?: number | null) => {
+    if (val == null) return '—';
     if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
     if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}k`;
     return `$${val.toFixed(0)}`;
@@ -126,7 +127,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
                       </div>
                       {poolId && (
                         <a
-                          href={`https://explorer.mezo.org/address/${poolId}`}
+                          href={addressExplorerUrl(poolId)}
                           target="_blank"
                           rel="noreferrer"
                           className="font-mono text-[10px] text-[#DF7AA7] hover:underline flex items-center gap-1 mt-0.5"
@@ -141,7 +142,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
                   <div className="flex items-center gap-4 text-right font-mono text-xs">
                     <div>
                       <span className="text-[10px] text-[#845D74] block">Fee Rate</span>
-                      <span className="text-[#2C1924] font-bold">{node.fee || '0.25'}%</span>
+                      <span className="text-[#2C1924] font-bold">{node.fee != null ? `${node.fee}%` : '—'}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-[#845D74] block">Depth</span>

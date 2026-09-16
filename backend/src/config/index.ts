@@ -20,9 +20,11 @@ export const MEZO_WS_RPC = process.env.MEZO_WS_RPC || 'wss://rpc-ws.test.mezo.or
 export const MEZO_CHAIN_ID = parseInt(process.env.MEZO_CHAIN_ID || '31611', 10);
 export const MEZO_EXPLORER_URL = process.env.MEZO_EXPLORER_URL || 'https://explorer.test.mezo.org';
 
-// Mezo Swap DEX (Solidly / Aerodrome fork)
-export const MEZO_SWAP_ROUTER = getAddress(process.env.MEZO_ROUTER_ADDRESS || '0x16a76d3cd3c1e3ce843c6680d6b37e9116b5c706');
-export const MEZO_SWAP_FACTORY = getAddress(process.env.MEZO_FACTORY_ADDRESS || '0xf07474472d8e54a18d1612eb5711c29665b62bec');
+// Mezo Swap DEX (Tigris Aerodrome fork). Defaults are the verified Mezo
+// testnet contracts (https://mezo.org/docs/developers/features/mezo-pools/);
+// override via environment when networks change.
+export const MEZO_SWAP_ROUTER = getAddress(process.env.MEZO_ROUTER_ADDRESS || '0x9a1ff7FE3a0F69959A3fBa1F1e5ee18e1A9CD7E9');
+export const MEZO_SWAP_FACTORY = getAddress(process.env.MEZO_FACTORY_ADDRESS || '0x4947243CC818b627A5D06d14C4eCe7398A23Ce1A');
 
 // ─── LLM Configuration (OpenRouter) ───────────────────────────
 
@@ -45,6 +47,12 @@ export const OPENROUTER_FALLBACK_MODELS: string[] = (
 export const OPENROUTER_MODEL_CANDIDATES: string[] = [
   ...new Set([OPENROUTER_MODEL, ...OPENROUTER_FALLBACK_MODELS].filter(Boolean)),
 ];
+
+/** Per-model request timeout for LLM calls (ms). */
+export const LLM_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.LLM_TIMEOUT_MS || 20_000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 20_000;
+})();
 
 // ─── Risk Thresholds ───────────────────────────────────────────
 
@@ -133,6 +141,55 @@ export const RISK_THRESHOLDS = {
 };
 
 export * from './constant.js';
+
+// ─── Market Data (all values configurable via environment) ──────
+
+function parseNumberEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export const MARKET_CONFIG = {
+  /** TTL for cached USD price lookups (ms) */
+  priceCacheTtlMs: parseNumberEnv('PRICE_CACHE_TTL_MS', 60_000),
+  /** Max age of an oracle round before it is treated as stale (seconds) */
+  priceMaxStalenessSec: parseNumberEnv('PRICE_MAX_STALENESS_SEC', 3_600),
+  /** TTL for cached pool listings (ms) */
+  poolsCacheTtlMs: parseNumberEnv('POOLS_CACHE_TTL_MS', 30_000),
+  /** Max number of factory pairs scanned per pool listing request */
+  poolsMaxScan: Math.max(1, Math.floor(parseNumberEnv('POOLS_MAX_SCAN', 50))),
+};
+
+// ─── Lending Risk Parameters (operator-configured, no on-chain source on testnet) ─
+
+export const LENDING_CONFIG = {
+  /** Max loan-to-value ratio applied to borrow quotes (fraction, e.g. 0.75) */
+  maxLtv: parseNumberEnv('BORROW_MAX_LTV', 0.75),
+  /** Liquidation loan-to-value threshold (fraction, e.g. 0.85) */
+  liquidationLtv: parseNumberEnv('BORROW_LIQ_LTV', 0.85),
+  /** Per-debt-symbol APR lookup: BORROW_APR_<SYMBOL>, plus BORROW_APR_DEFAULT */
+  aprForSymbol(symbol: string): number | null {
+    const key = `BORROW_APR_${symbol.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+    const raw = process.env[key] ?? process.env.BORROW_APR_DEFAULT;
+    if (raw === undefined || raw.trim() === '') return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  },
+  /** Optional lending pool contract; empty means borrow execution is unavailable */
+  lendingPoolAddress: (process.env.LENDING_POOL_ADDRESS || '') as `0x${string}` | '',
+  /** Optional vault contract; empty means vault deposits are unavailable */
+  vaultAddress: (process.env.VAULT_ADDRESS || '') as `0x${string}` | '',
+};
+
+// ─── CORS ────────────────────────────────────────────────────────
+
+/** Allowed origins for cross-origin API access (comma-separated). Empty = same-origin only. */
+export const CORS_ORIGINS: string[] = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 // ─── Rate Limiting ─────────────────────────────────────────────
 

@@ -61,15 +61,18 @@ export interface BalanceResult {
   rawBalance: string;
   formattedBalance: string;
   usdValue?: string;
+  /** Price source: oracle | router-quote. Absent when price is unknown. */
+  priceSource?: 'oracle' | 'router-quote';
 }
 
 // ─── Route Types ───────────────────────────────────────────────
 
-/** Single route hop in a swap path */
+/** Single route hop in a swap path (Tigris router route: from/to/stable/factory) */
 export interface RouteHop {
   from: Address;
   to: Address;
   stable: boolean;
+  factory: Address;
   poolAddress?: Address;
 }
 
@@ -77,7 +80,8 @@ export interface RouteHop {
 export interface RouteNode {
   dex: string;
   ratio: number;        // % of trade routed through this path
-  fee: number;          // fee in %
+  /** fee in %. Absent when not resolvable on-chain. */
+  fee?: number;
   weight: number;       // graph weight
   poolAddress?: string;
   liquidityUsd?: number;
@@ -92,7 +96,9 @@ export interface PoolDetails {
   baseToken: { address: string; symbol: string; name: string };
   quoteToken: { address: string; symbol: string; name: string };
   priceUsd: string;
-  liquidity: number;
+  /** TVL in USD, or null when it cannot be valued on-chain */
+  liquidity: number | null;
+  /** 24h volume is not observable on-chain; 0 means unknown */
   volume24h: number;
   stable: boolean;
   pairCreatedAt?: number;
@@ -168,7 +174,7 @@ export interface GuardianRiskResponse {
 
 export interface TxStep {
   index: number;
-  action: 'APPROVE' | 'SWAP' | 'BRIDGE_OUT';
+  action: 'APPROVE' | 'SWAP' | 'BRIDGE_OUT' | 'ADD_LIQUIDITY' | 'REMOVE_LIQUIDITY';
   to: string;
   description: string;
   data?: string;
@@ -294,6 +300,46 @@ export const BridgeOutSchema = z.object({
   amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
   destinationChain: z.number().int().min(0).max(1),
   recipient: z.string().min(1, 'Recipient address is required'),
+});
+
+export const PricesQuerySchema = z.object({
+  /** Optional comma-separated symbols. Defaults to the verified whitelist. */
+  symbols: z.string().min(1).optional(),
+});
+
+export const PoolsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+  wallet: z.string().min(1).optional(),
+});
+
+export const PoolAddressParamSchema = z.object({
+  address: z.string().min(1, 'Pool address is required'),
+});
+
+export const BorrowQuoteSchema = z.object({
+  walletAddress: z.string().min(1).optional(),
+  collateralSymbol: z.string().min(1, 'Collateral symbol is required'),
+  collateralAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  debtSymbol: z.string().min(1, 'Debt symbol is required'),
+});
+
+export const QuoteLiquiditySchema = z.object({
+  tokenA: z.string().min(1, 'tokenA address is required'),
+  tokenB: z.string().min(1, 'tokenB address is required'),
+  stable: z.coerce.boolean().optional().default(false),
+  amountADesired: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  amountBDesired: z.union([z.string(), z.number()]).transform((v) => String(v)),
+});
+
+export const AddLiquiditySchema = QuoteLiquiditySchema.extend({
+  senderAddress: z.string().min(1, 'Sender address is required'),
+});
+
+export const RemoveLiquiditySchema = z.object({
+  senderAddress: z.string().min(1, 'Sender address is required'),
+  poolAddress: z.string().min(1, 'Pool address is required'),
+  liquidity: z.union([z.string(), z.number()]).transform((v) => String(v)),
 });
 
 export interface ProcessIntentResult {

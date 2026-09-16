@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useAccount, useSendTransaction, usePublicClient } from 'wagmi';
+import { useAccount, useSendTransaction, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { useQuery } from '@tanstack/react-query';
 import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp, User } from 'lucide-react';
 import { ProHeader } from './ProHeader';
 import { ProRouteVisualizer } from './ProRouteVisualizer';
@@ -9,7 +10,10 @@ import { ProGuardianRadar } from './ProGuardianRadar';
 import { HistoryPanel } from './HistoryPanel';
 import { GenerativeInkCanvas } from './GenerativeInkCanvas';
 import type { RiskCheck, RouteNode, PtbStep, SwapSnapshot } from '../../types/shared';
-import { makeHistoryId } from '../../utils/explorer';
+import { makeHistoryId, txExplorerUrl } from '../../utils/explorer';
+import { ZERO_ADDRESS } from '../../constants';
+import { marketApi, type PoolDto } from '../../services/mezoApi';
+import { mezoTestnet } from '../../mezo-chain';
 
 const HISTORY_KEY = 'soka:swap-history';
 const LEGACY_HISTORY_KEY = 'adidahood:swap-history';
@@ -34,31 +38,6 @@ function migrateLegacyHistory(): SwapSnapshot[] {
   } catch { return []; }
 }
 
-function buildDemoHistory(): SwapSnapshot[] {
-  const now = Date.now();
-  const checks = (impact: "SAFE" | "WARNING" | "DANGER"): RiskCheck[] => [
-    { name: "Price Impact", status: impact, message: "Effective impact vs slippage curve" },
-    { name: "Liquidity Risk", status: impact === "DANGER" ? "DANGER" : impact === "WARNING" ? "WARNING" : "SAFE", message: "Trade size vs pool depth" },
-    { name: "DEX Verification", status: impact === "DANGER" ? "WARNING" : "SAFE", message: "Creator matches audited protocol" },
-    { name: "Liquidity Health", status: impact === "WARNING" ? "WARNING" : impact === "DANGER" ? "DANGER" : "SAFE", message: "Pool age verified on-chain" },
-  ];
-  const ptb = (n: number, dex = "mezo_pools", fromBtc = true): PtbStep[] => {
-    const steps: PtbStep[] = [];
-    steps.push(fromBtc ? { index: 1, command: "GasReserve", description: "Reserve native BTC gas + approve swap input" } : { index: 1, command: "TokenApprove", description: "Approve token spending for Mezo Pools" });
-    let i = 2;
-    for (let h = 0; h < n; h++) steps.push({ index: i++, command: "ContractCall", target: `MezoPools::swapExactInputSingle`, description: `MezoPools concentrated AMM tick route` });
-    steps.push({ index: i, command: "TransferAssets", description: "Settle output to your Mezo wallet" });
-    return steps;
-  };
-  const route = (arr: Array<[string, number, number]>): RouteNode[] =>
-    arr.map(([dex, ratio, fee], i) => ({ dex, ratio, fee, weight: ratio, liquidityUsd: 1250000 + i * 290000, poolAddress: "0x" + (i + 1).toString(16).padStart(4, "0") + "eabed72c53f027380872d35c6301cc6a7dc9dfe5e9f1fdc4c3f1a2b3c4d5e" + (i + 7).toString(16) }));
-  return [
-    { id: makeHistoryId(), prompt: "Swap 0.05 BTC to MUSD", status: "CONFIRMED", createdAt: now - 33 * 864e5, amount: "0.05", sourceSymbol: "BTC", destSymbol: "MUSD", expectedOutput: "4625.50", executionImpact: "0.04%", slippage: "0.08%", gasEstimate: "0.00012 BTC", guardianScore: 96, guardianRiskLevel: "LOW", guardianSafe: true, txDigest: "0x8f3a", routeNodes: route([["MEZO POOLS", 100, 0.003]]), checks: checks("SAFE"), ptbSteps: ptb(2, "mezo_pools") },
-    { id: makeHistoryId(), prompt: "Swap 500 MUSD for MEZO", status: "SIMULATED", createdAt: now - 2 * 36e5, amount: "500", sourceSymbol: "MUSD", destSymbol: "MEZO", expectedOutput: "1284.52", executionImpact: "0.8%", slippage: "1.2%", gasEstimate: "0.00015 BTC", guardianScore: 82, guardianRiskLevel: "LOW", guardianSafe: true, routeNodes: route([["MEZO POOLS", 70, 0.003], ["MEZO POOLS (HOP)", 30, 0.005]]), checks: checks("SAFE"), ptbSteps: ptb(2, "mezo_pools") },
-    { id: makeHistoryId(), prompt: "Swap 1.5 BTC to MEZO", status: "SIMULATED", createdAt: now - 90 * 60e3, amount: "1.5", sourceSymbol: "BTC", destSymbol: "MEZO", expectedOutput: "389200", executionImpact: "4.8%", slippage: "8.5%", gasEstimate: "0.00025 BTC", guardianScore: 28, guardianRiskLevel: "CRITICAL", guardianSafe: false, routeNodes: route([["MEZO POOLS", 60, 0.003], ["MEZO POOLS (SECONDARY)", 40, 0.01]]), checks: checks("DANGER"), ptbSteps: ptb(3, "mezo_pools") },
-  ];
-}
-
 function loadHistory(): SwapSnapshot[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
@@ -74,7 +53,7 @@ function loadHistory(): SwapSnapshot[] {
       normalized.push({ ...x, id });
     }
     if (normalized.length === 0 && localStorage.getItem(LEGACY_HISTORY_KEY)) return migrateLegacyHistory().slice(0, MAX_HISTORY);
-    if (normalized.length === 0) { const s = buildDemoHistory(); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(s)); } catch { /* */ } return s; }
+    // No demo seeding: history only contains the user's real on-chain activity.
     return normalized.slice(0, MAX_HISTORY);
   } catch { return []; }
 }
@@ -82,6 +61,8 @@ function loadHistory(): SwapSnapshot[] {
 export const ProSwapper: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const publicClient = usePublicClient();
   const { openConnectModal } = useConnectModal();
@@ -139,15 +120,7 @@ export const ProSwapper: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState("");
   const [vaultAcknowledged, setVaultAcknowledged] = useState(false);
 
-  // Mock vault data
-  const vaultBalance = { totalDeposited: 12450.80, avgApr: 8.25, deposits: 3 };
-  const vaults = [
-    { id: "btc", name: "BTC Yield Vault", featured: true, address: "0x1a2b3c4d5e6f7890abcdef1234567890abcdef12", depositToken: "BTC", receiptToken: "xBTC", operator: "Mezo Staking", withdrawalFee: "0.1%", withdrawalTimelock: "24h", yieldAsset: "BTC", apr: 5.2, tvl: 12500000 },
-    { id: "musd", name: "MUSD Savings Vault", featured: false, address: "0x9876543210fedcba0987654321fedcba09876543", depositToken: "MUSD", receiptToken: "sMUSD", operator: "Mezo Stability Pool", withdrawalFee: "0.0%", withdrawalTimelock: "0h", yieldAsset: "MUSD", apr: 8.5, tvl: 8500000 },
-    { id: "mezo", name: "MEZO Governance Vault", featured: false, address: "0xmezo1234567890abcdefmezo1234567890abcdef", depositToken: "MEZO", receiptToken: "vMEZO", operator: "Mezo DAO", withdrawalFee: "0.2%", withdrawalTimelock: "12h", yieldAsset: "MEZO", apr: 15.3, tvl: 3200000 },
-    { id: "tbtc", name: "tBTC Bridge Vault", featured: false, address: "0x1234567890abcdef1234567890abcdef12345678", depositToken: "tBTC", receiptToken: "stBTC", operator: "Threshold Network", withdrawalFee: "0.0%", withdrawalTimelock: "0h", yieldAsset: "tBTC", apr: 6.1, tvl: 5200000 },
-    { id: "usdc", name: "USDC Lending Vault", featured: false, address: "0xabcdef1234567890abcdef1234567890abcdef12", depositToken: "USDC", receiptToken: "lUSDC", operator: "Lending Pool", withdrawalFee: "0.0%", withdrawalTimelock: "0h", yieldAsset: "USDC", apr: 7.5, tvl: 2100000 },
-  ];
+  // Real on-chain pools are wired below (after pool/vault step state).
 
   // Pool state - chat flow
   const [poolStep, setPoolStep] = useState<"idle" | "list" | "details" | "addLiquidity" | "addIncentive" | "removeLiquidity" | "success">("idle");
@@ -156,14 +129,39 @@ export const ProSwapper: React.FC = () => {
   const [incentiveAmount, setIncentiveAmount] = useState("");
   const [removeAmount, setRemoveAmount] = useState("");
 
-  // Mock pool data
-  const pools = [
-    { id: "musdc-musd", name: "mUSDC/MUSD", feeTier: 10, type: "Concentrated Stable", tvl: 279800, volume: 139.90, apr: 2.68, tvlFormatted: "$279.80K", volumeFormatted: "$139.90", aprFormatted: "2.68%", feeFormatted: "0.13%", token0: "mUSDC", token1: "MUSD" },
-    { id: "btc-musd", name: "BTC/MUSD", feeTier: 200, type: "Concentrated Volatile", tvl: 210560, volume: 631.68, apr: 96.18, tvlFormatted: "$210.56K", volumeFormatted: "$631.68", aprFormatted: "96.18%", feeFormatted: "30.35%", token0: "BTC", token1: "MUSD" },
-    { id: "musdc-btc", name: "mUSDC/BTC", feeTier: 200, type: "Concentrated Volatile", tvl: 55140, volume: 165.42, apr: 81.83, tvlFormatted: "$55.14K", volumeFormatted: "$165.42", aprFormatted: "81.83%", feeFormatted: "17.03%", token0: "mUSDC", token1: "BTC" },
-    { id: "mezo-musd", name: "MEZO/MUSD", feeTier: 200, type: "Concentrated Volatile", tvl: 11900, volume: 35.71, apr: 709.65, tvlFormatted: "$11.90K", volumeFormatted: "$35.71", aprFormatted: "709.65%", feeFormatted: "33.27%", token0: "MEZO", token1: "MUSD" },
-    { id: "btc-musd-basic", name: "BTC/MUSD", feeTier: 0, type: "Basic Volatile", tvl: 11820, volume: 35.46, apr: 31.67, tvlFormatted: "$11.82K", volumeFormatted: "$35.46", aprFormatted: "31.67%", feeFormatted: "0.44%", token0: "BTC", token1: "MUSD" },
-  ];
+  // Borrow quote state (real on-chain valuation via /api/borrow-quote)
+  const [borrowQuote, setBorrowQuote] = useState<any>(null);
+  const [borrowQuoteLoading, setBorrowQuoteLoading] = useState(false);
+  const [borrowQuoteError, setBorrowQuoteError] = useState<string | null>(null);
+
+  // Pool execution state (real quotes + unsigned transactions)
+  const [liqQuote, setLiqQuote] = useState<any>(null);
+  const [liqQuoteLoading, setLiqQuoteLoading] = useState(false);
+  const [liqQuoteError, setLiqQuoteError] = useState<string | null>(null);
+
+  // Real on-chain pools (Mezo Swap factory). Loaded on demand for Pool/Vault flows.
+  const poolsEnabled = poolStep !== "idle" || vaultStep !== "idle";
+  const poolsQuery = useQuery({
+    queryKey: ['soka-pools', walletAddress ?? 'disconnected'],
+    queryFn: () => marketApi.getPools({ limit: 30, offset: 0, wallet: walletAddress ?? undefined }),
+    enabled: poolsEnabled,
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const pools: PoolDto[] = poolsQuery.data?.pools ?? [];
+  const poolsTotal = poolsQuery.data?.totalPairs ?? 0;
+
+  const findPoolByTokens = (a: string, b: string): PoolDto | undefined => {
+    const la = a.toLowerCase(), lb = b.toLowerCase();
+    return pools.find((p) => {
+      const s0 = p.token0.symbol.toLowerCase(), s1 = p.token1.symbol.toLowerCase();
+      return (s0 === la && s1 === lb) || (s0 === lb && s1 === la);
+    });
+  };
+
+  const poolDisplayName = (p: PoolDto): string => `${p.token0.symbol}/${p.token1.symbol}`;
+  const fmtUsd = (v: number | null | undefined): string =>
+    v == null ? "—" : v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(2)}M` : v >= 1_000 ? `$${(v / 1_000).toFixed(2)}K` : `$${v.toFixed(2)}`;
 
   const upsertHistory = (id: string, patch: Partial<SwapSnapshot>) => {
     setHistory(prev => { const n = prev.map(x => (x.id === id ? { ...x, ...patch } : x)); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
@@ -178,6 +176,8 @@ export const ProSwapper: React.FC = () => {
     setBorrowToken(null);
     setCollateralAmount("");
     setBorrowAcknowledged(false);
+    setBorrowQuote(null);
+    setBorrowQuoteError(null);
     setVaultStep("idle");
     setSelectedVault(null);
     setDepositAmount("");
@@ -185,6 +185,10 @@ export const ProSwapper: React.FC = () => {
     setPoolStep("idle");
     setSelectedPool(null);
     setLiquidityAmount("");
+    setIncentiveAmount("");
+    setRemoveAmount("");
+    setLiqQuote(null);
+    setLiqQuoteError(null);
     setActiveAction(null);
   };
   const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
@@ -208,115 +212,281 @@ export const ProSwapper: React.FC = () => {
     setBorrowStep("enter_amount");
     setSokaMessage(`You selected ${token}. How much BTC would you like to deposit as collateral?`);
   };
-  const handleBorrowAmountSubmit = () => {
+  const handleBorrowAmountSubmit = async () => {
     if (!collateralAmount || parseFloat(collateralAmount) <= 0 || !borrowToken) return;
-    setBorrowStep("review");
-    const collateralValueUsd = parseFloat(collateralAmount) * 92000;
-    const borrowAmount = collateralValueUsd * 0.75;
-    const interestRate = borrowToken === "MUSD" ? 4.5 : 3.8;
-    const liquidationPrice = borrowAmount / (parseFloat(collateralAmount) * 0.85);
-    setSokaMessage(`📋 Borrow Summary:\n\n• Borrow: ${borrowAmount.toFixed(2)} ${borrowToken}\n• Collateral: ${collateralAmount} BTC ($${collateralValueUsd.toFixed(2)})\n• LTV: 75.00%\n• Interest Rate: ${interestRate}% APR\n• Liquidation LTV: 85%\n• Liquidation Price: $${liquidationPrice.toFixed(2)}\n\n⚠️ If BTC drops to $${liquidationPrice.toFixed(2)}, your collateral will be liquidated. Please acknowledge the risks to proceed.`);
+    setBorrowQuoteLoading(true);
+    setBorrowQuoteError(null);
+    try {
+      const quote = await marketApi.borrowQuote({
+        walletAddress: walletAddress ?? undefined,
+        collateralSymbol: "BTC",
+        collateralAmount,
+        debtSymbol: borrowToken,
+      });
+      setBorrowQuote(quote);
+      setBorrowStep("review");
+      const maxBorrow = quote.maxBorrowAmount ?? "—";
+      const liqPrice = quote.liquidationPriceUsd != null ? `$${Number(quote.liquidationPriceUsd).toFixed(2)}` : "—";
+      const apr = quote.aprPct != null ? `${quote.aprPct}% APR` : "rate unavailable on-chain";
+      setSokaMessage(`📋 Borrow Quote (live on-chain valuation):\n\n• Borrow up to: ${maxBorrow} ${borrowToken}\n• Collateral: ${collateralAmount} BTC${quote.collateralValueUsd != null ? ` ($${Number(quote.collateralValueUsd).toFixed(2)})` : " (price unavailable)"}\n• Max LTV: ${(quote.maxLtv * 100).toFixed(0)}%\n• Interest Rate: ${apr}\n• Liquidation Price: ${liqPrice}\n\n⚠️ Execution is unavailable: no lending pool contract exists on Mezo testnet. This quote is advisory only.`);
+    } catch (err: any) {
+      setBorrowQuoteError(err.message || "Failed to fetch borrow quote");
+      setSokaMessage(`Borrow quote failed: ${err.message || "backend unreachable"}. Check that the backend is running and the wallet has BTC for collateral valuation.`);
+    } finally {
+      setBorrowQuoteLoading(false);
+    }
   };
   const handleBorrowConfirm = () => {
-    setBorrowStep("success");
-    setSokaMessage(`✅ Borrow Successful!\n\nYou borrowed ${borrowAmount.toFixed(2)} ${borrowToken} with ${collateralAmount} BTC as collateral.\n\nYour position is now active. You can repay at any time.`);
+    // No lending pool contract exists on Mezo testnet: never fabricate success.
+    setSokaMessage(`Borrow execution is unavailable: no lending pool contract exists on Mezo testnet. Your quote (${borrowQuote?.maxBorrowAmount ?? "—"} ${borrowToken ?? ""}) remains advisory only.`);
   };
   const handleBorrowCancel = () => {
     setBorrowStep("idle");
     setCollateralAmount("");
     setBorrowToken(null);
     setBorrowAcknowledged(false);
+    setBorrowQuote(null);
+    setBorrowQuoteError(null);
     setSokaMessage("Borrow cancelled. Is there anything else I can help you with?");
   };
-  // Calculated borrow values
-  const collateralValueUsd = parseFloat(collateralAmount || "0") * 0.68;
-  const maxLtv = 0.75;
-  const borrowAmount = collateralValueUsd * maxLtv;
-  const interestRate = borrowToken === "MUSD" ? 4.5 : borrowToken === "MUSDC" ? 3.8 : 0;
-  const liquidationLtv = 0.85;
-  const liquidationPrice = collateralAmount && parseFloat(collateralAmount) > 0 ? borrowAmount / (parseFloat(collateralAmount) * liquidationLtv) : 0;
-  // Vault handlers - chat flow
+  // Borrow figures always come from the live quote (never local estimates).
+  const collateralValueUsd = borrowQuote?.collateralValueUsd != null ? Number(borrowQuote.collateralValueUsd) : 0;
+  const maxLtv = borrowQuote?.maxLtv ?? 0;
+  const borrowAmount = borrowQuote?.maxBorrowAmount != null ? Number(borrowQuote.maxBorrowAmount) : 0;
+  const interestRate = borrowQuote?.aprPct;
+  const liquidationLtv = borrowQuote?.liquidationLtv ?? 0;
+  const liquidationPrice = borrowQuote?.liquidationPriceUsd != null ? Number(borrowQuote.liquidationPriceUsd) : 0;
+  // Vault handlers - venues are REAL on-chain pools; deposits execute as
+  // add-liquidity through the wallet (no mock vault contracts exist).
   const handleOpenVault = () => {
     setVaultStep("list");
-    setSokaMessage("Here's your vault overview and available vaults. Select a vault to view details or deposit.");
+    setSokaMessage("Here are live Mezo Swap pools as yield venues (on-chain TVL and reserves). Select a venue to supply liquidity.");
   };
-  const handleSelectVault = (vaultId: string) => {
-    setSelectedVault(vaultId);
+  const handleSelectVault = (poolAddress: string) => {
+    const pool = pools.find(p => p.address.toLowerCase() === poolAddress.toLowerCase());
+    if (!pool) return;
+    setSelectedVault(poolAddress);
+    setSelectedPool(poolAddress);
     setVaultStep("details");
-    const vault = vaults.find(v => v.id === vaultId);
-    if (vault) {
-      setSokaMessage(`📋 ${vault.name} Details:\n\n• Vault Address: ${vault.address.slice(0, 10)}...${vault.address.slice(-8)}\n• Deposit Token: ${vault.depositToken}\n• Receipt Token: ${vault.receiptToken}\n• Operator: ${vault.operator}\n• Withdrawal Fee: ${vault.withdrawalFee}\n• Withdrawal Time-lock: ${vault.withdrawalTimelock}\n• Yield Asset: ${vault.yieldAsset}\n• APR: ${vault.apr}%\n• TVL: $${(vault.tvl / 1000000).toFixed(1)}M\n\nClick Deposit to proceed.`);
-    }
+    setSokaMessage(`📋 ${poolDisplayName(pool)} Venue (live):\n\n• Pool: ${pool.address}\n• Type: ${pool.stable == null ? "Unknown" : pool.stable ? "Stable" : "Volatile"}\n• Fee: ${pool.feePct != null ? `${pool.feePct}%` : "—"}\n• TVL: ${fmtUsd(pool.tvlUsd)}\n• Reserves: ${pool.token0.reserve} ${pool.token0.symbol} / ${pool.token1.reserve} ${pool.token1.symbol}${pool.userLpBalance != null ? `\n• Your LP: ${pool.userLpBalance} (${pool.userSharePct != null ? pool.userSharePct.toFixed(4) : "—"}%)` : ""}\n\n supplying liquidity mints real LP tokens to your wallet.`);
   };
   const handleDepositVault = () => {
     setVaultStep("deposit");
-    const vault = vaults.find(v => v.id === selectedVault);
-    setSokaMessage(`How much ${vault?.depositToken || "token"} would you like to deposit into ${vault?.name || "vault"}?`);
+    const pool = pools.find(p => p.address === selectedVault);
+    setSokaMessage(`How much ${pool?.token0.symbol || "token"} (paired with ${pool?.token1.symbol || "token"}) would you like to supply to ${pool ? poolDisplayName(pool) : "the pool"}? Amounts are quoted on-chain before signing.`);
   };
-  const handleDepositAmountSubmit = () => {
-    if (!depositAmount || parseFloat(depositAmount) <= 0) return;
-    setVaultStep("confirm");
-    const vault = vaults.find(v => v.id === selectedVault);
-    const receiptAmount = parseFloat(depositAmount) * 0.98; // Mock conversion
-    setSokaMessage(`📋 Deposit Summary:\n\n• Vault: ${vault?.name}\n• Deposit: ${depositAmount} ${vault?.depositToken}\n• You'll receive: ${receiptAmount.toFixed(2)} ${vault?.receiptToken}\n• APR: ${vault?.apr}%\n• Yield Asset: ${vault?.yieldAsset}\n\nPlease acknowledge to confirm deposit.`);
+  const handleDepositAmountSubmit = async () => {
+    if (!depositAmount || parseFloat(depositAmount) <= 0 || !selectedVault) return;
+    const pool = pools.find(p => p.address === selectedVault);
+    if (!pool) return;
+    setLiqQuoteLoading(true);
+    setLiqQuoteError(null);
+    try {
+      // Quote token0 leg; the router prices the paired leg from live reserves.
+      const quote = await marketApi.quoteAddLiquidity({
+        tokenA: pool.token0.address,
+        tokenB: pool.token1.address,
+        stable: pool.stable ?? false,
+        amountADesired: depositAmount,
+        amountBDesired: depositAmount,
+      });
+      setLiqQuote({ ...quote, poolAddress: pool.address, tokenA: pool.token0, tokenB: pool.token1 });
+      setVaultStep("confirm");
+      setSokaMessage(`📋 Supply Preview (live quote):\n\n• Pool: ${poolDisplayName(pool)}\n• You supply: ${quote.quotedAmountA} ${pool.token0.symbol} + ${quote.quotedAmountB} ${pool.token1.symbol}\n• LP tokens: ${quote.liquidityTokens}\n\nSign with your wallet to execute on Mezo testnet.`);
+    } catch (err: any) {
+      setLiqQuoteError(err.message || "Quote failed");
+      setSokaMessage(`Supply quote failed: ${err.message || "backend unreachable"}.`);
+    } finally {
+      setLiqQuoteLoading(false);
+    }
   };
-  const handleVaultConfirm = () => {
-    setVaultStep("success");
-    const vault = vaults.find(v => v.id === selectedVault);
-    setSokaMessage(`✅ Deposit Successful!\n\nYou deposited ${depositAmount} ${vault?.depositToken} into ${vault?.name}.\n\nYour deposit is now earning ${vault?.apr}% APR.`);
+  const handleVaultConfirm = async () => {
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      return;
+    }
+    if (!selectedVault || !liqQuote) return;
+    setIsExecuting(true);
+    try {
+      const tx = await marketApi.addLiquidity({
+        senderAddress: walletAddress,
+        tokenA: liqQuote.tokenA.address,
+        tokenB: liqQuote.tokenB.address,
+        stable: pools.find(p => p.address === selectedVault)?.stable ?? false,
+        amountADesired: liqQuote.quotedAmountA,
+        amountBDesired: liqQuote.quotedAmountB,
+      });
+      await executeUnsignedTx(tx, `Supply to ${selectedVault.slice(0, 10)}…`);
+      setVaultStep("success");
+      setSokaMessage(`✅ Liquidity supplied on Mezo testnet. LP tokens are now in your wallet.`);
+      poolsQuery.refetch();
+    } catch (err: any) {
+      setSokaMessage(`Supply failed: ${err.message || "wallet rejected the transaction"}.`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
   const handleVaultCancel = () => {
     setVaultStep("idle");
     setSelectedVault(null);
     setDepositAmount("");
     setVaultAcknowledged(false);
+    setLiqQuote(null);
+    setLiqQuoteError(null);
     setSokaMessage("Vault action cancelled. Is there anything else I can help you with?");
   };
-  // Pool handlers - chat flow
+  // Shared on-chain executor for unsigned backend transactions.
+  const executeUnsignedTx = async (tx: any, label: string): Promise<string> => {
+    if (chainId !== mezoTestnet.id) {
+      throw new Error(`Wrong network: switch your wallet to Mezo Testnet (chain ${mezoTestnet.id})`);
+    }
+    let target = (tx.to || tx.target) as `0x${string}`;
+    let txData = (tx.data || "0x") as `0x${string}`;
+    let txVal = BigInt(tx.value || "0");
+    let gasLim = tx.gasLimit ? BigInt(tx.gasLimit) : undefined;
+    if (tx.transactionData) {
+      try {
+        const parsed = JSON.parse(tx.transactionData);
+        if (parsed.to) target = parsed.to;
+        if (parsed.data) txData = parsed.data;
+        if (parsed.value) txVal = BigInt(parsed.value);
+        if (parsed.gasLimit) gasLim = BigInt(parsed.gasLimit);
+      } catch { /* use top-level fields */ }
+    }
+    if (!target || !target.startsWith('0x') || target.length !== 42) {
+      throw new Error(`Backend returned an invalid transaction target for ${label}`);
+    }
+    const hash = await sendTransactionAsync({ to: target, data: txData, value: txVal, gas: gasLim });
+    if (!hash) throw new Error("No transaction hash returned from wallet.");
+    if (publicClient) {
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+      if (receipt.status === 'reverted') throw new Error(`Transaction reverted on-chain: ${hash}`);
+    }
+    setTxDigest(hash);
+    return hash;
+  };
+  // Pool handlers - all data and execution are live on Mezo testnet.
   const handleOpenPool = () => {
     setPoolStep("list");
-    setSokaMessage("Here are the available pools. Select a pool to view details, add liquidity, add incentives, or remove liquidity.");
+    setSokaMessage("Here are live Mezo Swap pools from the on-chain factory. Select a pool to view reserves, quote, add or remove liquidity.");
   };
-  const handleSelectPool = (poolId: string) => {
-    setSelectedPool(poolId);
+  const handleSelectPool = (poolAddress: string) => {
+    const pool = pools.find(p => p.address.toLowerCase() === poolAddress.toLowerCase());
+    if (!pool) return;
+    setSelectedPool(pool.address);
     setPoolStep("details");
-    const pool = pools.find(p => p.id === poolId);
-    if (pool) {
-      setSokaMessage(`📋 ${pool.name} Pool:\n\n• Type: ${pool.type}\n• Fee Tier: ${pool.feeFormatted}\n• TVL: ${pool.tvlFormatted}\n• Volume: ${pool.volumeFormatted}\n• APR: ${pool.aprFormatted}\n\nChoose an action: Add Liquidity, Add Incentive, or Remove Liquidity.`);
-    }
+    setSokaMessage(`📋 ${poolDisplayName(pool)} Pool (live):\n\n• Type: ${pool.stable == null ? "Unknown" : pool.stable ? "Stable" : "Volatile"}\n• Fee: ${pool.feePct != null ? `${pool.feePct}%` : "—"}\n• TVL: ${fmtUsd(pool.tvlUsd)}\n• Reserves: ${pool.token0.reserve} ${pool.token0.symbol} / ${pool.token1.reserve} ${pool.token1.symbol}${pool.userLpBalance != null ? `\n• Your LP: ${pool.userLpBalance} (${pool.userSharePct != null ? pool.userSharePct.toFixed(4) : "—"}%)` : ""}\n\nChoose an action: Add Liquidity or Remove Liquidity.`);
   };
   const handleAddLiquidity = () => {
+    if (!selectedPool) return;
     setPoolStep("addLiquidity");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`How much liquidity would you like to add to ${pool?.name}?`);
-  };
-  const handleAddIncentive = () => {
-    setPoolStep("addIncentive");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`How much incentive token would you like to add to ${pool?.name}?`);
+    setLiqQuote(null);
+    setLiqQuoteError(null);
+    const pool = pools.find(p => p.address === selectedPool);
+    setSokaMessage(`How much ${pool?.token0.symbol} (paired with ${pool?.token1.symbol} at live reserves) would you like to add to ${pool ? poolDisplayName(pool) : "the pool"}?`);
   };
   const handleRemoveLiquidity = () => {
+    if (!selectedPool) return;
     setPoolStep("removeLiquidity");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`How much liquidity would you like to remove from ${pool?.name}?`);
+    setLiqQuote(null);
+    setLiqQuoteError(null);
+    const pool = pools.find(p => p.address === selectedPool);
+    setSokaMessage(`How much LP token would you like to remove from ${pool ? poolDisplayName(pool) : "the pool"}?${pool?.userLpBalance != null ? ` Your balance: ${pool.userLpBalance}.` : ""}`);
   };
-  const handleLiquiditySubmit = () => {
-    if (!liquidityAmount || parseFloat(liquidityAmount) <= 0) return;
-    setPoolStep("success");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`✅ Liquidity Added!\n\nYou added $${liquidityAmount} to ${pool?.name} pool.\n\nYou're now earning ${pool?.aprFormatted} APR on your liquidity.`);
+  const handleAddIncentive = () => {
+    // No incentive/gauge contracts are wired on testnet: keep the entry point
+    // visible but honest instead of fabricating rewards.
+    setSokaMessage("Incentive gauges are not wired on Mezo testnet yet. Add liquidity to earn swap fees; gauge emissions will appear here once a gauge contract is configured.");
+  };
+  const handleLiquiditySubmit = async () => {
+    if (!liquidityAmount || parseFloat(liquidityAmount) <= 0 || !selectedPool) return;
+    const pool = pools.find(p => p.address === selectedPool);
+    if (!pool) return;
+    setLiqQuoteLoading(true);
+    setLiqQuoteError(null);
+    try {
+      const quote = await marketApi.quoteAddLiquidity({
+        tokenA: pool.token0.address,
+        tokenB: pool.token1.address,
+        stable: pool.stable ?? false,
+        amountADesired: liquidityAmount,
+        amountBDesired: liquidityAmount,
+      });
+      setLiqQuote({ ...quote, poolAddress: pool.address, tokenA: pool.token0, tokenB: pool.token1 });
+      setSokaMessage(`📋 Add-liquidity Preview (live quote):\n\n• Pool: ${poolDisplayName(pool)}\n• You supply: ${quote.quotedAmountA} ${pool.token0.symbol} + ${quote.quotedAmountB} ${pool.token1.symbol}\n• LP tokens: ${quote.liquidityTokens}\n\nUse Confirm below to sign with your wallet.`);
+    } catch (err: any) {
+      setLiqQuoteError(err.message || "Quote failed");
+      setSokaMessage(`Add-liquidity quote failed: ${err.message || "backend unreachable"}.`);
+    } finally {
+      setLiqQuoteLoading(false);
+    }
+  };
+  const handleLiquidityConfirm = async () => {
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      return;
+    }
+    if (!liqQuote) return;
+    setIsExecuting(true);
+    try {
+      const tx = await marketApi.addLiquidity({
+        senderAddress: walletAddress,
+        tokenA: liqQuote.tokenA.address,
+        tokenB: liqQuote.tokenB.address,
+        stable: pools.find(p => p.address === liqQuote.poolAddress)?.stable ?? false,
+        amountADesired: liqQuote.quotedAmountA,
+        amountBDesired: liqQuote.quotedAmountB,
+      });
+      await executeUnsignedTx(tx, "add liquidity");
+      setPoolStep("success");
+      setSokaMessage(`✅ Liquidity added on Mezo testnet. LP tokens are now in your wallet.`);
+      poolsQuery.refetch();
+    } catch (err: any) {
+      setSokaMessage(`Add liquidity failed: ${err.message || "wallet rejected the transaction"}.`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
   const handleIncentiveSubmit = () => {
-    if (!incentiveAmount || parseFloat(incentiveAmount) <= 0) return;
-    setPoolStep("success");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`✅ Incentive Added!\n\nYou added ${incentiveAmount} incentive tokens to ${pool?.name} pool.\n\nEarned: ${pool?.aprFormatted} APR.`);
+    setSokaMessage("Incentive gauges are not wired on Mezo testnet yet.");
   };
-  const handleRemoveSubmit = () => {
-    if (!removeAmount || parseFloat(removeAmount) <= 0) return;
-    setPoolStep("success");
-    const pool = pools.find(p => p.id === selectedPool);
-    setSokaMessage(`✅ Liquidity Removed!\n\nYou removed ${removeAmount} from ${pool?.name} pool.`);
+  const handleRemoveSubmit = async () => {
+    if (!removeAmount || parseFloat(removeAmount) <= 0 || !selectedPool) return;
+    setLiqQuoteLoading(true);
+    setLiqQuoteError(null);
+    try {
+      const quote = await marketApi.quoteRemoveLiquidity({ poolAddress: selectedPool, liquidity: removeAmount });
+      setLiqQuote({ ...quote });
+      setSokaMessage(`📋 Remove Preview (live quote):\n\n• You receive: ${quote.quotedAmountA} + ${quote.quotedAmountB}\n\nUse Confirm below to sign with your wallet.`);
+    } catch (err: any) {
+      setLiqQuoteError(err.message || "Quote failed");
+      setSokaMessage(`Remove quote failed: ${err.message || "backend unreachable"}.`);
+    } finally {
+      setLiqQuoteLoading(false);
+    }
+  };
+  const handleRemoveConfirm = async () => {
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      return;
+    }
+    if (!liqQuote?.poolAddress || !removeAmount) return;
+    setIsExecuting(true);
+    try {
+      const tx = await marketApi.removeLiquidity({
+        senderAddress: walletAddress,
+        poolAddress: liqQuote.poolAddress,
+        liquidity: removeAmount,
+      });
+      await executeUnsignedTx(tx, "remove liquidity");
+      setPoolStep("success");
+      setSokaMessage(`✅ Liquidity removed on Mezo testnet. Underlying tokens are back in your wallet.`);
+      poolsQuery.refetch();
+    } catch (err: any) {
+      setSokaMessage(`Remove liquidity failed: ${err.message || "wallet rejected the transaction"}.`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
   const handlePoolCancel = () => {
     setPoolStep("idle");
@@ -357,23 +527,22 @@ export const ProSwapper: React.FC = () => {
       resetAllFeatures();
       setActiveAction("vault");
       setVaultStep("list");
-      setSokaMessage("I found the best vault options for you on Mezo. Here's your vault overview:");
+      setSokaMessage("Live Mezo Swap pools as yield venues are loading on-chain. Select a venue to supply liquidity and mint real LP tokens.");
 
-      // Auto-select vault if token mentioned
-      let vaultId = null;
-      if (btcMatch) vaultId = "btc";
-      else if (musdMatch) vaultId = "musd";
-      else if (mezoMatch) vaultId = "mezo";
-      else if (tbtcMatch) vaultId = "tbtc";
-      else if (usdcMatch) vaultId = "usdc";
+      // Auto-select venue if tokens mentioned (matches against live pools)
+      const mentions = [btcMatch && "btc", mushMatch && "mush", usdcMatch && "usdc", mezoMatch && "mezo", musdMatch && "musd", tbtcMatch && "tbtc"].filter(Boolean) as string[];
 
-      if (vaultId) {
-        const vault = vaults.find(v => v.id === vaultId);
+      if (mentions.length > 0) {
         setTimeout(() => {
-          setSelectedVault(vaultId);
-          setVaultStep("deposit");
-          setDepositAmount(extractedAmount || "");
-          setSokaMessage(`📋 ${vault?.name} Details:\n\n• Deposit Token: ${vault?.depositToken}\n• APR: ${vault?.apr}%\n• TVL: $${((vault?.tvl || 0) / 1000000).toFixed(2)}M\n\n${extractedAmount ? `You want to deposit ${extractedAmount} ${vault?.depositToken}. Click to confirm.` : `How much ${vault?.depositToken} would you like to deposit?`}`);
+          const venue = pools.find((p) =>
+            mentions.some((m) => p.token0.symbol.toLowerCase().includes(m) || p.token1.symbol.toLowerCase().includes(m))
+          ) ?? pools[0];
+          if (!venue) {
+            setSokaMessage("No live pools are available yet. Check that the backend is running and the factory is reachable.");
+            return;
+          }
+          handleSelectVault(venue.address);
+          if (extractedAmount) setDepositAmount(extractedAmount);
         }, 500);
       }
       return true;
@@ -423,28 +592,35 @@ export const ProSwapper: React.FC = () => {
       setPoolStep("list");
       setSokaMessage("Here are the available pools. Select a pool to view details:");
 
-      // Auto-select pool if mentioned
-      let poolId = null;
-      if (lowerPrompt.includes("btc") || lowerPrompt.includes("bitcoin")) poolId = "btc-musd";
-      else if (lowerPrompt.includes("musdc") || lowerPrompt.includes("mush") || lowerPrompt.includes("stable")) poolId = "musdc-musd";
-      else if (lowerPrompt.includes("mezo")) poolId = "mezo-musd";
+      // Auto-select pool from live data if tokens mentioned
+      const mentionsPool = [
+        (lowerPrompt.includes("btc") || lowerPrompt.includes("bitcoin")) && "btc",
+        (lowerPrompt.includes("musdc") || lowerPrompt.includes("mush") || lowerPrompt.includes("stable")) && "musdc",
+        lowerPrompt.includes("musdt") && "musdt",
+        lowerPrompt.includes("mezo") && "mezo",
+        lowerPrompt.includes("musd") && "musd",
+      ].filter(Boolean) as string[];
 
-      if (poolId) {
-        const pool = pools.find(p => p.id === poolId);
+      if (mentionsPool.length > 0) {
         setTimeout(() => {
-          setSelectedPool(poolId);
+          const pool = pools.find((p) =>
+            mentionsPool.some((m) => p.token0.symbol.toLowerCase().includes(m) || p.token1.symbol.toLowerCase().includes(m))
+          ) ?? pools[0];
+          if (!pool) {
+            setSokaMessage("No live pools are available yet. Check that the backend is running and the factory is reachable.");
+            return;
+          }
+          handleSelectPool(pool.address);
           if (isRemove) {
             setPoolStep("removeLiquidity");
             setRemoveAmount(extractedAmount || "");
-            setSokaMessage(`📋 ${pool?.name} Pool:\n\n• APR: ${pool?.aprFormatted}\n• TVL: ${pool?.tvlFormatted}\n\n${extractedAmount ? `You want to remove ${extractedAmount}. Click to confirm.` : "How much liquidity would you like to remove?"}`);
+            setSokaMessage(`📋 ${poolDisplayName(pool)} Pool (live):\n\n• TVL: ${fmtUsd(pool.tvlUsd)}\n\n${extractedAmount ? `You want to remove ${extractedAmount} LP. Review the live quote to confirm.` : "How much LP token would you like to remove?"}`);
           } else if (isIncentive) {
-            setPoolStep("addIncentive");
-            setIncentiveAmount(extractedAmount || "");
-            setSokaMessage(`📋 ${pool?.name} Pool:\n\n• APR: ${pool?.aprFormatted}\n• TVL: ${pool?.tvlFormatted}\n\n${extractedAmount ? `You want to add ${extractedAmount} incentive. Click to confirm.` : "How much incentive would you like to add?"}`);
+            setSokaMessage("Incentive gauges are not wired on Mezo testnet yet. Select Add Liquidity to earn swap fees from live pools.");
           } else {
             setPoolStep("addLiquidity");
             setLiquidityAmount(extractedAmount || "");
-            setSokaMessage(`📋 ${pool?.name} Pool:\n\n• APR: ${pool?.aprFormatted}\n• TVL: ${pool?.tvlFormatted}\n\n${extractedAmount ? `You want to add ${extractedAmount}. Click to confirm.` : "How much liquidity would you like to add?"}`);
+            setSokaMessage(`📋 ${poolDisplayName(pool)} Pool (live):\n\n• TVL: ${fmtUsd(pool.tvlUsd)}\n\n${extractedAmount ? `You want to add ${extractedAmount}. Review the live quote to confirm.` : "How much liquidity would you like to add?"}`);
           }
         }, 500);
       }
@@ -476,11 +652,16 @@ export const ProSwapper: React.FC = () => {
     const snapshot: SwapSnapshot = { id: swapId, prompt, status: "SIMULATED", createdAt: Date.now(), routeNodes: [], checks: [], ptbSteps: [] };
     activeSwapRef.current = snapshot;
     setHistory(prev => { const a = prev[0]; const dup = !!a && a.prompt === prompt && a.status === "SIMULATED" && a.routeNodes.length === 0 && Date.now() - a.createdAt < 5000; if (dup) { activeSwapRef.current = a; return prev; } const n = [snapshot, ...prev.filter(x => x.id !== snapshot.id)].slice(0, MAX_HISTORY); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
-    setIsProcessing(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setCancelMsg(null); setSokaMessage(null); setBorrowStep("idle"); setBorrowToken(null); setCollateralAmount(""); setBorrowAcknowledged(false); setVaultStep("idle"); setSelectedVault(null); setDepositAmount(""); setVaultAcknowledged(false); setPoolStep("idle"); setSelectedPool(null); setLiquidityAmount("");
+    setIsProcessing(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setCancelMsg(null); setSokaMessage(null); setBorrowStep("idle"); setBorrowToken(null); setCollateralAmount(""); setBorrowAcknowledged(false); setBorrowQuote(null); setBorrowQuoteError(null); setVaultStep("idle"); setSelectedVault(null); setDepositAmount(""); setVaultAcknowledged(false); setPoolStep("idle"); setSelectedPool(null); setLiquidityAmount(""); setLiqQuote(null); setLiqQuoteError(null);
     try {
-      const res = await fetch("/api/process-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, senderAddress: walletAddress || "0x0000000000000000000000000000000000000000000000000000000000000000" }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process intent");
+      const res = await fetch("/api/process-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, senderAddress: walletAddress || ZERO_ADDRESS }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const details = Array.isArray((data as any)?.details)
+          ? (data as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join("; ")
+          : "";
+        throw new Error(details ? `${(data as any)?.error || "Failed to process intent"}: ${details}` : (data as any)?.error || "Failed to process intent");
+      }
       if (data.tokenSuggestion) { setTokenSuggestion(data.tokenSuggestion); setIsProcessing(false); upsertHistory(swapId, { status: "FAILED" }); return; }
       if (data.alternativeSource) setAlternativeSource(data.alternativeSource);
       if (data.intent) { setSourceSymbol(data.intent.source_token_symbol || "BTC"); setDestSymbol(data.intent.destination_token_symbol || "MUSD"); setTradeAmount(data.intent.trade_amount || "0.05"); }
@@ -497,6 +678,14 @@ export const ProSwapper: React.FC = () => {
       if (openConnectModal) openConnectModal();
       return;
     }
+    if (chainId !== mezoTestnet.id) {
+      try {
+        await switchChain({ chainId: mezoTestnet.id });
+      } catch {
+        setErrorMessage(`Wrong network: switch your wallet to Mezo Testnet (chain ${mezoTestnet.id})`);
+        return;
+      }
+    }
     if (isExecuting) return;
     setIsExecuting(true);
     setErrorMessage(null);
@@ -512,39 +701,15 @@ export const ProSwapper: React.FC = () => {
           slippage: parseFloat(optimalSlippage.replace("%", "")) || 0.5,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to build transaction");
-
-      let target = (data.to || data.target) as `0x${string}`;
-      let txData = (data.data || "0x") as `0x${string}`;
-      let txVal = BigInt(data.value || "0");
-      let gasLim = data.gasLimit ? BigInt(data.gasLimit) : undefined;
-
-      if (data.transactionData) {
-        try {
-          const parsed = JSON.parse(data.transactionData);
-          if (parsed.to) target = parsed.to;
-          if (parsed.data) txData = parsed.data;
-          if (parsed.value) txVal = BigInt(parsed.value);
-          if (parsed.gasLimit) gasLim = BigInt(parsed.gasLimit);
-        } catch {
-          // fallback
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const details = Array.isArray((data as any)?.details)
+          ? (data as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join("; ")
+          : "";
+        throw new Error(details ? `${(data as any)?.error || "Failed to build transaction"}: ${details}` : (data as any)?.error || "Failed to build transaction");
       }
 
-      const hash = await sendTransactionAsync({
-        to: target,
-        data: txData,
-        value: txVal,
-        gas: gasLim,
-      });
-
-      if (!hash) throw new Error("No transaction hash returned from wallet.");
-      setTxDigest(hash);
-
-      if (publicClient) {
-        await publicClient.waitForTransactionReceipt({ hash });
-      }
+      const hash = await executeUnsignedTx(data, `swap ${tradeAmount} ${sourceSymbol} to ${destSymbol}`);
 
       if (activeSwapRef.current) {
         upsertHistory(activeSwapRef.current.id, {
@@ -561,7 +726,7 @@ export const ProSwapper: React.FC = () => {
     }
   };
 
-  const quickPrompts = ["Swap 0.05 BTC to MUSD", "Borrow MUSD with BTC", "Mezo Pools TVL", "Gasless Meta-Tx"];
+  const quickPrompts = ["Swap 0.05 BTC to MUSD", "Borrow MUSD with BTC", "Show MUSD pools"];
   const hasResult = routeNodes.length > 0 || guardianChecks.length > 0;
   const hasRiskWarnings = guardianChecks.some(c => c.status === "WARNING" || c.status === "DANGER") || !guardianSafe;
 
@@ -818,21 +983,22 @@ export const ProSwapper: React.FC = () => {
                         <div className="mb-4">
                           <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Collateral (BTC)</label>
                           <input type="number" value={collateralAmount} onChange={(e) => setCollateralAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="font-mono text-[11px] text-[#845D74]">≈ ${collateralValueUsd.toFixed(2)}</span>
-                            <div className="flex gap-1 font-mono">
-                              {[25, 50, 75, 100].map(pct => (
-                                <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#2C1924]/10 text-[10px] font-bold text-[#845D74] hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
-                              ))}
-                            </div>
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="font-mono text-[11px] text-[#845D74]">≈ ${borrowQuote ? collateralValueUsd.toFixed(2) : "—"} (live oracle)</span>
+                          <div className="flex gap-1 font-mono">
+                            {[25, 50, 75, 100].map(pct => (
+                              <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#2C1924]/10 text-[10px] font-bold text-[#845D74] hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
+                            ))}
                           </div>
                         </div>
-                        {collateralAmount && parseFloat(collateralAmount) > 0 && (
-                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 mb-4">
-                            <div className="font-mono text-[12px] text-emerald-800">Borrow up to <span className="font-bold">{borrowAmount.toFixed(2)} {borrowToken}</span></div>
-                          </div>
-                        )}
-                        <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Review</button>
+                      </div>
+                      {borrowQuoteError && <div className="font-mono text-[11px] text-[#ef4444] mb-2">{borrowQuoteError}</div>}
+                      {collateralAmount && parseFloat(collateralAmount) > 0 && borrowQuote && (
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 mb-4">
+                          <div className="font-mono text-[12px] text-emerald-800">Borrow up to <span className="font-bold">{borrowQuote.maxBorrowAmount ?? "—"} {borrowToken}</span></div>
+                        </div>
+                      )}
+                      <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0 || borrowQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{borrowQuoteLoading ? "Quoting on-chain…" : "Review"}</button>
                         <button onClick={() => setBorrowStep("select_token")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Change token</button>
                       </>
                     )}
@@ -842,27 +1008,30 @@ export const ProSwapper: React.FC = () => {
                       <>
                         <div className="space-y-2.5 mb-4">
                           <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                            <span className="font-meta text-[12px] font-semibold text-[#845D74]">Borrow</span>
-                            <span className="font-display text-[15px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</span>
+                            <span className="font-meta text-[12px] font-semibold text-[#845D74]">Borrow (max, live quote)</span>
+                            <span className="font-display text-[15px] font-bold text-[#DF7AA7]">{borrowQuote?.maxBorrowAmount ?? "—"} {borrowToken}</span>
                           </div>
                           <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
                             <span className="font-meta text-[12px] font-semibold text-[#845D74]">Collateral</span>
-                            <span className="font-display text-[15px] font-bold text-[#2C1924]">{collateralAmount} BTC</span>
+                            <span className="font-display text-[15px] font-bold text-[#2C1924]">{collateralAmount} BTC{borrowQuote?.collateralValueUsd != null ? ` ($${Number(borrowQuote.collateralValueUsd).toFixed(2)})` : ""}</span>
                           </div>
                           <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
                             <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">LTV</div>
-                              <div className="font-display text-[14px] font-bold text-emerald-600">75%</div>
+                              <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Max LTV</div>
+                              <div className="font-display text-[14px] font-bold text-emerald-600">{borrowQuote ? `${(borrowQuote.maxLtv * 100).toFixed(0)}%` : "—"}</div>
                             </div>
                             <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
                               <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Rate</div>
-                              <div className="font-display text-[14px] font-bold text-[#2C1924]">{interestRate}%</div>
+                              <div className="font-display text-[14px] font-bold text-[#2C1924]">{interestRate != null ? `${interestRate}%` : "—"}</div>
                             </div>
                             <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
                               <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Liq. Price</div>
-                              <div className="font-display text-[14px] font-bold text-[#ef4444]">${liquidationPrice.toFixed(4)}</div>
+                              <div className="font-display text-[14px] font-bold text-[#ef4444]">{borrowQuote?.liquidationPriceUsd != null ? `$${Number(borrowQuote.liquidationPriceUsd).toFixed(2)}` : "—"}</div>
                             </div>
                           </div>
+                        </div>
+                        <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 mb-4 font-meta text-[11.5px] text-amber-900">
+                          Execution unavailable: no lending pool contract exists on Mezo testnet. Quotes are advisory only.
                         </div>
                         <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-4 select-none" onClick={() => setBorrowAcknowledged(!borrowAcknowledged)}>
                           <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center transition-colors ${borrowAcknowledged ? "bg-emerald-600 border-emerald-600" : "bg-white border-amber-300"}`}>
@@ -929,36 +1098,45 @@ export const ProSwapper: React.FC = () => {
                     {/* Vault Balance Overview */}
                     {vaultStep === "list" && (
                       <>
-                        {/* Balance Summary */}
+                        {/* Live venues summary */}
                         <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-3 font-meta">
                           <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Total Deposited</div>
-                            <div className="font-display text-[14px] font-bold text-[#DF7AA7] mt-0.5">${vaultBalance.totalDeposited.toLocaleString()}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Live Pools</div>
+                            <div className="font-display text-[14px] font-bold text-[#DF7AA7] mt-0.5">{poolsQuery.isLoading ? "…" : poolsTotal}</div>
                           </div>
                           <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Avg APR</div>
-                            <div className="font-display text-[14px] font-bold text-emerald-600 mt-0.5">{vaultBalance.avgApr}%</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Venues Shown</div>
+                            <div className="font-display text-[14px] font-bold text-emerald-600 mt-0.5">{pools.length}</div>
                           </div>
                           <div className="text-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] shadow-2xs">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Deposits</div>
-                            <div className="font-display text-[14px] font-bold text-[#2C1924] mt-0.5">{vaultBalance.deposits}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-[#845D74]">Your LP Positions</div>
+                            <div className="font-display text-[14px] font-bold text-[#2C1924] mt-0.5">{pools.filter(p => p.userLpBalance != null && parseFloat(p.userLpBalance) > 0).length}</div>
                           </div>
                         </div>
                         {/* Vault List */}
-                        <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74] mb-2">Available Vaults</div>
+                        <div className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#845D74] mb-2">Yield Venues (live Mezo Swap pools)</div>
+                        {poolsQuery.isLoading && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#845D74]">Loading live pools from Mezo testnet…</div>
+                        )}
+                        {poolsQuery.isError && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#ef4444]">Failed to load pools: {(poolsQuery.error as Error)?.message || "backend unreachable"}</div>
+                        )}
+                        {!poolsQuery.isLoading && !poolsQuery.isError && pools.length === 0 && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#845D74]">No pools found on-chain.</div>
+                        )}
                         <div className="space-y-2">
-                          {vaults.map(vault => (
-                            <button key={vault.id} onClick={() => handleSelectVault(vault.id)} className={`w-full p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer shadow-2xs ${vault.featured ? "border-amber-300/80 bg-amber-50/70 hover:bg-amber-100/80" : "border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60"}`}>
+                          {pools.map(pool => (
+                            <button key={pool.address} onClick={() => handleSelectVault(pool.address)} className="w-full p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer shadow-2xs border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  {vault.featured && <span className="px-1.5 py-0.5 rounded-md bg-amber-200/80 text-amber-900 font-mono text-[8px] font-bold">FEATURED</span>}
-                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{vault.name}</span>
+                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{poolDisplayName(pool)}</span>
+                                  <span className="px-1.5 py-0.5 rounded-md bg-white border border-[#2C1924]/10 font-mono text-[8px] font-bold text-[#845D74]">{pool.stable == null ? "—" : pool.stable ? "STABLE" : "VOLATILE"}</span>
                                 </div>
-                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{vault.apr}%</span>
+                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{pool.feePct != null ? `${pool.feePct}% fee` : "fee —"}</span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 font-mono">
-                                <span className="text-[10px] text-[#845D74]">TVL: ${(vault.tvl / 1000000).toFixed(1)}M</span>
-                                <span className="text-[10px] text-[#845D74]">Fee: {vault.withdrawalFee}</span>
+                                <span className="text-[10px] text-[#845D74]">TVL: {fmtUsd(pool.tvlUsd)}</span>
+                                {pool.userLpBalance != null && <span className="text-[10px] text-emerald-700">Your LP: {pool.userLpBalance}</span>}
                               </div>
                             </button>
                           ))}
@@ -968,42 +1146,42 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Vault Details */}
                     {vaultStep === "details" && selectedVault && (() => {
-                      const vault = vaults.find(v => v.id === selectedVault);
-                      return vault ? (
+                      const pool = pools.find(p => p.address === selectedVault);
+                      return pool ? (
                         <>
                           <div className="space-y-2 mb-3.5 font-meta">
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Vault Address</span>
-                              <span className="font-mono text-[11px] font-bold text-[#2C1924]">{vault.address.slice(0, 8)}...{vault.address.slice(-6)}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Pool Address</span>
+                              <span className="font-mono text-[11px] font-bold text-[#2C1924]">{pool.address.slice(0, 8)}...{pool.address.slice(-6)}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Deposit Token</span>
-                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{vault.depositToken}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Pair</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{poolDisplayName(pool)}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Receipt Token</span>
-                              <span className="font-display text-[12.5px] font-bold text-[#DF7AA7]">{vault.receiptToken}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Type</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#DF7AA7]">{pool.stable == null ? "Unknown" : pool.stable ? "Stable" : "Volatile"}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Operator</span>
-                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.operator}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Fee</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{pool.feePct != null ? `${pool.feePct}%` : "—"}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Withdrawal Fee</span>
-                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.withdrawalFee}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">TVL (live)</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{fmtUsd(pool.tvlUsd)}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Yield Asset</span>
-                              <span className="text-[11.5px] font-bold text-[#2C1924]">{vault.yieldAsset}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Reserves (live)</span>
+                              <span className="text-[11.5px] font-bold text-[#2C1924]">{pool.token0.reserve} / {pool.token1.reserve}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                              <span className="text-[11px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[15px] font-bold text-emerald-600">{vault.apr}%</span>
+                              <span className="text-[11px] font-bold text-emerald-800">Your LP Position</span>
+                              <span className="font-display text-[15px] font-bold text-emerald-600">{pool.userLpBalance ?? "—"}</span>
                             </div>
                           </div>
                           <div className="flex gap-2.5 font-meta">
                             <button onClick={() => setVaultStep("list")} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">← Back</button>
-                            <button onClick={handleDepositVault} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer">Deposit</button>
+                            <button onClick={handleDepositVault} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer">Supply</button>
                           </div>
                         </>
                       ) : null;
@@ -1011,19 +1189,15 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Deposit Amount */}
                     {vaultStep === "deposit" && (() => {
-                      const vault = vaults.find(v => v.id === selectedVault);
-                      return vault ? (
+                      const pool = pools.find(p => p.address === selectedVault);
+                      return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount ({vault.depositToken})</label>
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount ({pool.token0.symbol}, paired at live reserves)</label>
                             <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-emerald-500 focus:bg-white transition-all" />
                           </div>
-                          {depositAmount && parseFloat(depositAmount) > 0 && (
-                            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 mb-3.5">
-                              <div className="font-meta text-[11.5px] text-emerald-900">You'll receive ~ <span className="font-bold text-emerald-700">{(parseFloat(depositAmount) * 0.98).toFixed(2)} {vault.receiptToken}</span></div>
-                            </div>
-                          )}
-                          <button onClick={handleDepositAmountSubmit} disabled={!depositAmount || parseFloat(depositAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Review Deposit</button>
+                          <button onClick={handleDepositAmountSubmit} disabled={!depositAmount || parseFloat(depositAmount) <= 0 || liqQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{liqQuoteLoading ? "Quoting on-chain…" : "Review Supply"}</button>
+                          {liqQuoteError && <div className="mt-2 font-mono text-[11px] text-[#ef4444]">{liqQuoteError}</div>}
                           <button onClick={() => setVaultStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-emerald-700 hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
@@ -1031,21 +1205,21 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Confirm Deposit */}
                     {vaultStep === "confirm" && (() => {
-                      const vault = vaults.find(v => v.id === selectedVault);
-                      return vault ? (
+                      const pool = pools.find(p => p.address === selectedVault);
+                      return pool && liqQuote ? (
                         <>
                           <div className="space-y-2.5 mb-3.5 font-meta">
                             <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[12px] font-semibold text-[#845D74]">Deposit</span>
-                              <span className="font-display text-[14px] font-bold text-[#2C1924]">{depositAmount} {vault.depositToken}</span>
+                              <span className="text-[12px] font-semibold text-[#845D74]">Supply</span>
+                              <span className="font-display text-[14px] font-bold text-[#2C1924]">{liqQuote.quotedAmountA} {pool.token0.symbol} + {liqQuote.quotedAmountB} {pool.token1.symbol}</span>
                             </div>
                             <div className="flex justify-between items-center p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[12px] font-semibold text-[#845D74]">Receive</span>
-                              <span className="font-display text-[14px] font-bold text-emerald-700">{(parseFloat(depositAmount || "0") * 0.98).toFixed(2)} {vault.receiptToken}</span>
+                              <span className="text-[12px] font-semibold text-[#845D74]">Receive (LP)</span>
+                              <span className="font-display text-[14px] font-bold text-emerald-700">{liqQuote.liquidityTokens}</span>
                             </div>
                             <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                              <span className="text-[12px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[14px] font-bold text-emerald-600">{vault.apr}%</span>
+                              <span className="text-[12px] font-bold text-emerald-800">Pool Fee</span>
+                              <span className="font-display text-[14px] font-bold text-emerald-600">{pool.feePct != null ? `${pool.feePct}%` : "—"}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-3.5 select-none" onClick={() => setVaultAcknowledged(!vaultAcknowledged)}>
@@ -1064,28 +1238,29 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Success */}
                     {vaultStep === "success" && (() => {
-                      const vault = vaults.find(v => v.id === selectedVault);
-                      return vault ? (
+                      const pool = pools.find(p => p.address === selectedVault);
+                      return pool ? (
                         <div className="text-center py-4">
                           <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
                             <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                           </div>
-                          <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Deposit Successful!</div>
-                          <div className="font-meta text-[13px] text-[#845D74] mb-3">Your deposit is now earning yield on Mezo</div>
+                          <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Liquidity Supplied!</div>
+                          <div className="font-meta text-[13px] text-[#845D74] mb-3">LP tokens are now in your wallet on Mezo testnet</div>
                           <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
                             <div className="grid grid-cols-2 gap-4 text-left">
                               <div>
-                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Deposited</div>
-                                <div className="font-display text-[15px] font-bold text-emerald-700">{depositAmount} {vault.depositToken}</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Pool</div>
+                                <div className="font-display text-[15px] font-bold text-emerald-700">{poolDisplayName(pool)}</div>
                               </div>
                               <div>
-                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">APR</div>
-                                <div className="font-display text-[15px] font-bold text-emerald-600">{vault.apr}%</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Tx</div>
+                                <div className="font-mono text-[11px] font-bold text-[#2C1924]">{txDigest ? `${txDigest.slice(0, 8)}…${txDigest.slice(-6)}` : "—"}</div>
                               </div>
                             </div>
                           </div>
                           <div className="flex gap-3 justify-center font-meta">
-                            <button onClick={handleVaultCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Withdraw</button>
+                            <button onClick={handleVaultCancel} className="px-5 py-2 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-all cursor-pointer">Close</button>
+                            {txDigest && <a href={txExplorerUrl(txDigest)} target="_blank" rel="noreferrer" className="px-5 py-2 rounded-xl bg-[#DF7AA7] text-white font-bold text-[12px] inline-flex items-center gap-1">Mezo Explorer <ExternalLink className="h-3 w-3" /></a>}
                           </div>
                         </div>
                       ) : null;
@@ -1117,19 +1292,31 @@ export const ProSwapper: React.FC = () => {
                     {/* Pool List */}
                     {poolStep === "list" && (
                       <>
+                        {poolsQuery.isLoading && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#845D74]">Loading live pools from Mezo testnet…</div>
+                        )}
+                        {poolsQuery.isError && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#ef4444]">Failed to load pools: {(poolsQuery.error as Error)?.message || "backend unreachable"}</div>
+                        )}
+                        {!poolsQuery.isLoading && !poolsQuery.isError && pools.length === 0 && (
+                          <div className="p-4 text-center font-mono text-[12px] text-[#845D74]">No pools found on-chain.</div>
+                        )}
+                        {!poolsQuery.isLoading && !poolsQuery.isError && pools.length > 0 && (
+                          <div className="font-mono text-[10px] text-[#845D74] mb-2">{poolsTotal} pools on-chain · showing {pools.length}</div>
+                        )}
                         <div className="space-y-2">
                           {pools.map(pool => (
-                            <button key={pool.id} onClick={() => handleSelectPool(pool.id)} className="w-full p-3 rounded-xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60 text-left transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 cursor-pointer shadow-2xs">
+                            <button key={pool.address} onClick={() => handleSelectPool(pool.address)} className="w-full p-3 rounded-xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] hover:bg-white hover:border-[#DF7AA7]/60 text-left transition-all duration-200 hover:shadow-xs hover:-translate-y-0.5 cursor-pointer shadow-2xs">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{pool.name}</span>
-                                  <span className="px-1.5 py-0.5 rounded-md bg-[#DF7AA7]/10 text-[#DF7AA7] font-mono text-[9px] font-bold">{pool.type}</span>
+                                  <span className="font-display text-[13.5px] font-bold text-[#2C1924]">{poolDisplayName(pool)}</span>
+                                  <span className="px-1.5 py-0.5 rounded-md bg-[#DF7AA7]/10 text-[#DF7AA7] font-mono text-[9px] font-bold">{pool.stable == null ? "—" : pool.stable ? "STABLE" : "VOLATILE"}</span>
                                 </div>
-                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{pool.aprFormatted}</span>
+                                <span className="font-display text-[13.5px] font-bold text-emerald-600">{pool.feePct != null ? `${pool.feePct}% fee` : "fee —"}</span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 font-mono">
-                                <span className="text-[10px] text-[#845D74]">TVL: {pool.tvlFormatted}</span>
-                                <span className="text-[10px] text-[#845D74]">Fee: {pool.feeFormatted}</span>
+                                <span className="text-[10px] text-[#845D74]">TVL: {fmtUsd(pool.tvlUsd)}</span>
+                                {pool.userLpBalance != null && <span className="text-[10px] text-emerald-700">Your LP: {pool.userLpBalance}</span>}
                               </div>
                             </button>
                           ))}
@@ -1139,33 +1326,33 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Pool Details */}
                     {poolStep === "details" && selectedPool && (() => {
-                      const pool = pools.find(p => p.id === selectedPool);
+                      const pool = pools.find(p => p.address === selectedPool);
                       return pool ? (
                         <>
                           <div className="space-y-2 mb-3.5 font-meta">
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
                               <span className="text-[11px] font-semibold text-[#845D74]">Pool</span>
-                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.name}</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{poolDisplayName(pool)}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
                               <span className="text-[11px] font-semibold text-[#845D74]">Type</span>
-                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.type}</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.stable == null ? "Unknown" : pool.stable ? "Stable" : "Volatile"}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Fee Tier</span>
-                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.feeFormatted}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Fee (on-chain)</span>
+                              <span className="font-display text-[12.5px] font-bold text-[#2C1924]">{pool.feePct != null ? `${pool.feePct}%` : "—"}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">TVL</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.tvlFormatted}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">TVL (live)</span>
+                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{fmtUsd(pool.tvlUsd)}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08]">
-                              <span className="text-[11px] font-semibold text-[#845D74]">Volume</span>
-                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.volumeFormatted}</span>
+                              <span className="text-[11px] font-semibold text-[#845D74]">Reserves (live)</span>
+                              <span className="font-display text-[13px] font-bold text-[#2C1924]">{pool.token0.reserve} / {pool.token1.reserve}</span>
                             </div>
                             <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                              <span className="text-[11px] font-bold text-emerald-800">APR</span>
-                              <span className="font-display text-[15px] font-bold text-emerald-600">{pool.aprFormatted}</span>
+                              <span className="text-[11px] font-bold text-emerald-800">Your LP Position</span>
+                              <span className="font-display text-[15px] font-bold text-emerald-600">{pool.userLpBalance ?? "—"}</span>
                             </div>
                           </div>
                           {/* Action Buttons */}
@@ -1196,59 +1383,55 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Add Liquidity */}
                     {poolStep === "addLiquidity" && (() => {
-                      const pool = pools.find(p => p.id === selectedPool);
+                      const pool = pools.find(p => p.address === selectedPool);
                       return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount (USD)</label>
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount ({pool.token0.symbol}, paired at live reserves)</label>
                             <input type="number" value={liquidityAmount} onChange={(e) => setLiquidityAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
                           </div>
-                          {liquidityAmount && parseFloat(liquidityAmount) > 0 && (
+                          {liqQuote && (
                             <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 mb-3.5">
-                              <div className="font-meta text-[11.5px] text-emerald-900">Est. APR: <span className="font-bold text-emerald-700">{pool.aprFormatted}</span></div>
+                              <div className="font-meta text-[11.5px] text-emerald-900">Live quote: supply <span className="font-bold text-emerald-700">{liqQuote.quotedAmountA} {pool.token0.symbol} + {liqQuote.quotedAmountB} {pool.token1.symbol}</span> for <span className="font-bold">{liqQuote.liquidityTokens}</span> LP</div>
                             </div>
                           )}
-                          <button onClick={handleLiquiditySubmit} disabled={!liquidityAmount || parseFloat(liquidityAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Add Liquidity</button>
+                          <button onClick={handleLiquiditySubmit} disabled={!liquidityAmount || parseFloat(liquidityAmount) <= 0 || liqQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{liqQuoteLoading ? "Quoting on-chain…" : "Quote Add Liquidity"}</button>
+                          {liqQuoteError && <div className="mt-2 font-mono text-[11px] text-[#ef4444]">{liqQuoteError}</div>}
+                          {liqQuote && (
+                            <button onClick={handleLiquidityConfirm} disabled={isExecuting} className="w-full py-2.5 mt-2 rounded-xl font-bold text-[13.5px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{isExecuting ? "Signing…" : "Confirm & Sign"}</button>
+                          )}
                           <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
                     })()}
 
                     {/* Add Incentive */}
-                    {poolStep === "addIncentive" && (() => {
-                      const pool = pools.find(p => p.id === selectedPool);
-                      return pool ? (
-                        <>
-                          <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Incentive Token Amount</label>
-                            <input type="number" value={incentiveAmount} onChange={(e) => setIncentiveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-amber-500 focus:bg-white transition-all" />
-                          </div>
-                          {incentiveAmount && parseFloat(incentiveAmount) > 0 && (
-                            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 mb-3.5">
-                              <div className="font-meta text-[11.5px] text-amber-800">Est. Reward APR: <span className="font-bold">{pool.aprFormatted}</span></div>
-                            </div>
-                          )}
-                          <button onClick={handleIncentiveSubmit} disabled={!incentiveAmount || parseFloat(incentiveAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-amber-500 hover:bg-amber-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Add Incentive</button>
-                          <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-amber-700 hover:underline cursor-pointer">← Back to details</button>
-                        </>
-                      ) : null;
-                    })()}
+                    {poolStep === "addIncentive" && (
+                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 font-meta text-[12px] text-amber-900">
+                        Incentive gauges are not wired on Mezo testnet yet. Add liquidity to earn swap fees from live pools.
+                        <button onClick={() => setPoolStep("details")} className="block w-full py-1.5 mt-2 text-[11.5px] font-bold text-amber-700 hover:underline cursor-pointer">← Back to details</button>
+                      </div>
+                    )}
 
                     {/* Remove Liquidity */}
                     {poolStep === "removeLiquidity" && (() => {
-                      const pool = pools.find(p => p.id === selectedPool);
+                      const pool = pools.find(p => p.address === selectedPool);
                       return pool ? (
                         <>
                           <div className="mb-4">
-                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount to Remove (USD)</label>
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">LP Amount to Remove{pool.userLpBalance != null ? ` (balance: ${pool.userLpBalance})` : ""}</label>
                             <input type="number" value={removeAmount} onChange={(e) => setRemoveAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-rose-400 focus:bg-white transition-all" />
                           </div>
-                          {removeAmount && parseFloat(removeAmount) > 0 && (
+                          {liqQuote && (
                             <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 mb-3.5">
-                              <div className="font-meta text-[11.5px] text-rose-800">You will receive: <span className="font-bold">${removeAmount}</span></div>
+                              <div className="font-meta text-[11.5px] text-rose-800">Live quote: receive <span className="font-bold">{liqQuote.quotedAmountA} + {liqQuote.quotedAmountB}</span></div>
                             </div>
                           )}
-                          <button onClick={handleRemoveSubmit} disabled={!removeAmount || parseFloat(removeAmount) <= 0} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-rose-500 hover:bg-rose-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">Remove Liquidity</button>
+                          <button onClick={handleRemoveSubmit} disabled={!removeAmount || parseFloat(removeAmount) <= 0 || liqQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-rose-500 hover:bg-rose-600 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{liqQuoteLoading ? "Quoting on-chain…" : "Quote Remove"}</button>
+                          {liqQuoteError && <div className="mt-2 font-mono text-[11px] text-[#ef4444]">{liqQuoteError}</div>}
+                          {liqQuote && (
+                            <button onClick={handleRemoveConfirm} disabled={isExecuting} className="w-full py-2.5 mt-2 rounded-xl font-bold text-[13.5px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{isExecuting ? "Signing…" : "Confirm & Sign"}</button>
+                          )}
                           <button onClick={() => setPoolStep("details")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-rose-700 hover:underline cursor-pointer">← Back to details</button>
                         </>
                       ) : null;
@@ -1256,23 +1439,23 @@ export const ProSwapper: React.FC = () => {
 
                     {/* Success */}
                     {poolStep === "success" && (() => {
-                      const pool = pools.find(p => p.id === selectedPool);
+                      const pool = pools.find(p => p.address === selectedPool);
                       return pool ? (
                         <div className="text-center py-4">
                           <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
                             <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                           </div>
                           <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Success!</div>
-                          <div className="font-meta text-[13px] text-[#845D74] mb-3">Action completed on {pool.name}</div>
+                          <div className="font-meta text-[13px] text-[#845D74] mb-3">Action completed on {poolDisplayName(pool)} (Mezo testnet)</div>
                           <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
                             <div className="grid grid-cols-2 gap-4 text-left">
                               <div>
                                 <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Pool</div>
-                                <div className="font-display text-[15px] font-bold text-[#DF7AA7]">{pool.name}</div>
+                                <div className="font-display text-[15px] font-bold text-[#DF7AA7]">{poolDisplayName(pool)}</div>
                               </div>
                               <div>
-                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">APR</div>
-                                <div className="font-display text-[15px] font-bold text-emerald-600">{pool.aprFormatted}</div>
+                                <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">TVL (live)</div>
+                                <div className="font-display text-[15px] font-bold text-emerald-600">{fmtUsd(pool.tvlUsd)}</div>
                               </div>
                             </div>
                           </div>
@@ -1280,6 +1463,7 @@ export const ProSwapper: React.FC = () => {
                             <button onClick={() => setPoolStep("details")} className="px-5 py-2 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-all cursor-pointer">View Pool</button>
                             <button onClick={handlePoolCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Close</button>
                           </div>
+                          {txDigest && <a href={txExplorerUrl(txDigest)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 font-mono text-[11px] text-[#DF7AA7] hover:underline">View on Mezo Explorer <ExternalLink className="h-3 w-3" /></a>}
                         </div>
                       ) : null;
                     })()}
@@ -1365,7 +1549,7 @@ export const ProSwapper: React.FC = () => {
                   {txDigest && (
                     <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 font-meta text-[12px] shadow-2xs">
                       <span className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4 text-[#10b981]" /> Swap confirmed!</span>
-                      <a href={`https://explorer.mezo.org/tx/${txDigest}`} target="_blank" rel="noreferrer" className="rounded-xl bg-[#DF7AA7] hover:bg-[#DF7AA7]/90 px-3 py-1 text-[11px] font-bold text-white inline-flex items-center gap-1 shadow-2xs transition-all">Mezo Explorer <ExternalLink className="h-3 w-3" /></a>
+                      <a href={txExplorerUrl(txDigest)} target="_blank" rel="noreferrer" className="rounded-xl bg-[#DF7AA7] hover:bg-[#DF7AA7]/90 px-3 py-1 text-[11px] font-bold text-white inline-flex items-center gap-1 shadow-2xs transition-all">Mezo Explorer <ExternalLink className="h-3 w-3" /></a>
                     </div>
                   )}
                   {hasRiskWarnings && (

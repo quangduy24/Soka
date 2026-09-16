@@ -26,8 +26,19 @@ import {
   RiskAdviceSchema,
   RiskSummarySchema,
   BridgeOutSchema,
+  PricesQuerySchema,
+  PoolsQuerySchema,
+  PoolAddressParamSchema,
+  BorrowQuoteSchema,
+  QuoteLiquiditySchema,
+  AddLiquiditySchema,
+  RemoveLiquiditySchema,
 } from '../types/index.js';
 import { RISK_THRESHOLDS, ZERO_ADDRESS } from '../config/index.js';
+import { TOKEN_WHITELIST } from '../config/constant.js';
+import { getPricesForSymbols, getTokenUsdPrice } from '../services/prices/priceService.js';
+import { listPools, getPoolDetail, quoteAddLiquidity, quoteRemoveLiquidity, buildAddLiquidityTx, buildRemoveLiquidityTx, ensureMusdRegistered } from '../services/pools/poolService.js';
+import { getBorrowQuote } from '../services/lending/borrowService.js';
 import { parseIntent } from '../services/llm/intentParser.js';
 import { findOptimalRoute } from '../services/router/mezoRouter.js';
 import { buildMezoSwapTx } from '../services/router/mezoTxBuilder.js';
@@ -85,6 +96,9 @@ async function resolveDynamicAmount(
 apiRouter.post('/parse-intent', validateBody(ParseIntentSchema), async (req: Request, res: Response) => {
   try {
     const { prompt } = req.body;
+    if (/\bmusd\b/i.test(prompt)) {
+      await ensureMusdRegistered();
+    }
     const result = await parseIntent(prompt);
     res.json(result);
   } catch (err) {
@@ -140,10 +154,29 @@ apiRouter.post('/balance', validateBody(BalanceSchema), async (req: Request, res
     const { address, symbol } = req.body;
     if (symbol) {
       const formattedBalance = await getFormattedBalance(address, symbol);
-      res.json({ address, symbol, balance: formattedBalance });
+      const price = await getTokenUsdPrice(symbol);
+      const usd =
+        price.priceUsd != null ? (parseFloat(formattedBalance) * price.priceUsd).toFixed(2) : undefined;
+      res.json({
+        address,
+        symbol,
+        balance: formattedBalance,
+        ...(usd !== undefined ? { usdValue: usd, priceSource: price.source } : {}),
+      });
     } else {
       const all = await getAllBalances(address);
-      res.json({ address, balances: all });
+      const withUsd = await Promise.all(
+        all.map(async (b) => {
+          const price = await getTokenUsdPrice(b.symbol);
+          if (price.priceUsd == null) return b;
+          return {
+            ...b,
+            usdValue: (parseFloat(b.formattedBalance) * price.priceUsd).toFixed(2),
+            priceSource: price.source,
+          };
+        })
+      );
+      res.json({ address, balances: withUsd });
     }
   } catch (err) {
     logger.error('Failed to query balance', { error: (err as Error).message });
@@ -199,6 +232,11 @@ apiRouter.post(
   async (req: Request, res: Response) => {
     try {
       const { prompt, senderAddress, slippage = 0.5 } = req.body;
+
+      // MUSD is discovered on-chain (pool legs); ensure it resolves before parsing.
+      if (/\bmusd\b/i.test(prompt)) {
+        await ensureMusdRegistered();
+      }
 
       // Step 1: Parse intent
       const parseResult = await parseIntent(prompt);
@@ -380,5 +418,134 @@ apiRouter.post('/risk-advice', validateBody(RiskAdviceSchema), async (req: Reque
   } catch (err) {
     logger.error('Failed to generate risk advice', { error: (err as Error).message });
     res.status(500).json({ error: 'Failed to generate advice', details: (err as Error).message });
+  }
+});
+
+// ─── GET /api/prices ────────────────────────────────────────────
+// Real USD prices from the PriceOracle precompile + router quotes.
+// Unknown prices resolve to null (never estimated).
+
+apiRouter.get('/prices', async (req: Request, res: Response) => {
+  try {
+    const parsed = PricesQuerySchema.safeParse(req.query);
+    const symbols = parsed.success && parsed.data.symbols
+      ? parsed.data.symbols.split(',').map((s) => s.trim()).filter(Boolean)
+      : TOKEN_WHITELIST.map((t) => t.symbol);
+    const prices = await getPricesForSymbols(symbols);
+    res.json({ prices });
+  } catch (err) {
+    logger.error('Failed to fetch prices', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to fetch prices', details: (err as Error).message });
+  }
+});
+
+// ─── GET /api/pools ─────────────────────────────────────────────
+// Real pools enumerated from the Mezo Swap factory.
+
+apiRouter.get('/pools', async (req: Request, res: Response) => {
+  try {
+    const parsed = PoolsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      });
+    }
+    const result = await listPools({
+      limit: parsed.data.limit,
+      offset: parsed.data.offset,
+      walletAddress: parsed.data.wallet,
+    });
+    res.json(result);
+  } catch (err) {
+    logger.error('Failed to list pools', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to list pools', details: (err as Error).message });
+  }
+});
+
+// ─── GET /api/pools/:address ─────────────────────────────────────
+
+apiRouter.get('/pools/:address', async (req: Request, res: Response) => {
+  try {
+    const parsedAddr = PoolAddressParamSchema.safeParse(req.params);
+    if (!parsedAddr.success) {
+      return res.status(400).json({ error: 'Invalid pool address' });
+    }
+    const parsedQuery = PoolsQuerySchema.safeParse(req.query);
+    const wallet = parsedQuery.success ? parsedQuery.data.wallet : undefined;
+    const pool = await getPoolDetail(parsedAddr.data.address, wallet);
+    res.json(pool);
+  } catch (err) {
+    const message = (err as Error).message;
+    const status = message.startsWith('Invalid pool address') || message.startsWith('Address is not')
+      ? 404
+      : 500;
+    logger.error('Failed to fetch pool detail', { error: message });
+    res.status(status).json({ error: 'Failed to fetch pool', details: message });
+  }
+});
+
+// ─── POST /api/pools/quote-liquidity ────────────────────────────
+// Read-only add-liquidity preview (execution unavailable, see response).
+
+apiRouter.post('/pools/quote-liquidity', validateBody(QuoteLiquiditySchema), async (req: Request, res: Response) => {
+  try {
+    const quote = await quoteAddLiquidity(req.body);
+    res.json(quote);
+  } catch (err) {
+    logger.error('Failed to quote liquidity', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to quote liquidity', details: (err as Error).message });
+  }
+});
+
+// ─── POST /api/borrow-quote ─────────────────────────────────────
+// Read-only borrow preview from real balances and on-chain prices.
+
+apiRouter.post('/borrow-quote', validateBody(BorrowQuoteSchema), async (req: Request, res: Response) => {
+  try {
+    const quote = await getBorrowQuote(req.body);
+    res.json(quote);
+  } catch (err) {
+    logger.error('Failed to quote borrow', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to quote borrow', details: (err as Error).message });
+  }
+});
+
+// ─── POST /api/pools/quote-remove ───────────────────────────────
+// Read-only remove-liquidity preview.
+
+apiRouter.post('/pools/quote-remove', validateBody(RemoveLiquiditySchema.omit({ senderAddress: true })), async (req: Request, res: Response) => {
+  try {
+    const quote = await quoteRemoveLiquidity(req.body);
+    res.json(quote);
+  } catch (err) {
+    logger.error('Failed to quote remove liquidity', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to quote remove liquidity', details: (err as Error).message });
+  }
+});
+
+// ─── POST /api/pools/add-liquidity ──────────────────────────────
+// Builds unsigned addLiquidity calldata for real execution.
+
+apiRouter.post('/pools/add-liquidity', validateBody(AddLiquiditySchema), async (req: Request, res: Response) => {
+  try {
+    const tx = await buildAddLiquidityTx(req.body);
+    res.json(tx);
+  } catch (err) {
+    logger.error('Failed to build add liquidity transaction', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to build add liquidity transaction', details: (err as Error).message });
+  }
+});
+
+// ─── POST /api/pools/remove-liquidity ───────────────────────────
+// Builds unsigned removeLiquidity calldata for real execution.
+
+apiRouter.post('/pools/remove-liquidity', validateBody(RemoveLiquiditySchema), async (req: Request, res: Response) => {
+  try {
+    const tx = await buildRemoveLiquidityTx(req.body);
+    res.json(tx);
+  } catch (err) {
+    logger.error('Failed to build remove liquidity transaction', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to build remove liquidity transaction', details: (err as Error).message });
   }
 });

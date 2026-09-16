@@ -17,6 +17,7 @@ Tokens available on Mezo Testnet:
 - BTC (Native Gas Currency, Bitcoin)
 - wBTC (Wrapped Bitcoin ERC-20 precompile)
 - MEZO (Mezo Governance Token)
+- MUSD (Mezo USD stablecoin, core routing asset)
 - mUSDC (USD Coin)
 - mUSDT (Tether USD)
 - mDAI (Maker DAI)

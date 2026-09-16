@@ -10,7 +10,9 @@ export interface MezoBalance {
   decimals: number;
   rawBalance: string;
   formattedBalance: string;
+  /** USD value from on-chain pricing; absent when the price is unknown. */
   usdValue?: number;
+  priceSource?: 'oracle' | 'router-quote';
 }
 
 export interface BridgeTokenMapping {
@@ -60,7 +62,20 @@ export interface ExecuteTxResult {
   };
 }
 
-const API_BASE = typeof window !== 'undefined' ? '' : 'http://localhost:3000';
+const API_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+  (typeof window !== 'undefined' ? '' : 'http://localhost:3000');
+
+async function parseError(res: Response, fallback: string): Promise<Error> {
+  const err = await res.json().catch(() => ({ error: res.statusText }));
+  const details = Array.isArray((err as any)?.details)
+    ? (err as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join('; ')
+    : typeof (err as any)?.details === 'string'
+      ? (err as any).details
+      : '';
+  const message = (err as any)?.error || fallback;
+  return new Error(details ? `${message}: ${details}` : message);
+}
 
 export const mezoApi = {
   /**
@@ -74,7 +89,7 @@ export const mezoApi = {
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to fetch balances: ${res.statusText}`);
+      throw await parseError(res, 'Failed to fetch balances');
     }
 
     const data = await res.json();
@@ -85,7 +100,9 @@ export const mezoApi = {
         decimals: b.decimals,
         rawBalance: b.rawBalance,
         formattedBalance: b.formattedBalance,
-        usdValue: estimateTokenUsd(b.symbol, parseFloat(b.formattedBalance)),
+        // Backend-computed USD value; stays undefined when the price is unknown.
+        usdValue: b.usdValue !== undefined ? parseFloat(b.usdValue) : undefined,
+        priceSource: b.priceSource,
       }));
     }
     return [];
@@ -97,7 +114,7 @@ export const mezoApi = {
   async getBridgeInfo(): Promise<BridgeInfo> {
     const res = await fetch(`${API_BASE}/api/bridge-info`);
     if (!res.ok) {
-      throw new Error(`Failed to fetch bridge info: ${res.statusText}`);
+      throw await parseError(res, 'Failed to fetch bridge info');
     }
     return res.json();
   },
@@ -118,10 +135,7 @@ export const mezoApi = {
       body: JSON.stringify(params),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.details || err.error || 'Failed to build bridge transaction');
-    }
+    if (!res.ok) throw await parseError(res, 'Failed to build bridge transaction');
 
     return res.json();
   },
@@ -140,10 +154,7 @@ export const mezoApi = {
       body: JSON.stringify(params),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.details || err.error || 'Failed to process intent');
-    }
+    if (!res.ok) throw await parseError(res, 'Failed to process intent');
 
     return res.json();
   },
@@ -164,19 +175,89 @@ export const mezoApi = {
       body: JSON.stringify(params),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.details || err.error || 'Failed to build swap transaction');
-    }
+    if (!res.ok) throw await parseError(res, 'Failed to build swap transaction');
 
     return res.json();
   },
 };
 
-function estimateTokenUsd(symbol: string, balance: number): number {
-  const s = symbol.toUpperCase();
-  if (s.includes('BTC')) return balance * 95_000;
-  if (s === 'MEZO') return balance * 2.5;
-  if (s.includes('USD') || s.includes('DAI')) return balance * 1.0;
-  return balance * 1.0;
+export interface PoolLegDto {
+  address: string;
+  symbol: string;
+  decimals: number;
+  reserve: string;
+  priceUsd: number | null;
+  priceSource: 'oracle' | 'router-quote' | null;
 }
+
+export interface PoolDto {
+  address: string;
+  token0: PoolLegDto;
+  token1: PoolLegDto;
+  stable: boolean | null;
+  feePct: number | null;
+  tvlUsd: number | null;
+  userSharePct: number | null;
+  userLpBalance: string | null;
+  volume24h: null;
+}
+
+async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, init);
+  if (!res.ok) throw await parseError(res, `Request failed: ${path}`);
+  return res.json() as Promise<T>;
+}
+
+export const marketApi = {
+  getPrices(symbols?: string[]): Promise<{ prices: Array<{ symbol: string; address: string; priceUsd: number | null; source: string | null; updatedAt: number | null }> }> {
+    const qs = symbols && symbols.length > 0 ? `?symbols=${encodeURIComponent(symbols.join(','))}` : '';
+    return getJson(`/api/prices${qs}`);
+  },
+  getPools(params?: { limit?: number; offset?: number; wallet?: string }): Promise<{ totalPairs: number; offset: number; limit: number; pools: PoolDto[] }> {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    if (params?.offset != null) qs.set('offset', String(params.offset));
+    if (params?.wallet) qs.set('wallet', params.wallet);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return getJson(`/api/pools${suffix}`);
+  },
+  getPoolDetail(address: string, wallet?: string): Promise<PoolDto> {
+    const suffix = wallet ? `?wallet=${encodeURIComponent(wallet)}` : '';
+    return getJson(`/api/pools/${address}${suffix}`);
+  },
+  quoteAddLiquidity(body: { tokenA: string; tokenB: string; stable: boolean; amountADesired: string; amountBDesired: string }): Promise<any> {
+    return getJson('/api/pools/quote-liquidity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  quoteRemoveLiquidity(body: { poolAddress: string; liquidity: string }): Promise<any> {
+    return getJson('/api/pools/quote-remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  addLiquidity(body: { senderAddress: string; tokenA: string; tokenB: string; stable: boolean; amountADesired: string; amountBDesired: string }): Promise<ExecuteTxResult> {
+    return getJson('/api/pools/add-liquidity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  removeLiquidity(body: { senderAddress: string; poolAddress: string; liquidity: string }): Promise<ExecuteTxResult> {
+    return getJson('/api/pools/remove-liquidity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  borrowQuote(body: { walletAddress?: string; collateralSymbol: string; collateralAmount: string; debtSymbol: string }): Promise<any> {
+    return getJson('/api/borrow-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+};

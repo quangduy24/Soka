@@ -62,22 +62,33 @@ export async function checkPoolSafety(
     references: refs,
   });
 
-  // Check 2: Liquidity Health
+  // Check 2: Liquidity Health (unknown when the route carries no valuation)
   const minLiquidityThreshold = RISK_THRESHOLDS.minLiquidity.volatilePair;
-  const poolLiquidity = route[0]?.liquidityUsd ?? 250_000;
+  const poolLiquidity: number | null = route[0]?.liquidityUsd ?? null;
 
-  checks.push({
-    name: 'Liquidity Health',
-    category: 'Pool Safety',
-    status: poolLiquidity >= minLiquidityThreshold ? 'SAFE' : 'WARNING',
-    message:
-      poolLiquidity >= minLiquidityThreshold
-        ? `Sufficient liquidity detected ($${poolLiquidity.toLocaleString()})`
-        : `Pool liquidity is below optimal threshold ($${poolLiquidity.toLocaleString()})`,
-    value: poolLiquidity,
-    threshold: minLiquidityThreshold,
-    references: refs,
-  });
+  if (poolLiquidity == null) {
+    checks.push({
+      name: 'Liquidity Health',
+      category: 'Pool Safety',
+      status: 'WARNING',
+      message: 'Pool liquidity is unverifiable on-chain for this route',
+      threshold: minLiquidityThreshold,
+      references: refs,
+    });
+  } else {
+    checks.push({
+      name: 'Liquidity Health',
+      category: 'Pool Safety',
+      status: poolLiquidity >= minLiquidityThreshold ? 'SAFE' : 'WARNING',
+      message:
+        poolLiquidity >= minLiquidityThreshold
+          ? `Sufficient liquidity detected ($${poolLiquidity.toLocaleString()})`
+          : `Pool liquidity is below optimal threshold ($${poolLiquidity.toLocaleString()})`,
+      value: poolLiquidity,
+      threshold: minLiquidityThreshold,
+      references: refs,
+    });
+  }
 
   // Check 3: Pool Contract Verification on Mezo Factory
   try {
@@ -88,7 +99,7 @@ export async function checkPoolSafety(
       const isVerifiedPair = (await client.readContract({
         address: MEZO_SWAP_FACTORY,
         abi: factoryAbi,
-        functionName: 'isPair',
+        functionName: 'isPool',
         args: [checksummedPool],
       } as any).catch(() => true)) as boolean;
 

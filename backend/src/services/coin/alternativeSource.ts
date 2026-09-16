@@ -6,6 +6,7 @@
 
 import { getAllBalances } from './coinService.js';
 import { resolveTokenLogo } from './tokenResolver.js';
+import { getTokenUsdPrice } from '../prices/priceService.js';
 import { TOKEN_WHITELIST } from '../../config/constant.js';
 
 export interface AlternativeSource {
@@ -18,18 +19,9 @@ export interface AlternativeSource {
 }
 
 /**
- * Estimates USD exchange rate for a token symbol.
- */
-function getEstimatedPriceUsd(symbol: string): number {
-  const upper = symbol.toUpperCase();
-  if (upper.includes('BTC')) return 95_000;
-  if (upper === 'MEZO') return 2.5;
-  if (upper.includes('USD') || upper.includes('DAI')) return 1.0;
-  return 1.0;
-}
-
-/**
  * Discovers alternative tokens held in the user's wallet that can fund the swap.
+ * Valuations use real on-chain prices; tokens without a known price are skipped
+ * instead of being estimated.
  */
 export async function findAlternativeSources(params: {
   walletAddress: string;
@@ -42,11 +34,14 @@ export async function findAlternativeSources(params: {
 
   const balances = await getAllBalances(walletAddress);
 
-  // Target approximate USD value
+  // Target approximate USD value from the real on-chain price (unknown -> no suggestions)
   const intendedSymbol = TOKEN_WHITELIST.find(
     (t) => t.address.toLowerCase() === intendedSourceAddress.toLowerCase()
   )?.symbol || 'BTC';
-  const targetUsd = parseFloat(intendedAmount) * getEstimatedPriceUsd(intendedSymbol);
+  const intendedPrice = await getTokenUsdPrice(intendedSymbol);
+  if (intendedPrice.priceUsd == null) return [];
+  const targetUsd = parseFloat(intendedAmount) * intendedPrice.priceUsd;
+  if (!Number.isFinite(targetUsd) || targetUsd <= 0) return [];
 
   const candidates: AlternativeSource[] = [];
 
@@ -61,11 +56,12 @@ export async function findAlternativeSources(params: {
     const balanceNum = parseFloat(b.formattedBalance);
     if (balanceNum <= 0) continue;
 
-    const tokenPrice = getEstimatedPriceUsd(b.symbol);
-    const usdValue = balanceNum * tokenPrice;
+    const tokenPrice = await getTokenUsdPrice(b.symbol);
+    if (tokenPrice.priceUsd == null || tokenPrice.priceUsd <= 0) continue;
+    const usdValue = balanceNum * tokenPrice.priceUsd;
 
     if (usdValue >= Math.max(1, targetUsd * 0.1)) {
-      const neededAmount = tokenPrice > 0 ? (targetUsd / tokenPrice).toFixed(4) : '0';
+      const neededAmount = (targetUsd / (tokenPrice.priceUsd as number)).toFixed(4);
       candidates.push({
         symbol: b.symbol,
         tokenAddress: b.tokenAddress,

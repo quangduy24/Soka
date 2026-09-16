@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Skull } from 'lucide-react';
 import type { RiskCheck } from '../../types/shared';
+import { mezoExplorerUrl } from '../../utils/explorer';
 
 interface ProGuardianRadarProps {
   score: number;
@@ -138,11 +139,7 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
                 {chk.references && chk.references.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-5 mt-1">
                     {chk.references.map((ref, rIdx) => {
-                      const url = ref.type === 'coin'
-                        ? `https://explorer.mezo.org/token/${ref.value}`
-                        : ref.type === 'tx'
-                        ? `https://explorer.mezo.org/tx/${ref.value}`
-                        : `https://explorer.mezo.org/address/${ref.value}`;
+                      const url = mezoExplorerUrl(ref);
                       return (
                         <a
                           key={rIdx}

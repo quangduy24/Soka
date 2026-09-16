@@ -36,15 +36,17 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  const { data: balances, isFetching, refetch } = useQuery({
+  const { data: balances, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['wallet-menu', walletAddress],
     queryFn: async () => fetchWalletTokens(null, walletAddress),
     enabled: open,
     refetchInterval: 15000,
     staleTime: 5000,
+    retry: 1,
   });
 
   const totalUsd = (balances || []).reduce((sum, t) => sum + (t.usd ?? 0), 0);
+  const hasPricedBalances = (balances || []).some((t) => t.usd !== undefined);
   const mask = (v: string) => (hidden ? '••••' : v);
   const addr = `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`;
 
@@ -109,7 +111,7 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
                     fontWeight: 700,
                   }}
                 >
-                  {mask(totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : '—')}
+                  {mask(totalUsd > 0 ? `$${fmt(totalUsd, 2)}` : hasPricedBalances ? '$0.00' : '—')}
                 </span>
                 <span
                   className="rounded-full bg-[#F8C8DC] px-2.5 py-1 font-mono text-[9px] font-bold text-[#C2185B]"
@@ -118,11 +120,18 @@ export const WalletMenu: React.FC<WalletMenuProps> = ({ walletAddress, onDisconn
                   {balances?.length ?? 0} asset{(balances?.length ?? 0) === 1 ? '' : 's'}
                 </span>
               </span>
+              {!hasPricedBalances && (balances?.length ?? 0) > 0 && (
+                <span className="font-mono text-[9px] text-[#0f172a]/50">USD prices unavailable on-chain</span>
+              )}
             </div>
 
             {/* Token rows */}
             <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-white/10 px-1.5 py-1.5">
-              {!balances || balances.length === 0 ? (
+              {isError ? (
+                <div className="px-3 py-6 text-center font-mono text-[10px] text-[#ef4444]">
+                  Failed to load balances: {(error as Error)?.message || 'backend unreachable'}
+                </div>
+              ) : !balances || balances.length === 0 ? (
                 <div className="px-3 py-6 text-center font-mono text-[10px] text-[#0f172a]/40">
                   {isFetching ? 'Loading balances…' : 'No tokens found'}
                 </div>

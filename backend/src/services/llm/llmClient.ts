@@ -8,6 +8,7 @@ import {
   OPENROUTER_MODEL,
   OPENROUTER_BASE_URL,
   OPENROUTER_MODEL_CANDIDATES,
+  LLM_TIMEOUT_MS,
 } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
@@ -43,6 +44,7 @@ async function callOpenRouterRest(model: string, options: LlmCallOptions): Promi
       temperature: options.temperature ?? 0.2,
       max_tokens: options.maxTokens ?? 1024,
     }),
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   });
 
   if (!response.ok) {

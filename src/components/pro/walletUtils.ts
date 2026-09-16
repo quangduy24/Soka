@@ -3,22 +3,6 @@ import { mezoApi } from '../../services/mezoApi.js';
 
 export const HIDE_KEY = 'soka:hide-balance';
 
-/** Approximate USD estimate for well-known Mezo tokens. */
-export const USD_EST: Record<string, number> = {
-  BTC: 95000,
-  wBTC: 95000,
-  MEZO: 2.5,
-  mUSDC: 1.0,
-  mUSDT: 1.0,
-  mDAI: 1.0,
-  mUSDe: 1.0,
-  mcbBTC: 95000,
-  mFBTC: 95000,
-  mSolvBTC: 95000,
-  mswBTC: 95000,
-  mT: 0.025,
-};
-
 export function loadHidden(): boolean {
   try {
     return localStorage.getItem(HIDE_KEY) === '1';
@@ -54,7 +38,7 @@ export function fmt(n: number, maxDec = 4): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: maxDec });
 }
 
-/** Normalized wallet token row. */
+/** Normalized wallet token row (USD value present only when priced on-chain). */
 export interface WalletToken {
   sym: string;
   coinType: string;
@@ -67,20 +51,17 @@ export async function fetchWalletTokens(
   _client: any,
   walletAddress: string
 ): Promise<WalletToken[]> {
-  try {
-    const balances = await mezoApi.getBalances(walletAddress);
-    return balances.map((b) => {
-      const human = parseFloat(b.formattedBalance) || 0;
-      const price = USD_EST[b.symbol] ?? 1.0;
-      return {
-        sym: b.symbol,
-        coinType: b.tokenAddress,
-        human,
-        decimals: b.decimals,
-        usd: human * price,
-      };
-    });
-  } catch {
-    return [];
-  }
+  // Errors propagate to the caller's query error state (never masked as empty).
+  const balances = await mezoApi.getBalances(walletAddress);
+  return balances.map((b) => {
+    const human = parseFloat(b.formattedBalance) || 0;
+    return {
+      sym: b.symbol,
+      coinType: b.tokenAddress,
+      human,
+      decimals: b.decimals,
+      // Backend-computed from the PriceOracle / router quotes; undefined = unknown.
+      usd: b.usdValue,
+    };
+  });
 }

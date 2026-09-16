@@ -22,12 +22,20 @@ export interface RiskCheck {
 export interface RouteNode {
   dex: string;
   ratio: number;
-  fee: number;
+  fee?: number;
   weight: number;
   poolAddress?: string;
-  liquidityUsd?: number;
+  liquidityUsd?: number | null;
   onChainLiquidityDepth?: number;
   stable?: boolean;
+}
+
+export interface RouteHop {
+  from: string;
+  to: string;
+  stable: boolean;
+  factory: string;
+  poolAddress?: string;
 }
 
 export interface TxStep {

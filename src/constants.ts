@@ -95,6 +95,9 @@ export const MEZO_TOKENS: TokenInfo[] = [
 
 export const TOKENS = MEZO_TOKENS;
 
+/** Canonical zero address shared by all frontend flows (20 bytes). */
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
 export function getTokenInfo(symbolOrAddress: string): TokenInfo | undefined {
   const query = symbolOrAddress.trim().toLowerCase();
   return MEZO_TOKENS.find(

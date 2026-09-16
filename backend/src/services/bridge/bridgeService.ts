@@ -17,6 +17,7 @@ import {
   MEZO_PRECOMPILES,
   MEZO_CHAIN_ID,
   RISK_THRESHOLDS,
+  MARKET_CONFIG,
   TOKEN_WHITELIST,
   ZERO_ADDRESS,
 } from '../../config/index.js';
@@ -128,28 +129,51 @@ export async function getMinBridgeOutAmount(tokenAddress: Address): Promise<bigi
 
 /**
  * Aggregates all bridge configuration and state for the frontend.
+ * Capacity reads run in parallel and the result is cached briefly;
+ * TTL comes from env POOLS_CACHE_TTL_MS (shared market-data cache window).
  */
+const bridgeInfoCache: { value: BridgeInfoResult; expiresAt: number } | null = null;
+let bridgeInfoCacheEntry: { value: BridgeInfoResult; expiresAt: number } | null = bridgeInfoCache;
+
 export async function getBridgeInfo(): Promise<BridgeInfoResult> {
+  if (bridgeInfoCacheEntry && Date.now() <= bridgeInfoCacheEntry.expiresAt) {
+    return bridgeInfoCacheEntry.value;
+  }
+
   const [enabledChains, tokenMappings] = await Promise.all([
     getBridgeOutChains(),
     getTokenMappings(),
   ]);
 
+  const perToken = await Promise.all(
+    TOKEN_WHITELIST.map(async (token) => {
+      const addr = token.address as Address;
+      const [capacity, minAmount] = await Promise.all([
+        getOutflowCapacity(addr),
+        getMinBridgeOutAmount(addr),
+      ]);
+      return { symbol: token.symbol, capacity: capacity.toString(), minAmount: minAmount.toString() };
+    })
+  );
+
   const capacities: Record<string, string> = {};
   const minAmounts: Record<string, string> = {};
-
-  for (const token of TOKEN_WHITELIST) {
-    const addr = token.address as Address;
-    capacities[token.symbol] = (await getOutflowCapacity(addr)).toString();
-    minAmounts[token.symbol] = (await getMinBridgeOutAmount(addr)).toString();
+  for (const t of perToken) {
+    capacities[t.symbol] = t.capacity;
+    minAmounts[t.symbol] = t.minAmount;
   }
 
-  return {
+  const result: BridgeInfoResult = {
     enabledChains,
     tokenMappings,
     outflowCapacities: capacities,
     minBridgeOutAmounts: minAmounts,
   };
+  bridgeInfoCacheEntry = {
+    value: result,
+    expiresAt: Date.now() + MARKET_CONFIG.poolsCacheTtlMs,
+  };
+  return result;
 }
 
 /**

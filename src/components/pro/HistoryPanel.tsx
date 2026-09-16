@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import SokaCharacter from './SokaCharacter';
 import type { SwapSnapshot, RiskCheck, PtbStep, RouteNode } from '../../types/shared';
-import { suiscanUrl, shortenRef, timeAgo } from '../../utils/explorer';
+import { suiscanUrl, shortenRef, timeAgo, txExplorerUrl } from '../../utils/explorer';
 
 interface HistoryPanelProps {
   history: SwapSnapshot[];
@@ -110,7 +110,7 @@ const RouteRow: React.FC<{ node: RouteNode; idx: number }> = ({ node, idx }) => 
         </a>
       )}
       <span className="font-bold text-[#2C1924]">{node.ratio ?? 100}%</span>
-      <span className="text-[#845D74]/60">fee {node.fee ?? 0.01}%</span>
+      <span className="text-[#845D74]/60">fee {node.fee != null ? `${node.fee}%` : '—'}</span>
     </div>
   </div>
 );
@@ -201,7 +201,7 @@ const TaskCard: React.FC<{ snap: SwapSnapshot; expanded: boolean; onToggle: () =
           </div>
 
           {snap.txDigest && (
-            <a href={`https://explorer.mezo.org/tx/${snap.txDigest}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start rounded-xl border border-[#2C1924]/10 bg-white px-2.5 py-1.5 font-mono text-[10px] font-bold text-[#2C1924] hover:bg-[#FAF8FA]">
+            <a href={txExplorerUrl(snap.txDigest)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start rounded-xl border border-[#2C1924]/10 bg-white px-2.5 py-1.5 font-mono text-[10px] font-bold text-[#2C1924] hover:bg-[#FAF8FA]">
               <ExternalLink className="h-3 w-3" /> View transaction {shortenRef(snap.txDigest)}
             </a>
           )}

@@ -146,7 +146,17 @@ export class LiquidityRiskGuardian {
     poolDetails?: PoolDetails | null
   ): RiskCheck {
     const minLiquidity = RISK_THRESHOLDS.minLiquidity.volatilePair;
-    const poolLiquidity = poolDetails?.liquidity ?? (route[0]?.liquidityUsd || 250_000);
+    const poolLiquidity = poolDetails?.liquidity ?? route[0]?.liquidityUsd ?? null;
+
+    if (poolLiquidity == null) {
+      return {
+        name: 'Pool Liquidity',
+        category: 'Pool Safety',
+        status: 'WARNING',
+        message: 'Pool liquidity is unverifiable on-chain for this route; trade at your own risk',
+        threshold: minLiquidity,
+      };
+    }
 
     if (poolLiquidity < minLiquidity * 0.5) {
       return {

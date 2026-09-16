@@ -17,6 +17,28 @@ export interface TokenCandidate {
 }
 
 /**
+ * Runtime registry for tokens discovered on-chain (e.g. MUSD found as a pool
+ * leg). Entries are verified by direct contract reads at discovery time, never
+ * hardcoded. Consulted after the static whitelist in resolveToken.
+ */
+const discoveredTokens = new Map<string, WhitelistToken>();
+
+export function registerDiscoveredToken(token: WhitelistToken): void {
+  discoveredTokens.set(token.symbol.toLowerCase(), token);
+  discoveredTokens.set(token.address.toLowerCase(), token);
+  for (const alias of token.aliases) {
+    if (!discoveredTokens.has(alias.toLowerCase())) {
+      discoveredTokens.set(alias.toLowerCase(), token);
+    }
+  }
+  logger.info(`Registered on-chain discovered token ${token.symbol}`, { address: token.address });
+}
+
+function lookupDiscovered(input: string): WhitelistToken | null {
+  return discoveredTokens.get(input) || null;
+}
+
+/**
  * Resolves a token symbol, alias, or address to a WhitelistToken entry.
  */
 export function resolveToken(symbolOrAddress: string): WhitelistToken | null {
@@ -46,7 +68,8 @@ export function resolveToken(symbolOrAddress: string): WhitelistToken | null {
     return TOKEN_WHITELIST[0];
   }
 
-  return null;
+  // 5. On-chain discovered tokens (verified at discovery time)
+  return lookupDiscovered(input);
 }
 
 /**

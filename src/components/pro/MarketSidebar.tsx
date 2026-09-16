@@ -186,6 +186,10 @@ async function fetchMarket<T>(path: string): Promise<T> {
 type MoverDto = { sym: string; name: string; price: string; chg: string; up: boolean; mc?: string; logo?: string };
 type GemDto = { sym: string; name: string; price: string; age: string; mc?: string; logo?: string };
 
+/** Market widgets are hidden until a real /api/market backend exists. */
+export const MARKET_ENABLED =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_MARKET === 'true') || false;
+
 export const MarketSidebar: React.FC<{ onPick: (sym: string) => void }> = ({ onPick }) => {
   const [movers, setMovers] = useState<MarketToken[]>(FALLBACK_MARKET.movers);
   const [trending, setTrending] = useState<MarketToken[]>(FALLBACK_MARKET.trending);
@@ -211,10 +215,14 @@ export const MarketSidebar: React.FC<{ onPick: (sym: string) => void }> = ({ onP
   }, []);
 
   useEffect(() => {
+    if (!MARKET_ENABLED) return;
     load();
     const iv = setInterval(load, 60_000); // refresh every minute
     return () => clearInterval(iv);
   }, [load]);
+
+  // Hidden until a real /api/market backend exists (no demo data shown).
+  if (!MARKET_ENABLED) return null;
 
   return (
     <div className="flex flex-col gap-3 min-w-0">
