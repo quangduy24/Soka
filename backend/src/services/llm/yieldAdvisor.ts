@@ -33,10 +33,13 @@ function buildDeterministicYieldMessage(
   topPool: { pair: string; tvlUsd: number | null; feePct: number | null } | null,
   borrowAprMusd: number,
   borrowAprMusdc: number,
-  maxLtvPct: number
+  maxLtvPct: number,
+  isLowestFee: boolean = false
 ): string {
   const poolInfo = topPool
-    ? `The top-yielding pool for ${tokenSymbol} is ${topPool.pair}${topPool.tvlUsd ? ` with ~$${Math.round(topPool.tvlUsd).toLocaleString()} TVL` : ''} earning ${topPool.feePct ?? '0.04'}% swap fees.`
+    ? isLowestFee
+      ? `The lowest-fee pool for ${tokenSymbol} is ${topPool.pair} with just ${topPool.feePct ?? '0.04'}% swap fees (TVL ~$${Math.round(topPool.tvlUsd ?? 0).toLocaleString()}).`
+      : `The top-yielding pool for ${tokenSymbol} is ${topPool.pair}${topPool.tvlUsd ? ` with ~$${Math.round(topPool.tvlUsd).toLocaleString()} TVL` : ''} earning ${topPool.feePct ?? '0.04'}% swap fees.`
     : `You can supply liquidity to the BTC/MUSD pool to earn trading fees on Mezo Swap.`;
 
   const borrowInfo = tokenSymbol.toUpperCase() === 'BTC' || tokenSymbol.toUpperCase() === 'WBTC'
@@ -57,6 +60,7 @@ export async function adviseYieldAndBorrow(params: {
 }): Promise<YieldAdvisorResult> {
   const { userPrompt, pools } = params;
   const tokenSymbol = (params.tokenSymbol || 'BTC').toUpperCase();
+  const isLowestFee = /lowest.*fee|low.*fee|cheapest.*fee|min.*fee/i.test(userPrompt);
 
   // 1. Identify relevant pools containing the target token
   const matchingPools = pools.filter(
@@ -66,7 +70,14 @@ export async function adviseYieldAndBorrow(params: {
   );
 
   const poolsToRank = matchingPools.length > 0 ? matchingPools : pools;
-  const sortedPools = [...poolsToRank].sort((a, b) => (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0));
+  const sortedPools = [...poolsToRank].sort((a, b) => {
+    if (isLowestFee) {
+      const feeA = a.feePct ?? 999;
+      const feeB = b.feePct ?? 999;
+      if (feeA !== feeB) return feeA - feeB;
+    }
+    return (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0);
+  });
   const topPools = sortedPools.slice(0, 3);
 
   const bestPools = topPools.map((p) => ({
@@ -103,20 +114,21 @@ export async function adviseYieldAndBorrow(params: {
     topPoolSummary,
     borrowAprMusd,
     borrowAprMusdc,
-    maxLtvPct
+    maxLtvPct,
+    isLowestFee
   );
 
   // 3. Prompt LLM for open, intelligent DeFi advisory response
   const systemPrompt = `You are Soka AI, the premier DeFi yield and capital efficiency copilot on Mezo Network (Bitcoin Layer 2 EVM).
-The user is asking about getting the best return, pool yields, or capital allocation for: "${tokenSymbol}".
+The user is asking about ${isLowestFee ? 'the lowest-fee liquidity pool' : 'getting the best return, pool yields, or capital allocation'} for: "${tokenSymbol}".
 
 Context:
-- Live Mezo Swap pools: ${JSON.stringify(bestPools)}
+- Live Mezo Swap pools (ordered by ${isLowestFee ? 'lowest fee' : 'TVL'}): ${JSON.stringify(bestPools)}
 - Mezo Borrow feature: Users can deposit ${tokenSymbol} as collateral and borrow stablecoins (MUSD @ ${borrowAprMusd}% APR, mUSDC @ ${borrowAprMusdc}% APR) with up to ${maxLtvPct}% Max LTV.
 
 YOUR TASK:
 Write a friendly, concise, and complete open advisory response (2 to 4 sentences, under 65 words).
-1. Highlight the best liquidity pool for ${tokenSymbol} on Mezo Swap (pair name, TVL, and fee yield).
+1. ${isLowestFee ? `Highlight the lowest-fee liquidity pool for ${tokenSymbol} on Mezo Swap (mention pair name, fee percentage, and TVL) to minimize cost.` : `Highlight the best liquidity pool for ${tokenSymbol} on Mezo Swap (pair name, TVL, and fee yield).`}
 2. Introduce Mezo Borrow: explain that instead of risking impermanent loss in a pool, they can also use their ${tokenSymbol} as collateral to borrow stablecoins (MUSD at ${borrowAprMusd}% APR or mUSDC at ${borrowAprMusdc}% APR) while retaining full upside of their assets.
 3. ALWAYS reply strictly in ENGLISH. Never use any other language.
 4. Speak naturally like an expert DeFi advisor. Do NOT use markdown code blocks or json.`;

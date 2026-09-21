@@ -559,6 +559,144 @@ apiRouter.post(
         }
       }
 
+      // Step 1c-2: LIQUIDITY / ADD_LIQUIDITY intent handler
+      if (intent.action_type === 'LIQUIDITY' || intent.action_type === 'ADD_LIQUIDITY') {
+        const srcSymbol = (intent.source_token_symbol || 'BTC').toUpperCase();
+        const dstSymbol = (intent.destination_token_symbol || '').toUpperCase();
+
+        // If same token on both sides or only one token specified, treat as pool recommendation / liquidity inquiry
+        if (!dstSymbol || srcSymbol === dstSymbol) {
+          const pools = await listPools({ limit: 10, offset: 0 });
+          const advice = await adviseYieldAndBorrow({
+            userPrompt: prompt,
+            tokenSymbol: srcSymbol,
+            pools: pools.pools,
+            walletAddress: wallet || undefined,
+          });
+
+          return res.json({
+            intent: {
+              ...intent,
+              action_type: 'ASK_POOLS',
+            },
+            answer: {
+              kind: 'pools_and_yield',
+              targetToken: advice.targetToken,
+              bestPools: advice.bestPools,
+              borrowOptions: advice.borrowOptions,
+              pools: pools.pools.map((p) => ({
+                address: p.address,
+                pair: `${p.token0.symbol}/${p.token1.symbol}`,
+                tvlUsd: p.tvlUsd,
+                feePct: p.feePct,
+                stable: p.stable,
+              })),
+              totalPairs: pools.totalPairs,
+            },
+            advise: null,
+            llmMessage: advice.message,
+          });
+        }
+
+        // Both tokens are distinct: resolve both tokens
+        const tokenA = resolveToken(srcSymbol);
+        const tokenB = resolveToken(dstSymbol);
+        if (!tokenA || !tokenB) {
+          const missing = !tokenA ? srcSymbol : dstSymbol;
+          const { advise, tokenSuggestion } = await unknownTokenAdvise(prompt, missing);
+          return await rejectIntent(res, 422, `Unknown token for liquidity: ${missing}.`, advise, { tokenSuggestion }, prompt, intent.action_type);
+        }
+
+        // Check if pool exists between tokenA and tokenB
+        const pools = await listPools({ limit: 50, offset: 0 });
+        const matchingPool = pools.pools.find(
+          (p) =>
+            (p.token0.symbol.toUpperCase() === tokenA.symbol.toUpperCase() && p.token1.symbol.toUpperCase() === tokenB.symbol.toUpperCase()) ||
+            (p.token0.symbol.toUpperCase() === tokenB.symbol.toUpperCase() && p.token1.symbol.toUpperCase() === tokenA.symbol.toUpperCase())
+        );
+
+        if (!matchingPool) {
+          return await rejectIntent(res, 422, `No liquidity pool found for ${tokenA.symbol}/${tokenB.symbol}.`, buildFallbackAdvise({
+            error: 'unsupported_action',
+            detail: `No live AMM pool exists between ${tokenA.symbol} and ${tokenB.symbol} on Mezo Testnet. Try supplying to ${pools.pools[0]?.token0.symbol}/${pools.pools[0]?.token1.symbol} instead.`,
+          }), undefined, prompt, intent.action_type);
+        }
+
+        // If amounts are provided, build unsigned liquidity tx
+        const amountA = parseFloat(intent.trade_amount);
+        if (Number.isFinite(amountA) && amountA > 0 && wallet && matchingPool.stable !== null) {
+          try {
+            let amountBDesired = intent.trade_amount;
+            try {
+              const paired = await quotePairedAmount({
+                tokenA: tokenA.address,
+                tokenB: tokenB.address,
+                stable: matchingPool.stable,
+                amountA: intent.trade_amount,
+              });
+              if (paired?.amountB) amountBDesired = paired.amountB;
+            } catch {
+              // fallback to 1:1 if paired quote fails
+            }
+
+            const liqTx = await buildAddLiquidityTx({
+              senderAddress: wallet,
+              tokenA: tokenA.address,
+              tokenB: tokenB.address,
+              stable: matchingPool.stable,
+              amountADesired: intent.trade_amount,
+              amountBDesired,
+            });
+
+            return res.json({
+              intent,
+              liquidity: liqTx,
+              ptb: liqTx,
+              advise: null,
+              llmMessage: `Ready to add liquidity: deposit ${intent.trade_amount} ${tokenA.symbol} and ${amountBDesired} ${tokenB.symbol} into the ${matchingPool.token0.symbol}/${matchingPool.token1.symbol} pool on Mezo Testnet.`,
+            });
+          } catch (err: any) {
+            logger.warn(`Failed to build liquidity tx from intent: ${err.message}`);
+          }
+        }
+
+        // Fallback to pool preview & capital efficiency advice
+        const advice = await adviseYieldAndBorrow({
+          userPrompt: prompt,
+          tokenSymbol: tokenA.symbol,
+          pools: [matchingPool],
+          walletAddress: wallet || undefined,
+        });
+
+        return res.json({
+          intent: { ...intent, action_type: 'ASK_POOLS' },
+          answer: {
+            kind: 'pools_and_yield',
+            targetToken: tokenA.symbol,
+            bestPools: [
+              {
+                pair: `${matchingPool.token0.symbol}/${matchingPool.token1.symbol}`,
+                address: matchingPool.address,
+                tvlUsd: matchingPool.tvlUsd,
+                feePct: matchingPool.feePct,
+                stable: matchingPool.stable,
+              },
+            ],
+            borrowOptions: advice.borrowOptions,
+            pools: pools.pools.map((p) => ({
+              address: p.address,
+              pair: `${p.token0.symbol}/${p.token1.symbol}`,
+              tvlUsd: p.tvlUsd,
+              feePct: p.feePct,
+              stable: p.stable,
+            })),
+            totalPairs: pools.totalPairs,
+          },
+          advise: null,
+          llmMessage: `Found pool ${matchingPool.token0.symbol}/${matchingPool.token1.symbol} (Fee: ${matchingPool.feePct}%, TVL: $${Math.round(matchingPool.tvlUsd ?? 0).toLocaleString()}). Click 'Supply to Pool' to deposit your liquidity!`,
+        });
+      }
+
       // Step 1d: Unknown tokens → candidates, never the zero address
       const srcToken = resolveToken(intent.source_token_address || intent.source_token_symbol);
       const dstToken = resolveToken(intent.destination_token_address || intent.destination_token_symbol);

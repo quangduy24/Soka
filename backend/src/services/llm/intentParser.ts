@@ -51,7 +51,7 @@ ${tokenLines}
 - MUSD (Mezo USD stablecoin, core routing asset)
 
 Output strictly valid JSON with no markdown and no backticks.
-For executable intents:
+For executable intents with complete pair & amount:
 {
   "action_type": "SWAP" | "BRIDGE_OUT" | "TRANSFER" | "LIQUIDITY",
   "trade_amount": "<numeric amount, 'ALL', 'MAX', or 'N%' e.g. '50%'>",
@@ -61,10 +61,10 @@ For executable intents:
   "destination_chain": "<required for BRIDGE_OUT: 0 for Ethereum, 1 for Bitcoin. Never set for TRANSFER>",
   "priority_mode": "SAFE" | "FAST" | "MAX_OUTPUT",
   "constraints": [
-    { "type": "slippage" | "deadline" | "minOutput", "value": "<value>" }
+    { "type": "slippage" | "deadline" | "minOutput" | "sort", "value": "<value>" }
   ]
 }
-For questions, pool recommendations, and help (never route these to a swap):
+For questions, pool/liquidity recommendations, lowest fees, yield, and help (never route these to a swap):
 {
   "action_type": "ASK_PRICE" | "ASK_POOLS" | "ASK_RISK" | "ASK_BRIDGE_STATUS" | "ASK_GAS" | "ASK_HELP",
   "trade_amount": "0",
@@ -73,9 +73,20 @@ For questions, pool recommendations, and help (never route these to a swap):
   "priority_mode": "SAFE",
   "constraints": []
 }
-If the user intent is unclear or outside the capabilities above, return:
+
+SPECIAL RULES FOR LIQUIDITY & POOLS:
+- When a user asks about adding liquidity, best pools, lowest fees, highest returns, or yield without providing both tokens to deposit (e.g. "i want to add liquidity with lowest fee", "add btc to pool that best return", "lowest fee pools", "which pool should i provide liquidity to?"):
+  Output action_type: "ASK_POOLS"!
+  Set source_token_symbol to the token mentioned (or "BTC" if none mentioned).
+  If lowest fee is mentioned, add constraint: { "type": "sort", "value": "lowest_fee" }.
+- If the user provides two distinct tokens to add liquidity (e.g. "add 0.001 BTC and 50 MUSD liquidity"):
+  Output action_type: "LIQUIDITY" with source_token_symbol and destination_token_symbol.
+- If the user asks a general DeFi question or expresses interest without full params (e.g. "how to swap", "how to bridge", "i want to transfer"):
+  Output action_type: "ASK_HELP".
+
+If the user intent is completely incomprehensible gibberish unrelated to trading or crypto, return:
 { "error": "unclear_intent" }
-Never invent token addresses, amounts, recipients, or chains.
+Never invent token addresses, recipients, or chains.
 
 EXAMPLES:
 1) User: "Bridge 0.05 BTC to Ethereum to 0x1234567890abcdef1234567890abcdef12345678"
@@ -113,6 +124,28 @@ Output:
   "destination_token_symbol": "BTC",
   "priority_mode": "SAFE",
   "constraints": []
+}
+
+4) User: "i want to add  liquidity with lowest fee"
+Output:
+{
+  "action_type": "ASK_POOLS",
+  "trade_amount": "0",
+  "source_token_symbol": "BTC",
+  "destination_token_symbol": "BTC",
+  "priority_mode": "SAFE",
+  "constraints": [{ "type": "sort", "value": "lowest_fee" }]
+}
+
+5) User: "i want to add 0.001 BTC liquidity with lowest fee"
+Output:
+{
+  "action_type": "ASK_POOLS",
+  "trade_amount": "0.001",
+  "source_token_symbol": "BTC",
+  "destination_token_symbol": "BTC",
+  "priority_mode": "SAFE",
+  "constraints": [{ "type": "sort", "value": "lowest_fee" }]
 }
 `;
 }
@@ -256,7 +289,7 @@ export function parseDeterministic(prompt: string): any | null {
   // must not become a swap). Patterns are attempted first; unmatched verbs
   // fall through to the question mapping.
   const askOnly = [
-    { re: /pool|liquidit|vault|venue|(?:best|highest|top|max)\s+(?:return|yield|apr|rate|apy|earn|gain)|where\s+to\s+(?:earn|stake|pool|yield)|how\s+to\s+earn/i, action: 'ASK_POOLS' },
+    { re: /pool|liquidit|vault|venue|(?:best|highest|top|max|lowest|cheapest|min)\s+(?:return|yield|apr|rate|apy|earn|gain|fee|cost|slippage)|where\s+to\s+(?:earn|stake|pool|yield|add)|how\s+to\s+(?:earn|add|provide)/i, action: 'ASK_POOLS' },
     { re: /risk|safe|safety|an toàn|rủi ro|danger/i, action: 'ASK_RISK' },
     { re: /bridge.*(status|capacity|limit|chain)|^(bridge|capacity|limit)/i, action: 'ASK_BRIDGE_STATUS' },
     { re: /gas|phí|fee|cost to trade/i, action: 'ASK_GAS' },
@@ -286,7 +319,11 @@ export function parseDeterministic(prompt: string): any | null {
           break;
         }
       }
-      return { action_type: askMatch.action, trade_amount: '0', source_token_symbol: targetToken, destination_token_symbol: targetToken, priority_mode: 'SAFE', constraints: [] };
+      const constraints: { type: string; value: string }[] = [];
+      if (/lowest.*fee|low.*fee|cheapest.*fee|min.*fee/i.test(p)) {
+        constraints.push({ type: 'sort', value: 'lowest_fee' });
+      }
+      return { action_type: askMatch.action, trade_amount: '0', source_token_symbol: targetToken, destination_token_symbol: targetToken, priority_mode: 'SAFE', constraints };
     }
     if (!hasExecutableVerb) return null;
   }
@@ -445,6 +482,7 @@ async function buildIntentResult(parsed: any): Promise<IntentParseResult | null>
 }
 
 const QUESTION_HINT = /(help|price|giá|what|how|can you|pool|risk|gas|faucet|do you|borrow|vault|stake|earn|yield|return|rate|apy|apr)/i;
+const DEFI_ACTION_HINT = /(liquidit|thanh khoản|fee|fees|phí|lowest|cheapest|best|add|remove|thêm|rút|provide|cung cấp|deposit|withdraw|nạp|borrow|vay|lend|cho vay|vault|stake|staking|earn|kiếm|yield|lãi|return|rate|apy|apr|pool|pools|bể|swap|trade|bridge|cầu|transfer|send|gửi|pay)/i;
 const AMOUNT_HINT = /(all|max|\d|%|half|nửa|one|two|một|hai|\bk\b|\bm\b)/i;
 
 /**
@@ -455,12 +493,12 @@ const AMOUNT_HINT = /(all|max|\d|%|half|nửa|one|two|một|hai|\bk\b|\bm\b)/i;
 export function hasActionableContent(prompt: string): boolean {
   const p = (prompt || '').trim();
   if (!p) return false;
-  if (QUESTION_HINT.test(p)) return true;
+  if (QUESTION_HINT.test(p) || DEFI_ACTION_HINT.test(p)) return true;
   if (/0x[0-9a-fA-F]{40}/.test(p)) return true;
   if (AMOUNT_HINT.test(p)) return true;
   const words = p.toLowerCase().split(/[^a-z0-9à-ỹ]+/iu);
   if (words.some((w) => w && resolveToken(w))) return true;
-  if (hasVerb(p, `${SWAP_VERBS}|${TRANSFER_VERBS}|bridge|cầu`)) return true;
+  if (hasVerb(p, `${SWAP_VERBS}|${TRANSFER_VERBS}|bridge|cầu|add|remove|thêm|rút|cung cấp|provide|nạp|deposit|withdraw`)) return true;
   return false;
 }
 
