@@ -146,6 +146,19 @@ export const ProSwapper: React.FC = () => {
   const [isBridging, setIsBridging] = useState(false);
   const [bridgeTxDigest, setBridgeTxDigest] = useState<string | null>(null);
 
+  // Transfer state - direct EVM transfer flow
+  const [transferStep, setTransferStep] = useState<"idle" | "form">("idle");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferToken, setTransferToken] = useState("BTC");
+  const [transferRecipient, setTransferRecipient] = useState("");
+  const [transferQuote, setTransferQuote] = useState<{
+    intent: any;
+    transfer: any;
+    ptb: any;
+  } | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferTxDigest, setTransferTxDigest] = useState<string | null>(null);
+
   // Borrow quote state (real on-chain valuation via /api/borrow-quote)
   const [borrowQuote, setBorrowQuote] = useState<any>(null);
   const [borrowQuoteLoading, setBorrowQuoteLoading] = useState(false);
@@ -215,10 +228,22 @@ export const ProSwapper: React.FC = () => {
     setIsBridging(false);
     setActiveAction(null);
     setYieldAdvice(null);
+    setTransferStep("idle");
+    setTransferAmount("");
+    setTransferRecipient("");
+    setTransferQuote(null);
+    setIsTransferring(false);
+    setTransferTxDigest(null);
   };
   const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
   const handleSelectSubAction = (action: string) => {
     setShowTransactionMenu(false);
+    if (action === "send") {
+      resetAllFeatures();
+      setTransferStep("form");
+      setSokaMessage("Enter the token, amount, and recipient EVM address to transfer on Mezo Testnet:");
+      return;
+    }
     const actionLabels: Record<string, string> = { deposit: "Deposit", withdraw: "Withdraw", send: "Send", receive: "Receive" };
     setSubmittedUserPrompt(`Action: ${actionLabels[action]}`);
     setSokaMessage(`You selected ${actionLabels[action]}. Please tell me the amount and token you'd like to ${action}.`);
@@ -840,6 +865,31 @@ export const ProSwapper: React.FC = () => {
         return;
       }
 
+      // Handle Transfer intents directly
+      if (data.intent?.action_type === 'TRANSFER' || data.transfer) {
+        setTransferQuote({
+          intent: data.intent,
+          transfer: data.transfer,
+          ptb: data.ptb || data.transfer,
+        });
+        setTransferAmount(data.intent?.trade_amount || "");
+        setTransferToken(data.intent?.source_token_symbol || "BTC");
+        setTransferRecipient(data.intent?.recipient || "");
+        setRouteNodes([]);
+        setGuardianChecks([]);
+        if (data.llmMessage) {
+          setSokaMessage(data.llmMessage);
+        }
+        upsertHistory(swapId, {
+          sourceSymbol: data.intent?.source_token_symbol || "BTC",
+          destSymbol: "TRANSFER",
+          amount: data.intent?.trade_amount || undefined,
+          status: "SIMULATED",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
       // Handle Bridge Out intents directly
       if (data.intent?.action_type === 'BRIDGE_OUT' || data.intent?.action_type === 'BRIDGE' || data.bridge) {
         setBridgeQuote({
@@ -959,6 +1009,62 @@ export const ProSwapper: React.FC = () => {
       if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "FAILED" });
     } finally {
       setIsBridging(false);
+    }
+  };
+
+  const handleExecuteTransfer = async () => {
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      return;
+    }
+    if (chainId !== mezoTestnet.id) {
+      try {
+        await switchChain({ chainId: mezoTestnet.id });
+      } catch {
+        setErrorMessage(`Wrong network: switch your wallet to Mezo Testnet (chain ${mezoTestnet.id})`);
+        return;
+      }
+    }
+    if (isExecuting || isTransferring || !transferQuote) return;
+    setIsTransferring(true);
+    setErrorMessage(null);
+    try {
+      let tx = transferQuote.ptb;
+      if (!tx || !tx.to) {
+        const res = await fetch("/api/transfer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            senderAddress: walletAddress,
+            tokenSymbol: transferQuote.intent.source_token_symbol || "BTC",
+            tokenAddress: transferQuote.intent.source_token_address,
+            amount: transferQuote.intent.trade_amount,
+            recipient: transferQuote.intent.recipient,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to build transfer transaction");
+        }
+        tx = data;
+      }
+
+      const hash = await executeUnsignedTx(tx, `transfer ${transferQuote.intent.trade_amount} ${transferQuote.intent.source_token_symbol} to ${transferQuote.intent.recipient}`);
+      setTransferTxDigest(hash);
+      setTxDigest(hash);
+      if (activeSwapRef.current) {
+        upsertHistory(activeSwapRef.current.id, {
+          status: "CONFIRMED",
+          txDigest: hash,
+          txHash: hash,
+        });
+      }
+      setSokaMessage(`✅ Transfer completed on Mezo testnet. Hash: ${hash}`);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Transfer execution failed.");
+      if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "FAILED" });
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -1911,6 +2017,81 @@ export const ProSwapper: React.FC = () => {
                 </div>
               )}
 
+              {/* Transfer Form - Clean Soft Design */}
+              {transferStep !== "idle" && (
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#2C1924]/[0.08] shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[85%]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2C1924]/[0.07]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Send className="w-4.5 h-4.5 text-[#DF7AA7]" />
+                        </div>
+                        <div>
+                          <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Transfer</h3>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">Send tokens directly on Mezo Testnet</p>
+                        </div>
+                      </div>
+                      <button onClick={() => { setTransferStep("idle"); setActiveAction(null); }} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount</label>
+                          <input
+                            type="number"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[14px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Token</label>
+                          <select
+                            value={transferToken}
+                            onChange={(e) => setTransferToken(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[14px] text-[#2C1924] outline-none focus:border-[#DF7AA7] focus:bg-white transition-all cursor-pointer"
+                          >
+                            <option value="BTC">BTC</option>
+                            <option value="MUSD">MUSD</option>
+                            <option value="mUSDC">mUSDC</option>
+                            <option value="MEZO">MEZO</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Recipient EVM Address</label>
+                        <input
+                          type="text"
+                          value={transferRecipient}
+                          onChange={(e) => setTransferRecipient(e.target.value.trim())}
+                          placeholder="0x..."
+                          className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[13px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const p = `Transfer ${transferAmount} ${transferToken} to ${transferRecipient}`;
+                          setSubmittedUserPrompt(p);
+                          setTransferStep("idle");
+                          handleProcessIntent(p);
+                        }}
+                        disabled={!transferAmount || parseFloat(transferAmount) <= 0 || !transferRecipient || !transferRecipient.startsWith('0x') || transferRecipient.length !== 42}
+                        className="w-full py-2.5 mt-2 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer"
+                      >
+                        Generate & Process Transfer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* User Message Bubble */}
               {(submittedUserPrompt || (intentPrompt.trim() !== "" && isProcessing)) && (
                 <div className="flex justify-end items-end gap-2.5">
@@ -2053,6 +2234,82 @@ export const ProSwapper: React.FC = () => {
                         {bridgeTxDigest ? "Close" : "Cancel"}
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Transfer Quote & Execution Card */}
+              {transferQuote && !isProcessing && (
+                <div className="flex flex-col gap-3 w-full">
+                  <div className="p-4 sm:p-5 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#2C1924]/[0.07] mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Send className="w-4.5 h-4.5 text-[#DF7AA7]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Direct Transfer</h3>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-mono text-[10px] font-bold">Mezo Testnet</span>
+                          </div>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">Direct on-chain transfer (no swap slippage)</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setTransferQuote(null)} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    </div>
+
+                    {/* Visual Route */}
+                    <div className="flex items-center gap-2 flex-wrap rounded-2xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] px-4 py-3 shadow-2xs mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[13px] font-bold text-[#2C1924]">{transferQuote.intent.trade_amount} {transferQuote.intent.source_token_symbol}</span>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-[#845D74]" />
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[12px] font-bold text-emerald-700 break-all">{transferQuote.intent.recipient}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.07]">
+                        <span className="font-meta text-[10px] uppercase font-bold text-[#845D74]">Network</span>
+                        <div className="font-mono text-[12px] font-bold text-[#2C1924] mt-0.5">Mezo Testnet (31611)</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.07]">
+                        <span className="font-meta text-[10px] uppercase font-bold text-[#845D74]">Execution</span>
+                        <div className="font-mono text-[12px] font-bold text-emerald-600 mt-0.5">Direct Transfer</div>
+                      </div>
+                    </div>
+
+                    {transferTxDigest ? (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center font-meta">
+                        <div className="text-[12px] font-bold text-emerald-800 mb-1">Transfer Confirmed!</div>
+                        <a href={txExplorerUrl(transferTxDigest)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-[11px] text-emerald-700 underline">
+                          View on Explorer <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleExecuteTransfer}
+                        disabled={isTransferring}
+                        className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isTransferring ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Confirming in Wallet...</span>
+                          </>
+                        ) : !walletAddress ? (
+                          <span>Connect Wallet to Transfer</span>
+                        ) : (
+                          <>
+                            <span>Confirm & Transfer {transferQuote.intent.trade_amount} {transferQuote.intent.source_token_symbol}</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

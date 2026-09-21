@@ -529,22 +529,28 @@ apiRouter.post(
             missing: ['recipient'],
           }), undefined, prompt, intent.action_type);
         }
-        if (!wallet) {
-          return await rejectIntent(res, 422, 'Connect a wallet to build a transfer.', buildFallbackAdvise({
-            error: 'missing_field',
-            detail: 'Transfers move real funds — connect a wallet first so the transaction targets your address.',
-            missing: ['senderAddress'],
-          }), undefined, prompt, intent.action_type);
-        }
         try {
+          const sender = wallet ?? (ZERO_ADDRESS as Address);
           const transferTx = await buildTransferTx({
-            senderAddress: wallet,
+            senderAddress: sender,
             tokenSymbol: intent.source_token_symbol,
             tokenAddress: intent.source_token_address,
             amount: intent.trade_amount,
             recipient: intent.recipient,
+            simulate: !!wallet,
           });
-          return res.json({ intent, transfer: transferTx, advise: null });
+          return res.json({
+            intent,
+            transfer: transferTx,
+            ptb: transferTx,
+            quoteOnly: !wallet,
+            advise: wallet ? null : buildFallbackAdvise({
+              error: 'missing_field',
+              detail: 'Transfer preview ready. Connect your wallet to sign and broadcast on Mezo Testnet.',
+              missing: ['senderAddress'],
+            }),
+            llmMessage: `Transfer preview ready: Send ${intent.trade_amount} ${intent.source_token_symbol} to ${intent.recipient.slice(0, 6)}...${intent.recipient.slice(-4)} on Mezo Testnet.`,
+          });
         } catch (err) {
           return await rejectIntent(res, 422, 'Cannot build transfer.', buildFallbackAdvise({
             error: 'missing_field',
