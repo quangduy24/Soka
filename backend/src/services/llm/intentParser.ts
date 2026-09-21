@@ -76,6 +76,33 @@ For questions and help (never route these to a swap):
 If the user intent is unclear or outside the capabilities above (like borrowing or vaults), return:
 { "error": "unclear_intent" }
 Never invent token addresses, amounts, recipients, or chains.
+
+EXAMPLES:
+1) User: "Bridge 0.05 BTC to Ethereum to 0x1234567890abcdef1234567890abcdef12345678"
+Output:
+{
+  "action_type": "BRIDGE_OUT",
+  "trade_amount": "0.05",
+  "source_token_symbol": "BTC",
+  "destination_token_symbol": "BTC",
+  "recipient": "0x1234567890abcdef1234567890abcdef12345678",
+  "destination_chain": "0",
+  "priority_mode": "SAFE",
+  "constraints": []
+}
+
+2) User: "Bridge 1 MUSD to Bitcoin"
+Output:
+{
+  "action_type": "BRIDGE_OUT",
+  "trade_amount": "1",
+  "source_token_symbol": "MUSD",
+  "destination_token_symbol": "MUSD",
+  "recipient": null,
+  "destination_chain": "1",
+  "priority_mode": "SAFE",
+  "constraints": []
+}
 `;
 }
 

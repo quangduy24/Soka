@@ -130,6 +130,14 @@ export const ProSwapper: React.FC = () => {
   const [incentiveAmount, setIncentiveAmount] = useState("");
   const [removeAmount, setRemoveAmount] = useState("");
 
+  // Bridge state - form flow
+  const [bridgeStep, setBridgeStep] = useState<"idle" | "form">("idle");
+  const [bridgeAmount, setBridgeAmount] = useState("0.01");
+  const [bridgeToken, setBridgeToken] = useState("BTC");
+  const [bridgeChain, setBridgeChain] = useState("Ethereum");
+  const [bridgeDestType, setBridgeDestType] = useState<"wallet" | "custom">("wallet");
+  const [bridgeCustomAddress, setBridgeCustomAddress] = useState("");
+
   // Borrow quote state (real on-chain valuation via /api/borrow-quote)
   const [borrowQuote, setBorrowQuote] = useState<any>(null);
   const [borrowQuoteLoading, setBorrowQuoteLoading] = useState(false);
@@ -190,6 +198,9 @@ export const ProSwapper: React.FC = () => {
     setRemoveAmount("");
     setLiqQuote(null);
     setLiqQuoteError(null);
+    setBridgeStep("idle");
+    setBridgeAmount("0.01");
+    setBridgeCustomAddress("");
     setActiveAction(null);
   };
   const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
@@ -887,7 +898,7 @@ export const ProSwapper: React.FC = () => {
                 </button>
 
                 <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("bridge"); setIntentPrompt("Bridge 0.01 BTC to Ethereum [paste 0x address]"); }} 
+                  onClick={() => { resetAllFeatures(); setActiveAction("bridge"); setIntentPrompt(""); setBridgeStep("form"); }} 
                   className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "bridge" 
                       ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
@@ -1501,6 +1512,88 @@ export const ProSwapper: React.FC = () => {
                         </div>
                       ) : null;
                     })()}
+                  </div>
+                </div>
+              )}
+
+              {/* Bridge Form - Clean Soft Design */}
+              {bridgeStep !== "idle" && (
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#2C1924]/[0.08] shadow-[0_4px_16px_-4px_rgba(44,25,36,0.06)] bg-white max-w-full sm:max-w-[85%]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#2C1924]/[0.07]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Upload className="w-4.5 h-4.5 text-[#DF7AA7]" />
+                        </div>
+                        <div>
+                          <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Bridge</h3>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">Bridge assets across chains</p>
+                        </div>
+                      </div>
+                      <button onClick={() => { setBridgeStep("idle"); setActiveAction(null); }} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    </div>
+
+                    {bridgeStep === "form" && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Amount</label>
+                            <input type="number" value={bridgeAmount} onChange={(e) => setBridgeAmount(e.target.value)} placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[14px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                          </div>
+                          <div>
+                            <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Token</label>
+                            <select value={bridgeToken} onChange={(e) => setBridgeToken(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-meta text-[13px] font-bold text-[#2C1924] outline-none focus:border-[#DF7AA7] focus:bg-white transition-all cursor-pointer">
+                              <option value="BTC">BTC</option>
+                              <option value="MUSD">MUSD</option>
+                              <option value="stBTC">stBTC</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Destination Chain</label>
+                          <select value={bridgeChain} onChange={(e) => setBridgeChain(e.target.value)} className="w-full px-3 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-meta text-[13px] font-bold text-[#2C1924] outline-none focus:border-[#DF7AA7] focus:bg-white transition-all cursor-pointer">
+                            <option value="Ethereum">Ethereum</option>
+                            <option value="Bitcoin">Bitcoin (L1)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Recipient</label>
+                          <div className="flex gap-2 mb-2">
+                            <button onClick={() => setBridgeDestType("wallet")} className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold font-meta transition-all cursor-pointer border ${bridgeDestType === "wallet" ? "bg-[#DF7AA7] text-white border-[#DF7AA7]" : "bg-[#FAF8FA] text-[#845D74] border-[#2C1924]/[0.08] hover:bg-white"}`}>My Wallet</button>
+                            <button onClick={() => setBridgeDestType("custom")} className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold font-meta transition-all cursor-pointer border ${bridgeDestType === "custom" ? "bg-[#DF7AA7] text-white border-[#DF7AA7]" : "bg-[#FAF8FA] text-[#845D74] border-[#2C1924]/[0.08] hover:bg-white"}`}>Custom Address</button>
+                          </div>
+                          
+                          {bridgeDestType === "custom" ? (
+                            <input type="text" value={bridgeCustomAddress} onChange={(e) => setBridgeCustomAddress(e.target.value)} placeholder="0x..." className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[12px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                          ) : (
+                            <div className="p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.05] font-mono text-[11px] text-[#2C1924] flex items-center justify-between">
+                              <span>{walletAddress ? `${walletAddress.slice(0,8)}...${walletAddress.slice(-6)}` : "Not connected"}</span>
+                              {!walletAddress && <button onClick={openConnectModal} className="text-[#DF7AA7] hover:underline font-bold font-meta">Connect</button>}
+                            </div>
+                          )}
+                        </div>
+
+                        <button 
+                          onClick={() => { 
+                            const addr = bridgeDestType === "wallet" ? walletAddress : bridgeCustomAddress;
+                            const amt = bridgeAmount || "0";
+                            const p = `Bridge ${amt} ${bridgeToken} to ${bridgeChain}${addr ? ` to ${addr}` : ""}`;
+                            setBridgeStep("idle");
+                            setIntentPrompt(p);
+                            handleProcessIntent(p);
+                          }}
+                          disabled={!bridgeAmount || parseFloat(bridgeAmount) <= 0 || (bridgeDestType === "wallet" && !walletAddress) || (bridgeDestType === "custom" && !bridgeCustomAddress)} 
+                          className="w-full py-2.5 mt-2 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer"
+                        >
+                          Generate & Process Intent
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
