@@ -64,16 +64,16 @@ For executable intents:
     { "type": "slippage" | "deadline" | "minOutput", "value": "<value>" }
   ]
 }
-For questions and help (never route these to a swap):
+For questions, pool recommendations, and help (never route these to a swap):
 {
   "action_type": "ASK_PRICE" | "ASK_POOLS" | "ASK_RISK" | "ASK_BRIDGE_STATUS" | "ASK_GAS" | "ASK_HELP",
   "trade_amount": "0",
-  "source_token_symbol": "<token for ASK_PRICE, else BTC>",
-  "destination_token_symbol": "<token for ASK_PRICE, else BTC>",
+  "source_token_symbol": "<token for ASK_PRICE or ASK_POOLS yield questions, else BTC>",
+  "destination_token_symbol": "<token for ASK_PRICE or ASK_POOLS, else BTC>",
   "priority_mode": "SAFE",
   "constraints": []
 }
-If the user intent is unclear or outside the capabilities above (like borrowing or vaults), return:
+If the user intent is unclear or outside the capabilities above, return:
 { "error": "unclear_intent" }
 Never invent token addresses, amounts, recipients, or chains.
 
@@ -100,6 +100,17 @@ Output:
   "destination_token_symbol": "MUSD",
   "recipient": null,
   "destination_chain": "1",
+  "priority_mode": "SAFE",
+  "constraints": []
+}
+
+3) User: "i want to add btc to pool that best return"
+Output:
+{
+  "action_type": "ASK_POOLS",
+  "trade_amount": "0",
+  "source_token_symbol": "BTC",
+  "destination_token_symbol": "BTC",
   "priority_mode": "SAFE",
   "constraints": []
 }
@@ -245,7 +256,7 @@ export function parseDeterministic(prompt: string): any | null {
   // must not become a swap). Patterns are attempted first; unmatched verbs
   // fall through to the question mapping.
   const askOnly = [
-    { re: /pool|liquidit|vault|venue/i, action: 'ASK_POOLS' },
+    { re: /pool|liquidit|vault|venue|(?:best|highest|top|max)\s+(?:return|yield|apr|rate|apy|earn|gain)|where\s+to\s+(?:earn|stake|pool|yield)|how\s+to\s+earn/i, action: 'ASK_POOLS' },
     { re: /risk|safe|safety|an toàn|rủi ro|danger/i, action: 'ASK_RISK' },
     { re: /bridge.*(status|capacity|limit|chain)|^(bridge|capacity|limit)/i, action: 'ASK_BRIDGE_STATUS' },
     { re: /gas|phí|fee|cost to trade/i, action: 'ASK_GAS' },
@@ -266,7 +277,16 @@ export function parseDeterministic(prompt: string): any | null {
     : null;
   if (!hasExecutableVerb || (!tryM1 && !tryM2)) {
     if (askMatch) {
-      return { action_type: askMatch.action, trade_amount: '0', source_token_symbol: 'BTC', destination_token_symbol: 'BTC', priority_mode: 'SAFE', constraints: [] };
+      let targetToken = 'BTC';
+      const words = p.split(/[^a-zA-Z0-9_]+/);
+      for (const w of words) {
+        const resolved = resolveToken(w);
+        if (resolved) {
+          targetToken = resolved.symbol;
+          break;
+        }
+      }
+      return { action_type: askMatch.action, trade_amount: '0', source_token_symbol: targetToken, destination_token_symbol: targetToken, priority_mode: 'SAFE', constraints: [] };
     }
     if (!hasExecutableVerb) return null;
   }
@@ -424,7 +444,7 @@ async function buildIntentResult(parsed: any): Promise<IntentParseResult | null>
   };
 }
 
-const QUESTION_HINT = /(help|price|giá|what|how|can you|pool|risk|gas|faucet|do you|borrow|vault|stake|earn)/i;
+const QUESTION_HINT = /(help|price|giá|what|how|can you|pool|risk|gas|faucet|do you|borrow|vault|stake|earn|yield|return|rate|apy|apr)/i;
 const AMOUNT_HINT = /(all|max|\d|%|half|nửa|one|two|một|hai|\bk\b|\bm\b)/i;
 
 /**

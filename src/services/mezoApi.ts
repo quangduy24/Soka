@@ -122,7 +122,7 @@ const API_BASE =
 
 async function parseError(res: Response, fallback: string): Promise<Error> {
   const err = await res.json().catch(() => ({ error: res.statusText }));
-  if ((err as any)?.advise || (err as any)?.guardian || (err as any)?.tokenSuggestion) {
+  if ((err as any)?.advise || (err as any)?.guardian || (err as any)?.tokenSuggestion || (err as any)?.llmMessage) {
     return new ApiRejectError(res.status, err, fallback);
   }
   const details = Array.isArray((err as any)?.details)

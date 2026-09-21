@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAccount, useSendTransaction, usePublicClient, useChainId, useSwitchChain } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp, User } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, ArrowRight, Wallet, Sparkles, ExternalLink, Info, History as HistoryIcon, Check, ArrowRightLeft, Landmark, Vault, Waves, Download, Upload, Send, ArrowDownToLine, ArrowUp, User, TrendingUp } from 'lucide-react';
 import { ProHeader } from './ProHeader';
 import { ProRouteVisualizer } from './ProRouteVisualizer';
 import { ProGuardianRadar } from './ProGuardianRadar';
@@ -155,6 +155,7 @@ export const ProSwapper: React.FC = () => {
   const [liqQuote, setLiqQuote] = useState<any>(null);
   const [liqQuoteLoading, setLiqQuoteLoading] = useState(false);
   const [liqQuoteError, setLiqQuoteError] = useState<string | null>(null);
+  const [yieldAdvice, setYieldAdvice] = useState<any | null>(null);
 
   // Real on-chain pools (Mezo Swap factory). Loaded on demand for Pool/Vault flows.
   const poolsEnabled = poolStep !== "idle" || vaultStep !== "idle";
@@ -213,6 +214,7 @@ export const ProSwapper: React.FC = () => {
     setBridgeTxDigest(null);
     setIsBridging(false);
     setActiveAction(null);
+    setYieldAdvice(null);
   };
   const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
   const handleSelectSubAction = (action: string) => {
@@ -531,7 +533,8 @@ export const ProSwapper: React.FC = () => {
       setSokaMessage(`✅ Liquidity added on Mezo testnet. LP tokens are now in your wallet.`);
       poolsQuery.refetch();
     } catch (err: any) {
-      setSokaMessage(`Add liquidity failed: ${err.message || "wallet rejected the transaction"}.`);
+      const msg = err.payload?.llmMessage || err.message || "wallet rejected the transaction";
+      setSokaMessage(`Add liquidity failed: ${msg}.`);
     } finally {
       setIsExecuting(false);
     }
@@ -664,6 +667,13 @@ export const ProSwapper: React.FC = () => {
       return true;
     }
 
+    // Advisory yield & best return queries go directly to LLM & yield advisor
+    const isYieldAdvisory = /(?:best|highest|top|max)\s+(?:return|yield|apr|rate|apy|earn|gain)|where\s+to\s+(?:earn|stake|pool|yield)|how\s+to\s+earn/i.test(lowerPrompt) ||
+      ((lowerPrompt.includes("best") || lowerPrompt.includes("highest") || lowerPrompt.includes("top")) && (lowerPrompt.includes("pool") || lowerPrompt.includes("return") || lowerPrompt.includes("yield") || lowerPrompt.includes("apr") || lowerPrompt.includes("apy")));
+    if (isYieldAdvisory) {
+      return false;
+    }
+
     // Pool/Liquidity intents - various phrasings
     if (lowerPrompt.includes("pool") || lowerPrompt.includes("liquidity") || lowerPrompt.includes("add liquidity") || lowerPrompt.includes("remove liquidity") || lowerPrompt.includes("provide liquidity") || lowerPrompt.includes("withdraw liquidity") || lowerPrompt.includes("earn fees") || lowerPrompt.includes("incentive") || lowerPrompt.includes("reward")) {
       const isRemove = lowerPrompt.includes("remove") || lowerPrompt.includes("withdraw");
@@ -770,6 +780,7 @@ export const ProSwapper: React.FC = () => {
     setLiquidityAmount("");
     setLiqQuote(null);
     setLiqQuoteError(null);
+    setYieldAdvice(null);
 
     try {
       const res = await fetch("/api/process-intent", {
@@ -810,6 +821,23 @@ export const ProSwapper: React.FC = () => {
         setSokaMessage(data.llmMessage);
       } else if (data.advise && data.advise.message) {
         setSokaMessage(data.advise.message);
+      }
+
+      // Handle Yield Advisory / Best Pools intents directly
+      if (data.answer?.kind === 'pools_and_yield' || data.intent?.action_type === 'ASK_POOLS') {
+        setYieldAdvice(data.answer);
+        setRouteNodes([]);
+        setGuardianChecks([]);
+        if (data.llmMessage) {
+          setSokaMessage(data.llmMessage);
+        }
+        setIsProcessing(false);
+        upsertHistory(swapId, {
+          sourceSymbol: data.answer?.targetToken || data.intent?.source_token_symbol || "BTC",
+          amount: data.intent?.trade_amount || undefined,
+          status: "SIMULATED",
+        });
+        return;
       }
 
       // Handle Bridge Out intents directly
@@ -1193,6 +1221,97 @@ export const ProSwapper: React.FC = () => {
                       <span className="font-meta text-[9px] font-semibold text-[#845D74]/80">Execution Agent</span>
                     </div>
                     <div className="text-[14px] font-medium text-[#2C1924] whitespace-pre-line leading-relaxed">{sokaMessage}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Yield & Capital Efficiency Advisory Card */}
+              {yieldAdvice && (
+                <div className="mt-2 ml-0 sm:ml-12">
+                  <div className="p-5 rounded-2xl border border-[#DF7AA7]/30 shadow-[0_4px_20px_-4px_rgba(223,122,167,0.15)] bg-gradient-to-b from-white to-[#FAF8FA] max-w-full sm:max-w-[85%]">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#2C1924]/[0.08]">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-[#DF7AA7]/10 flex items-center justify-center text-[#DF7AA7]">
+                          <TrendingUp className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="font-display text-[15px] font-bold text-[#2C1924]">Capital Efficiency Options for {yieldAdvice.targetToken || 'BTC'}</h4>
+                          <p className="font-meta text-[11px] text-[#845D74]">Compare trading fee earnings with collateralized borrowing</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setYieldAdvice(null)}
+                        className="w-6 h-6 rounded-full bg-white border border-[#2C1924]/10 flex items-center justify-center text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Options Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* Option 1: Top Liquidity Pool */}
+                      {yieldAdvice.bestPools && yieldAdvice.bestPools.length > 0 && (
+                        <div className="p-4 rounded-xl border border-emerald-200/80 bg-emerald-50/40 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-meta text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">Option 1 • Liquidity Pool</span>
+                              <span className="font-meta text-[11px] font-bold text-emerald-800">{yieldAdvice.bestPools[0].feePct}% Fee</span>
+                            </div>
+                            <h5 className="font-display text-[16px] font-bold text-[#2C1924]">{yieldAdvice.bestPools[0].pair}</h5>
+                            <p className="font-meta text-[12px] text-[#845D74] mt-1">
+                              Earn trading fees on Mezo Swap by providing {yieldAdvice.bestPools[0].pair} liquidity.
+                            </p>
+                            <div className="mt-2.5 py-1 px-2 rounded-lg bg-white/80 border border-emerald-200/60 font-mono text-[11px] text-[#2C1924]">
+                              TVL: <span className="font-bold text-emerald-800">{fmtUsd(yieldAdvice.bestPools[0].tvlUsd)}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              handleSelectPool(yieldAdvice.bestPools[0].address);
+                              handleAddLiquidity();
+                              setYieldAdvice(null);
+                            }}
+                            className="mt-3.5 w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-meta text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <span>Supply to {yieldAdvice.bestPools[0].pair}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Option 2: Mezo Borrow */}
+                      {yieldAdvice.borrowOptions && yieldAdvice.borrowOptions.length > 0 && (
+                        <div className="p-4 rounded-xl border border-[#DF7AA7]/40 bg-[#DF7AA7]/[0.05] flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-meta text-[10px] font-bold uppercase tracking-wider text-[#DF7AA7] bg-[#DF7AA7]/15 px-2 py-0.5 rounded-md">Option 2 • Mezo Borrow</span>
+                              <span className="font-meta text-[11px] font-bold text-[#DF7AA7]">{yieldAdvice.borrowOptions[0].aprPct}% APR</span>
+                            </div>
+                            <h5 className="font-display text-[16px] font-bold text-[#2C1924]">Borrow {yieldAdvice.borrowOptions[0].debtToken}</h5>
+                            <p className="font-meta text-[12px] text-[#845D74] mt-1">
+                              Deposit {yieldAdvice.targetToken || 'BTC'} as collateral to access liquidity without selling your assets.
+                            </p>
+                            <div className="mt-2.5 py-1 px-2 rounded-lg bg-white/80 border border-[#DF7AA7]/30 font-mono text-[11px] text-[#2C1924]">
+                              Max LTV: <span className="font-bold text-[#DF7AA7]">{yieldAdvice.borrowOptions[0].maxLtvPct}%</span> • Rate: <span className="font-bold">{yieldAdvice.borrowOptions[0].aprPct}%</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              handleOpenBorrow();
+                              if (yieldAdvice.borrowOptions[0].debtToken === 'MUSD' || yieldAdvice.borrowOptions[0].debtToken === 'MUSDC') {
+                                handleSelectBorrowToken(yieldAdvice.borrowOptions[0].debtToken);
+                              }
+                              setYieldAdvice(null);
+                            }}
+                            className="mt-3.5 w-full py-2 px-3 rounded-lg bg-[#DF7AA7] hover:bg-[#d06898] text-white font-meta text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <span>Explore Borrow with {yieldAdvice.targetToken || 'BTC'}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

@@ -79,6 +79,7 @@ import { liquidityRiskGuardian } from '../services/risk/LiquidityRiskGuardian.js
 import { getFormattedBalance, getAllBalances } from '../services/coin/coinService.js';
 import { buildBridgeOutTx, getBridgeInfo, getBridgeOutChains, getOutflowCapacity, getMinBridgeOutAmount, validateBridgeRecipient } from '../services/bridge/bridgeService.js';
 import { explainErrorWithLlm } from '../services/llm/errorAdvisor.js';
+import { adviseYieldAndBorrow } from '../services/llm/yieldAdvisor.js';
 import { mezoRpcProxy, getPublicClient } from '../utils/mezoClient.js';
 import { logger } from '../utils/logger.js';
 
@@ -434,23 +435,23 @@ apiRouter.post(
           });
         }
         if (intent.action_type === 'ASK_POOLS') {
-          const pools = await listPools({ limit: 5, offset: 0 });
+          const pools = await listPools({ limit: 10, offset: 0 });
+          const targetToken = intent.source_token_symbol || 'BTC';
           
-          let llmMessage = "I found some live pools on Mezo Testnet, but couldn't generate a detailed suggestion.";
-          try {
-            const prompt = `Here are the top liquidity pools on our DEX on Mezo Testnet: ${JSON.stringify(pools.pools.map(p => ({ pair: `${p.token0.symbol}/${p.token1.symbol}`, tvlUsd: p.tvlUsd, apr: p.feePct })))}\nAnalyze these pools and suggest 1-2 potential pools to the user based on TVL and APR. Write a friendly, concise chat response.`;
-            llmMessage = await generateLlmCompletion({
-               systemPrompt: "You are a helpful DeFi assistant. Provide actionable and clear advice on liquidity pools. Keep it very concise.",
-               userPrompt: prompt
-            });
-          } catch (e) {
-            logger.error('Failed to generate pool suggestion', { error: (e as Error).message });
-          }
+          const advice = await adviseYieldAndBorrow({
+            userPrompt: prompt,
+            tokenSymbol: targetToken,
+            pools: pools.pools,
+            walletAddress: wallet || undefined,
+          });
 
           return res.json({
             intent,
             answer: {
-              kind: 'pools',
+              kind: 'pools_and_yield',
+              targetToken: advice.targetToken,
+              bestPools: advice.bestPools,
+              borrowOptions: advice.borrowOptions,
               pools: pools.pools.map((p) => ({
                 address: p.address,
                 pair: `${p.token0.symbol}/${p.token1.symbol}`,
@@ -462,8 +463,9 @@ apiRouter.post(
             },
             advise: buildFallbackAdvise({
               error: 'unsupported_action',
-              detail: llmMessage
+              detail: advice.message,
             }),
+            llmMessage: advice.message,
           });
         }
         if (intent.action_type === 'ASK_RISK') {
@@ -1106,7 +1108,12 @@ apiRouter.post('/pools/add-liquidity', validateBody(AddLiquiditySchema), async (
     res.json(tx);
   } catch (err) {
     logger.error('Failed to build add liquidity transaction', { error: (err as Error).message });
-    res.status(500).json({ error: 'Failed to build add liquidity transaction', details: (err as Error).message });
+    const llmMessage = await explainErrorWithLlm({
+      userPrompt: `Add liquidity ${req.body.amountADesired}/${req.body.amountBDesired}`,
+      error: (err as Error).message,
+      intentAction: 'ADD_LIQUIDITY',
+    });
+    res.status(422).json({ error: 'Failed to build add liquidity transaction', details: (err as Error).message, llmMessage });
   }
 });
 

@@ -42,7 +42,7 @@ async function callOpenRouterRest(model: string, options: LlmCallOptions): Promi
         { role: 'user', content: options.userPrompt },
       ],
       temperature: options.temperature ?? LLM_DEFAULTS.temperature,
-      max_tokens: options.maxTokens ?? LLM_DEFAULTS.maxTokens,
+      max_tokens: Math.max(options.maxTokens ?? LLM_DEFAULTS.maxTokens, 2048),
     }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   });

@@ -587,8 +587,29 @@ export async function buildAddLiquidityTx(params: {
   const parsedA = parseUnits(amountADesired, decA);
   const parsedB = parseUnits(amountBDesired, decB);
   if (parsedA <= 0n || parsedB <= 0n) throw new Error('Liquidity amounts must be positive');
-  const minA = applySlippage(parsedA, slippagePercent);
-  const minB = applySlippage(parsedB, slippagePercent);
+
+  // Query optimal consumed amounts from the router so slippage bounds match on-chain AMM math
+  let optimalA = parsedA;
+  let optimalB = parsedB;
+  try {
+    const [quotedA, quotedB] = (await readContract<readonly [bigint, bigint, bigint]>({
+      address: MEZO_SWAP_ROUTER,
+      abi: routerAbi,
+      functionName: 'quoteAddLiquidity',
+      args: [tokenA, tokenB, stable, MEZO_SWAP_FACTORY, parsedA, parsedB],
+    } as any)) as readonly [bigint, bigint, bigint];
+    if (quotedA > 0n && quotedB > 0n) {
+      optimalA = quotedA;
+      optimalB = quotedB;
+    }
+  } catch (err) {
+    logger.warn('Failed to query router.quoteAddLiquidity, using desired amounts for slippage bounds', {
+      error: (err as Error).message,
+    });
+  }
+
+  const minA = applySlippage(optimalA, slippagePercent);
+  const minB = applySlippage(optimalB, slippagePercent);
 
   const txSteps: TxStep[] = [];
   await approveStep(tokenA as Address, senderAddress as Address, parsedA, 'token A', txSteps);
@@ -609,7 +630,11 @@ export async function buildAddLiquidityTx(params: {
     value: '0',
   });
 
-  return envelope(MEZO_SWAP_ROUTER, data, '0', txSteps, senderAddress as Address);
+  const res = await envelope(MEZO_SWAP_ROUTER, data, '0', txSteps, senderAddress as Address);
+  if (res.simulation && !res.simulation.success) {
+    throw new Error(`Simulation failed: ${res.simulation.error || 'The liquidity addition would revert on-chain'}`);
+  }
+  return res;
 }
 
 /**
