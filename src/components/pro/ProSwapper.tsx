@@ -109,6 +109,7 @@ export const ProSwapper: React.FC = () => {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [showTransactionMenu, setShowTransactionMenu] = useState(false);
   const [sokaMessage, setSokaMessage] = useState<string | null>(null);
+  const [processingStage, setProcessingStage] = useState<number>(0);
   // Borrow state - chat flow
   const [borrowToken, setBorrowToken] = useState<"MUSD" | "MUSDC" | null>(null);
   const [collateralAmount, setCollateralAmount] = useState("");
@@ -588,6 +589,17 @@ export const ProSwapper: React.FC = () => {
 
   useEffect(() => { const ii = searchParams.get("intent"); if (ii) handleProcessIntent(ii); }, [searchParams]);
 
+  useEffect(() => {
+    if (!isProcessing) {
+      setProcessingStage(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setProcessingStage((prev) => (prev < 3 ? prev + 1 : prev));
+    }, 1100);
+    return () => clearInterval(timer);
+  }, [isProcessing]);
+
   // Parse user intent and route to appropriate feature
   const parseUserIntent = async (prompt: string) => {
     const lowerPrompt = prompt.toLowerCase();
@@ -721,23 +733,84 @@ export const ProSwapper: React.FC = () => {
     const snapshot: SwapSnapshot = { id: swapId, prompt, status: "SIMULATED", createdAt: Date.now(), routeNodes: [], checks: [], ptbSteps: [] };
     activeSwapRef.current = snapshot;
     setHistory(prev => { const a = prev[0]; const dup = !!a && a.prompt === prompt && a.status === "SIMULATED" && a.routeNodes.length === 0 && Date.now() - a.createdAt < 5000; if (dup) { activeSwapRef.current = a; return prev; } const n = [snapshot, ...prev.filter(x => x.id !== snapshot.id)].slice(0, MAX_HISTORY); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
-    setIsProcessing(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setCancelMsg(null); setSokaMessage(null); setHasConfirmedSettings(false); setBridgeQuote(null); setBridgeTxDigest(null); setIsBridging(false); setBorrowStep("idle"); setBorrowToken(null); setCollateralAmount(""); setBorrowAcknowledged(false); setBorrowQuote(null); setBorrowQuoteError(null); setVaultStep("idle"); setSelectedVault(null); setDepositAmount(""); setVaultAcknowledged(false); setPoolStep("idle"); setSelectedPool(null); setLiquidityAmount(""); setLiqQuote(null); setLiqQuoteError(null);
+    
+    // Explicitly reset all execution and swap states to prevent stale state leaks
+    setRouteNodes([]);
+    setGuardianChecks([]);
+    setExpectedOutput("0.00");
+    setExecutionImpact("0.05%");
+    setSourceSymbol("");
+    setDestSymbol("");
+    setTradeAmount("");
+    setProcessingStage(0);
+    setIsProcessing(true);
+    setErrorMessage(null);
+    setTxDigest(null);
+    setTokenSuggestion(null);
+    setAlternativeSource(null);
+    setShowDetails(false);
+    setCancelMsg(null);
+    setSokaMessage(null);
+    setHasConfirmedSettings(false);
+    setBridgeQuote(null);
+    setBridgeTxDigest(null);
+    setIsBridging(false);
+    setBorrowStep("idle");
+    setBorrowToken(null);
+    setCollateralAmount("");
+    setBorrowAcknowledged(false);
+    setBorrowQuote(null);
+    setBorrowQuoteError(null);
+    setVaultStep("idle");
+    setSelectedVault(null);
+    setDepositAmount("");
+    setVaultAcknowledged(false);
+    setPoolStep("idle");
+    setSelectedPool(null);
+    setLiquidityAmount("");
+    setLiqQuote(null);
+    setLiqQuoteError(null);
+
     try {
-      const res = await fetch("/api/process-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, senderAddress: walletAddress || ZERO_ADDRESS }) });
+      const res = await fetch("/api/process-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, senderAddress: walletAddress || ZERO_ADDRESS }),
+      });
       const data = await res.json().catch(() => ({}));
+      
       if (!res.ok) {
-        if (data && (data.route || data.guardian)) {
-          if (data.error) setErrorMessage(data.error);
+        setRouteNodes([]);
+        setGuardianChecks([]);
+        if (data.llmMessage) {
+          setSokaMessage(data.llmMessage);
+          setErrorMessage(null);
+        } else if (data.advise?.detail) {
+          setSokaMessage(data.advise.detail);
+          setErrorMessage(null);
+        } else if (data.advise?.message) {
+          setSokaMessage(data.advise.message);
+          setErrorMessage(null);
         } else {
-          const details = Array.isArray((data as any)?.details)
-            ? (data as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join("; ")
-            : "";
-          throw new Error(details ? `${(data as any)?.error || "Failed to process intent"}: ${details}` : (data as any)?.error || "Failed to process intent");
+          setErrorMessage(data.error || "Failed to process intent");
         }
+        setIsProcessing(false);
+        upsertHistory(swapId, { status: "FAILED" });
+        return;
       }
-      if (data.tokenSuggestion) { setTokenSuggestion(data.tokenSuggestion); setIsProcessing(false); upsertHistory(swapId, { status: "FAILED" }); return; }
+
+      if (data.tokenSuggestion) {
+        setTokenSuggestion(data.tokenSuggestion);
+        setIsProcessing(false);
+        upsertHistory(swapId, { status: "FAILED" });
+        return;
+      }
       if (data.alternativeSource) setAlternativeSource(data.alternativeSource);
-      if (data.advise && data.advise.message) { setSokaMessage(data.advise.message); }
+      if (data.llmMessage) {
+        setSokaMessage(data.llmMessage);
+      } else if (data.advise && data.advise.message) {
+        setSokaMessage(data.advise.message);
+      }
 
       // Handle Bridge Out intents directly
       if (data.intent?.action_type === 'BRIDGE_OUT' || data.intent?.action_type === 'BRIDGE' || data.bridge) {
@@ -767,13 +840,43 @@ export const ProSwapper: React.FC = () => {
         return;
       }
 
-      if (data.intent) { setSourceSymbol(data.intent.source_token_symbol || "BTC"); setDestSymbol(data.intent.destination_token_symbol || "MUSD"); setTradeAmount(data.intent.trade_amount || "0.05"); }
-      const patch: Partial<SwapSnapshot> = { sourceSymbol: data.intent?.source_token_symbol || undefined, destSymbol: data.intent?.destination_token_symbol || undefined, amount: data.intent?.trade_amount || undefined };
-      if (data.route) { setRouteNodes(data.route.route || []); setExpectedOutput(parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString()); setExecutionImpact(data.route.execution_impact || "0.05%"); patch.routeNodes = data.route.route || []; patch.expectedOutput = parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString(); patch.executionImpact = data.route.execution_impact || "0.05%"; }
-      if (data.guardian) { setGuardianSafe(data.guardian.safe); setGuardianScore(data.guardian.score || 90); setGuardianRiskLevel(data.guardian.riskLevel || "LOW"); setGuardianChecks(data.guardian.checks || []); patch.guardianSafe = !!data.guardian.safe; patch.guardianScore = data.guardian.score || 90; patch.guardianRiskLevel = data.guardian.riskLevel || "LOW"; patch.checks = data.guardian.checks || []; }
+      if (data.intent) {
+        setSourceSymbol(data.intent.source_token_symbol || "BTC");
+        setDestSymbol(data.intent.destination_token_symbol || "MUSD");
+        setTradeAmount(data.intent.trade_amount || "0.05");
+      }
+      const patch: Partial<SwapSnapshot> = {
+        sourceSymbol: data.intent?.source_token_symbol || undefined,
+        destSymbol: data.intent?.destination_token_symbol || undefined,
+        amount: data.intent?.trade_amount || undefined,
+      };
+      if (data.route) {
+        setRouteNodes(data.route.route || []);
+        setExpectedOutput(parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString());
+        setExecutionImpact(data.route.execution_impact || "0.05%");
+        patch.routeNodes = data.route.route || [];
+        patch.expectedOutput = parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString();
+        patch.executionImpact = data.route.execution_impact || "0.05%";
+      }
+      if (data.guardian) {
+        setGuardianSafe(data.guardian.safe);
+        setGuardianScore(data.guardian.score || 90);
+        setGuardianRiskLevel(data.guardian.riskLevel || "LOW");
+        setGuardianChecks(data.guardian.checks || []);
+        patch.guardianSafe = !!data.guardian.safe;
+        patch.guardianScore = data.guardian.score || 90;
+        patch.guardianRiskLevel = data.guardian.riskLevel || "LOW";
+        patch.checks = data.guardian.checks || [];
+      }
       upsertHistory(swapId, patch);
-    } catch (err: any) { setErrorMessage(err.message || "Error communicating with SOKA"); upsertHistory(swapId, { status: "FAILED" }); }
-    finally { setIsProcessing(false); }
+    } catch (err: any) {
+      setRouteNodes([]);
+      setGuardianChecks([]);
+      setErrorMessage(err.message || "Error communicating with SOKA");
+      upsertHistory(swapId, { status: "FAILED" });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleExecuteBridge = async () => {
@@ -1926,18 +2029,35 @@ export const ProSwapper: React.FC = () => {
                   <div className="w-9 h-9 rounded-xl bg-white border border-[#2C1924]/10 flex items-center justify-center shadow-2xs shrink-0">
                     <img src="/icon-chatbox.png" alt="Soka" className="w-7 h-7 object-contain" />
                   </div>
-                  <div className="p-4 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs">
-                    <div className="flex items-center gap-2 font-mono text-[13px] font-bold text-[#845D74]">
-                      <span className="w-2 h-2 rounded-full bg-[#DF7AA7] animate-pulse" />
-                      <span className="w-2 h-2 rounded-full bg-[#EE97C2] animate-pulse" style={{ animationDelay: "0.15s" }} />
-                      <span className="w-2 h-2 rounded-full bg-[#F7D1D7] animate-pulse" style={{ animationDelay: "0.3s" }} />
-                      {(submittedUserPrompt || intentPrompt).toLowerCase().includes("bridge")
-                        ? "evaluating bridge route & capacity…"
-                        : (submittedUserPrompt || intentPrompt).toLowerCase().includes("borrow") || (submittedUserPrompt || intentPrompt).toLowerCase().includes("loan")
-                        ? "calculating borrow quote…"
-                        : (submittedUserPrompt || intentPrompt).toLowerCase().includes("pool") || (submittedUserPrompt || intentPrompt).toLowerCase().includes("liquidity")
-                        ? "checking live liquidity pools…"
-                        : "sniffing pools…"}
+                  <div className="p-4 sm:p-5 rounded-[22px] rounded-tl-[6px] border border-[#2C1924]/[0.08] bg-white shadow-2xs max-w-[85%] w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <span className="font-meta text-[10px] font-bold tracking-[0.12em] text-[#DF7AA7] uppercase">SOKA AI</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#DF7AA7] animate-pulse" />
+                      <span className="font-meta text-[9px] font-semibold text-[#845D74]/80">Processing Intent</span>
+                    </div>
+
+                    {/* Stepper Progress Bar */}
+                    <div className="flex items-center gap-1.5 mb-3">
+                      {[0, 1, 2, 3].map((step) => (
+                        <div
+                          key={step}
+                          className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                            processingStage >= step
+                              ? "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2]"
+                              : "bg-[#2C1924]/[0.08]"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 font-meta text-[13px] font-bold text-[#2C1924]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#DF7AA7] animate-ping shrink-0" />
+                      <span>
+                        {processingStage === 0 && "🧠 AI Soka đang phân tích ý định của bạn…"}
+                        {processingStage === 1 && "🔍 Đang kiểm tra số dư ví & dữ liệu on-chain…"}
+                        {processingStage === 2 && "⚡ Đang quét pool thanh khoản Mezo Swap…"}
+                        {processingStage >= 3 && "🛡️ Đang thẩm định an toàn với Risk Guardian…"}
+                      </span>
                     </div>
                   </div>
                 </div>

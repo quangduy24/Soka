@@ -78,12 +78,40 @@ import { getRiskSummary, summarizeRiskAdvice } from '../services/llm/riskAdvisor
 import { liquidityRiskGuardian } from '../services/risk/LiquidityRiskGuardian.js';
 import { getFormattedBalance, getAllBalances } from '../services/coin/coinService.js';
 import { buildBridgeOutTx, getBridgeInfo, getBridgeOutChains, getOutflowCapacity, getMinBridgeOutAmount, validateBridgeRecipient } from '../services/bridge/bridgeService.js';
+import { explainErrorWithLlm } from '../services/llm/errorAdvisor.js';
 import { mezoRpcProxy, getPublicClient } from '../utils/mezoClient.js';
 import { logger } from '../utils/logger.js';
 
-/** 422 responder for rejected intents — advise, never fabricated data. */
-function rejectIntent(res: Response, status: 422 | 403, error: string, advise: unknown, extra?: Record<string, unknown>) {
-  return res.status(status).json({ error, advise, ...extra });
+/** 422/403 responder for rejected intents — advise and natural language explanation via LLM. */
+async function rejectIntent(
+  res: Response,
+  status: 422 | 403,
+  error: string,
+  advise: unknown,
+  extra?: Record<string, unknown>,
+  userPrompt?: string,
+  intentAction?: string
+) {
+  let llmMessage = '';
+  if (userPrompt) {
+    try {
+      llmMessage = await explainErrorWithLlm({
+        userPrompt,
+        error,
+        details: (advise as { detail?: string })?.detail,
+        intentAction,
+        context: extra,
+      });
+    } catch (err) {
+      logger.warn(`Failed to generate LLM error explanation: ${(err as Error).message}`);
+    }
+  }
+  return res.status(status).json({
+    error,
+    llmMessage: llmMessage || undefined,
+    advise,
+    ...extra,
+  });
 }
 
 /** Builds an unknown-token advise with verified on-chain candidates. */
@@ -160,7 +188,7 @@ apiRouter.post('/parse-intent', validateBody(ParseIntentSchema), async (req: Req
     res.json(result);
   } catch (err) {
     if (err instanceof UnclearIntentError) {
-      return rejectIntent(res, 422, 'Unclear intent', err.advise);
+      return await rejectIntent(res, 422, 'Unclear intent', err.advise, undefined, req.body?.prompt);
     }
     logger.error('Failed to parse intent', { error: (err as Error).message });
     res.status(500).json({ error: 'Failed to parse intent', details: (err as Error).message });
@@ -265,7 +293,7 @@ apiRouter.post(
 
       // ── Guards: never build from invalid, unknown, or self-referential legs ──
       if (!isAddress(senderAddress) || senderAddress === ZERO_ADDRESS) {
-        return rejectIntent(res, 422, 'A connected wallet address is required to execute a swap.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'A connected wallet address is required to execute a swap.', buildFallbackAdvise({
           error: 'missing_field',
           detail: 'Connect a wallet first — swaps cannot be built for an empty or zero address.',
           missing: ['senderAddress'],
@@ -276,10 +304,10 @@ apiRouter.post(
       if (!srcToken || !dstToken) {
         const missing = !srcToken ? (sourceAddress || sourceSymbol) : (destAddress || destSymbol);
         const { advise, tokenSuggestion } = await unknownTokenAdvise(`${sourceSymbol} to ${destSymbol}`, String(missing));
-        return rejectIntent(res, 422, `Unknown token: ${missing}.`, advise, { tokenSuggestion });
+        return await rejectIntent(res, 422, `Unknown token: ${missing}.`, advise, { tokenSuggestion });
       }
       if (srcToken.address.toLowerCase() === dstToken.address.toLowerCase()) {
-        return rejectIntent(res, 422, 'Source and destination tokens must be different.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'Source and destination tokens must be different.', buildFallbackAdvise({
           error: 'missing_field',
           detail: `Swapping ${srcToken.symbol} to itself does nothing. Pick two different tokens.`,
           missing: ['destination token'],
@@ -287,7 +315,7 @@ apiRouter.post(
       }
       const size = parseFloat(String(amount));
       if (!Number.isFinite(size) || size <= 0) {
-        return rejectIntent(res, 422, 'Swap amount must be a positive number.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'Swap amount must be a positive number.', buildFallbackAdvise({
           error: 'missing_field',
           detail: 'Enter an amount greater than zero, or use ALL, MAX, or a percentage like 50%.',
           missing: ['amount'],
@@ -299,13 +327,17 @@ apiRouter.post(
       let finalAmount = String(amount);
       try {
         const dynamicResolved = await resolveDynamicAmount(String(amount), senderAddress, srcToken.address, srcToken.symbol);
-        if (dynamicResolved !== null) finalAmount = dynamicResolved.toFixed(DISPLAY_DECIMALS.amount);
+        if (dynamicResolved !== null) {
+          const factor = Math.pow(10, DISPLAY_DECIMALS.amount);
+          const floored = Math.floor(dynamicResolved * factor) / factor;
+          finalAmount = floored.toFixed(DISPLAY_DECIMALS.amount);
+        }
         const liveRoute = await findOptimalRoute(srcToken.address, dstToken.address, finalAmount, slippage);
         liveRouterData = liveRoute.routerData;
       } catch (err) {
         const message = (err as Error).message;
         if (message.startsWith('NO_LIQUIDITY')) {
-          return rejectIntent(res, 422, 'No live pool quote for this pair.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'No live pool quote for this pair.', buildFallbackAdvise({
             error: 'unsupported_action',
             detail: 'No active pool quoted this pair on-chain. Try a hub pair like BTC/MUSD or reduce the amount.',
           }));
@@ -336,7 +368,7 @@ apiRouter.post(
         executionImpact: null,
       });
       if (!assessment.safe && !acknowledgeRisk) {
-        return rejectIntent(
+        return await rejectIntent(
           res,
           403,
           'Guardian blocked this swap: review the warnings and acknowledge the risk to proceed.',
@@ -377,16 +409,16 @@ apiRouter.post(
         parseResult = await parseIntent(prompt);
       } catch (err) {
         if (err instanceof UnclearIntentError) {
-          return rejectIntent(res, 422, 'Unclear intent', err.advise);
+          return await rejectIntent(res, 422, 'Unclear intent', err.advise, undefined, prompt);
         }
         throw err;
       }
       const { intent } = parseResult;
       if (parseResult.validation_status !== 'VALID') {
-        return rejectIntent(res, 422, 'Ambiguous intent — I need a clearer request.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'Ambiguous intent — I need a clearer request.', buildFallbackAdvise({
           error: 'unclear_intent',
           detail: `I parsed "${prompt}" with low confidence (${parseResult.confidence_score.toFixed(2)}). Try one of the examples below.`,
-        }));
+        }), undefined, prompt, intent?.action_type);
       }
 
       // Step 1b: Conversational intents are answered from live chain data, never routed to a swap
@@ -489,18 +521,18 @@ apiRouter.post(
       // Step 1c: TRANSFER builds a real transfer tx (never a swap)
       if (intent.action_type === 'TRANSFER') {
         if (!intent.recipient || !isEvmAddress(intent.recipient)) {
-          return rejectIntent(res, 422, 'TRANSFER needs a recipient address.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'TRANSFER needs a recipient address.', buildFallbackAdvise({
             error: 'missing_field',
             detail: 'Who should receive the tokens? Provide an EVM address (0x + 40 hex chars). Example: "Send 10 MUSD to 0x…".',
             missing: ['recipient'],
-          }));
+          }), undefined, prompt, intent.action_type);
         }
         if (!wallet) {
-          return rejectIntent(res, 422, 'Connect a wallet to build a transfer.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'Connect a wallet to build a transfer.', buildFallbackAdvise({
             error: 'missing_field',
             detail: 'Transfers move real funds — connect a wallet first so the transaction targets your address.',
             missing: ['senderAddress'],
-          }));
+          }), undefined, prompt, intent.action_type);
         }
         try {
           const transferTx = await buildTransferTx({
@@ -512,10 +544,10 @@ apiRouter.post(
           });
           return res.json({ intent, transfer: transferTx, advise: null });
         } catch (err) {
-          return rejectIntent(res, 422, 'Cannot build transfer.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'Cannot build transfer.', buildFallbackAdvise({
             error: 'missing_field',
             detail: (err as Error).message,
-          }));
+          }), undefined, prompt, intent.action_type);
         }
       }
 
@@ -525,7 +557,7 @@ apiRouter.post(
       if (!srcToken || !dstToken) {
         const missing = !srcToken ? intent.source_token_symbol : intent.destination_token_symbol;
         const { advise, tokenSuggestion } = await unknownTokenAdvise(prompt, missing);
-        return rejectIntent(res, 422, `Unknown token: ${missing}.`, advise, { tokenSuggestion });
+        return await rejectIntent(res, 422, `Unknown token: ${missing}.`, advise, { tokenSuggestion }, prompt, intent.action_type);
       }
 
       // Handle bridge intent with parsed chain/recipient + on-chain preflight
@@ -534,19 +566,19 @@ apiRouter.post(
         const recipient = intent.recipient || senderAddress;
         const recipientError = validateBridgeRecipient(recipient, destinationChain);
         if (recipientError) {
-          return rejectIntent(res, 422, 'BRIDGE_OUT needs a valid recipient.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'BRIDGE_OUT needs a valid recipient.', buildFallbackAdvise({
             error: 'missing_field',
             detail: `${recipientError} Example: "Bridge 0.1 wBTC to Ethereum 0x…". Supported chains: ${Object.entries(BRIDGE_CHAIN_NAMES).map(([id, name]) => `${name} (${id})`).join(', ')}.`,
             missing: ['recipient'],
-          }));
+          }), undefined, prompt, intent.action_type);
         }
         const amountNum = parseFloat(intent.trade_amount);
         if (!Number.isFinite(amountNum) || amountNum <= 0) {
-          return rejectIntent(res, 422, 'Bridge amount must be a positive number.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'Bridge amount must be a positive number.', buildFallbackAdvise({
             error: 'missing_field',
             detail: 'Enter an amount greater than zero, or use ALL, MAX, or a percentage.',
             missing: ['amount'],
-          }));
+          }), undefined, prompt, intent.action_type);
         }
         try {
           const bridgeTx = await buildBridgeOutTx({
@@ -591,20 +623,20 @@ apiRouter.post(
             ptb: bridgeTx,
           });
         } catch (err) {
-          return rejectIntent(res, 422, 'Cannot build bridge transaction.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'Cannot build bridge transaction.', buildFallbackAdvise({
             error: 'unsupported_action',
             detail: (err as Error).message,
-          }));
+          }), undefined, prompt, intent.action_type);
         }
       }
 
       // Step 2: Same-token and amount guards
       if (srcToken.address.toLowerCase() === dstToken.address.toLowerCase()) {
-        return rejectIntent(res, 422, 'Source and destination tokens must be different.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'Source and destination tokens must be different.', buildFallbackAdvise({
           error: 'missing_field',
           detail: `Swapping ${srcToken.symbol} to itself does nothing. Pick two different tokens.`,
           missing: ['destination token'],
-        }));
+        }), undefined, prompt, intent.action_type);
       }
       let finalAmount = intent.trade_amount;
       try {
@@ -615,22 +647,25 @@ apiRouter.post(
           srcToken.symbol
         );
         if (dynamicResolved !== null) {
-          finalAmount = dynamicResolved.toFixed(DISPLAY_DECIMALS.amount);
+          // Always floor so we NEVER round UP past the actual wallet balance
+          const factor = Math.pow(10, DISPLAY_DECIMALS.amount);
+          const floored = Math.floor(dynamicResolved * factor) / factor;
+          finalAmount = floored.toFixed(DISPLAY_DECIMALS.amount);
         } else {
           const size = parseFloat(intent.trade_amount);
           if (!Number.isFinite(size) || size <= 0) {
-            return rejectIntent(res, 422, 'Swap amount must be a positive number.', buildFallbackAdvise({
+            return await rejectIntent(res, 422, 'Swap amount must be a positive number.', buildFallbackAdvise({
               error: 'missing_field',
               detail: 'Enter an amount greater than zero, or use ALL, MAX, or a percentage like 50%.',
               missing: ['amount'],
-            }));
+            }), undefined, prompt, intent.action_type);
           }
         }
       } catch (err) {
-        return rejectIntent(res, 422, 'Cannot resolve trade amount.', buildFallbackAdvise({
+        return await rejectIntent(res, 422, 'Cannot resolve trade amount.', buildFallbackAdvise({
           error: 'missing_field',
           detail: (err as Error).message,
-        }));
+        }), undefined, prompt, intent.action_type);
       }
 
       // Step 2b: Balance gate — suggest funded alternatives instead of a doomed quote
@@ -638,18 +673,20 @@ apiRouter.post(
         try {
           const balString = await getFormattedBalance(wallet, srcToken.address);
           const have = parseFloat(balString);
-          if (Number.isFinite(have) && have < parseFloat(finalAmount)) {
+          const need = parseFloat(finalAmount);
+          // Epsilon margin (1e-6) prevents false rejection from floating-point micro rounding
+          if (Number.isFinite(have) && have + 1e-6 < need) {
             const alternatives = await findAlternativeSources({
               walletAddress: wallet,
               destAddress: dstToken.address,
               intendedSourceAddress: srcToken.address,
               intendedAmount: finalAmount,
             });
-            return rejectIntent(res, 422, `Insufficient ${srcToken.symbol} balance.`, buildFallbackAdvise({
+            return await rejectIntent(res, 422, `Insufficient ${srcToken.symbol} balance.`, buildFallbackAdvise({
               error: 'missing_field',
               detail: `Wallet holds ${balString} ${srcToken.symbol} but the swap needs ${finalAmount}.${alternatives.length > 0 ? ' Fund it with one of these held tokens instead:' : ' No other funded token can cover it.'}`,
               missing: [`${srcToken.symbol} balance`],
-            }), { alternativeSource: alternatives });
+            }), { alternativeSource: alternatives }, prompt, intent.action_type);
           }
         } catch (err) {
           logger.warn(`Balance gate skipped: ${(err as Error).message}`);
@@ -671,10 +708,10 @@ apiRouter.post(
       } catch (err) {
         const message = (err as Error).message;
         if (message.startsWith('NO_LIQUIDITY')) {
-          return rejectIntent(res, 422, 'No live pool quote for this pair.', buildFallbackAdvise({
+          return await rejectIntent(res, 422, 'No live pool quote for this pair.', buildFallbackAdvise({
             error: 'unsupported_action',
-            detail: 'No active pool quoted this pair on-chain. Try a hub pair like BTC/MUSD or reduce the amount.',
-          }));
+            detail: `Mezo Swap router returned no active pool quote for ${srcToken.symbol}/${dstToken.symbol}. The pair lacks liquidity on testnet. Try trading BTC, MUSD, or mUSDC.`,
+          }), { pair: `${srcToken.symbol}/${dstToken.symbol}` }, prompt, intent.action_type);
         }
         throw err;
       }
@@ -732,7 +769,22 @@ apiRouter.post(
       });
     } catch (err) {
       logger.error('Failed to process intent pipeline', { error: (err as Error).message });
-      res.status(500).json({ error: 'Failed to process intent', details: (err as Error).message });
+      const prompt = (req.body as { prompt?: string })?.prompt || '';
+      let llmMsg = '';
+      if (prompt) {
+        try {
+          llmMsg = await explainErrorWithLlm({
+            userPrompt: prompt,
+            error: 'Failed to process intent',
+            details: (err as Error).message,
+          });
+        } catch { /* ignore */ }
+      }
+      res.status(500).json({
+        error: 'Failed to process intent',
+        llmMessage: llmMsg || undefined,
+        details: (err as Error).message,
+      });
     }
   }
 );
@@ -1011,7 +1063,7 @@ apiRouter.post('/borrow-reverse-quote', validateBody(BorrowReverseQuoteSchema), 
     res.json(quote);
   } catch (err) {
     if (err instanceof BorrowReverseError) {
-      return rejectIntent(res, 422, err.message, err.advise);
+      return await rejectIntent(res, 422, err.message, err.advise);
     }
     logger.error('Failed to reverse quote borrow', { error: (err as Error).message });
     res.status(500).json({ error: 'Failed to reverse quote borrow', details: (err as Error).message });
