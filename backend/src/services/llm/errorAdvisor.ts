@@ -2,6 +2,7 @@
  * Soka Intent Engine — LLM Error Advisor
  * Transforms technical on-chain, routing, and validation errors into concise,
  * friendly natural-language explanations powered by the LLM model.
+ * All user-facing explanations are strictly delivered in English.
  */
 
 import { generateLlmCompletion } from './llmClient.js';
@@ -15,63 +16,39 @@ export interface ExplainErrorParams {
   context?: Record<string, unknown>;
 }
 
-/** Checks if a string contains Vietnamese characters or common keywords. */
-function isVietnameseText(text: string): boolean {
-  if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text)) {
-    return true;
-  }
-  const lower = text.toLowerCase();
-  const vnKeywords = ['swap', 'đổi', 'chuyển', 'tất cả', 'hết', 'ví', 'sang', 'cho', 'bao nhiêu', 'rút', 'vay'];
-  return vnKeywords.some((k) => lower.includes(k) && !lower.match(/^[a-z0-9\s.,!?-]+$/i));
-}
-
-/** Provides deterministic fallback messages if LLM is unreachable. */
+/** Provides deterministic English fallback messages if LLM is unreachable. */
 function getDeterministicFallback(userPrompt: string, error: string, details?: string): string {
-  const isVn = isVietnameseText(userPrompt);
   const errLower = (error + ' ' + (details || '')).toLowerCase();
 
   if (errLower.includes('no_liquidity') || errLower.includes('no live pool') || errLower.includes('no active pool')) {
-    return isVn
-      ? 'Cặp giao dịch này hiện chưa có pool thanh khoản hoạt động trên Mezo Testnet. Bạn có thể thử swap giữa BTC, MUSD hoặc mUSDC nhé!'
-      : 'There is no active liquidity pool for this pair on Mezo Testnet yet. You can try swapping between BTC, MUSD, or mUSDC!';
+    return 'There is no active liquidity pool for this pair on Mezo Testnet yet. You can try swapping between BTC, MUSD, or mUSDC!';
   }
 
   if (errLower.includes('insufficient') || errLower.includes('balance')) {
-    return isVn
-      ? 'Số dư trong ví của bạn không đủ để thực hiện lệnh này. Vui lòng kiểm tra lại số dư ví hoặc giảm bớt số lượng nhé!'
-      : 'Your wallet balance is insufficient for this trade. Please check your balance or reduce the amount!';
+    return 'Your wallet balance is insufficient for this trade. Please check your balance or reduce the trade amount!';
   }
 
   if (errLower.includes('unknown token') || errLower.includes('unknown_token')) {
-    return isVn
-      ? 'Token này chưa được hỗ trợ trên mạng Mezo Testnet. Các token được hỗ trợ gồm: BTC, MUSD và mUSDC.'
-      : 'This token is not supported on Mezo Testnet. Currently supported tokens are: BTC, MUSD, and mUSDC.';
+    return 'This token is not supported on Mezo Testnet. Supported tokens are BTC, MUSD, and mUSDC.';
   }
 
   if (errLower.includes('unclear') || errLower.includes('ambiguous')) {
-    return isVn
-      ? 'Mình chưa hiểu rõ ý định của bạn. Bạn có thể thử các câu lệnh mẫu như "Swap 0.001 BTC sang MUSD" hoặc "Bridge 0.01 BTC sang Ethereum" nhé!'
-      : 'I could not clearly understand your intent. Try commands like "Swap 0.001 BTC to MUSD" or "Bridge 0.01 BTC to Ethereum"!';
+    return 'I could not clearly understand your intent. Try commands like "Swap 0.001 BTC to MUSD" or "Bridge 0.01 BTC to Ethereum"!';
   }
 
   if (errLower.includes('recipient') || errLower.includes('evm address')) {
-    return isVn
-      ? 'Giao dịch cần một địa chỉ ví nhận hợp lệ (bắt đầu bằng 0x). Bạn vui lòng kiểm tra lại địa chỉ ví nhé!'
-      : 'A valid destination address (starting with 0x) is required. Please verify the recipient address!';
+    return 'A valid destination address (starting with 0x) is required. Please verify the recipient address!';
   }
 
-  return isVn
-    ? `Hệ thống chưa thể xử lý yêu cầu: ${error}. Bạn có thể thử lại với cặp BTC/MUSD hoặc liên hệ hỗ trợ nhé!`
-    : `Unable to process request: ${error}. You can try with standard pairs like BTC/MUSD.`;
+  return `Unable to process request: ${error}. You can try again with standard pairs like BTC/MUSD.`;
 }
 
 /**
  * Explains an execution, routing, or validation error using the LLM model.
- * Produces a 1-2 sentence friendly, natural language response.
+ * Produces a 1-2 sentence friendly, natural language response strictly in English.
  */
 export async function explainErrorWithLlm(params: ExplainErrorParams): Promise<string> {
   const { userPrompt, error, details, intentAction, context } = params;
-  const isVn = isVietnameseText(userPrompt);
 
   const systemPrompt = `You are Soka AI, the helpful, friendly DeFi copilot on Mezo Testnet.
 A user asked: "${userPrompt}"
@@ -81,7 +58,7 @@ Context: ${JSON.stringify(context || {})}
 
 YOUR TASK:
 1. Explain the situation in 1 to 2 very concise, friendly, and complete sentences.
-2. Reply in ${isVn ? 'Vietnamese' : 'the user’s language (Vietnamese if the prompt is in Vietnamese or from a Vietnamese user, English otherwise)'}.
+2. ALWAYS reply strictly in ENGLISH. Never use any other language.
 3. STRICT GUIDELINES:
    - Always finish complete sentences. Do NOT leave sentences unfinished.
    - Speak naturally like a helpful AI DeFi assistant.
@@ -93,7 +70,7 @@ YOUR TASK:
   try {
     const completion = await generateLlmCompletion({
       systemPrompt,
-      userPrompt: `Explain this situation politely to the user: ${error}. Detail: ${details || ''}`,
+      userPrompt: `Explain this situation politely to the user in English: ${error}. Detail: ${details || ''}`,
       temperature: 0.3,
       maxTokens: 1024,
     });

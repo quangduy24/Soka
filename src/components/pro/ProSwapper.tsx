@@ -235,7 +235,7 @@ export const ProSwapper: React.FC = () => {
     setBorrowStep("enter_amount");
     setBorrowQuoteLoading(true);
     setSokaMessage(`Calculating exact collateral needed for ${amount} ${token}...`);
-    
+
     try {
       const reverseQuote = await marketApi.borrowReverseQuote({
         walletAddress: walletAddress || undefined,
@@ -243,14 +243,14 @@ export const ProSwapper: React.FC = () => {
         desiredDebtAmount: amount,
         debtSymbol: token
       });
-      
+
       setCollateralAmount(reverseQuote.requiredCollateralAmount);
       setSokaMessage(`You want to borrow ${amount} ${token}. The required collateral has been automatically calculated.`);
       setBorrowQuoteLoading(false);
     } catch (err: any) {
       setBorrowQuoteLoading(false);
       setBorrowQuoteError(err.message || "Failed to calculate required collateral.");
-      
+
       if (err.advise) {
         setSokaMessage(err.advise.message || "Unable to calculate borrow requirements due to an issue.");
       } else {
@@ -407,10 +407,10 @@ export const ProSwapper: React.FC = () => {
         const txData = (step.data || "0x") as `0x${string}`;
         const txVal = BigInt(step.value || "0");
         const gasLim = step.gasLimit ? BigInt(step.gasLimit) : undefined;
-        
+
         const hash = await sendTransactionAsync({ to: target, data: txData, value: txVal, gas: gasLim });
         if (!hash) throw new Error(`No transaction hash returned for step ${step.index}`);
-        
+
         setSokaMessage(`Transaction submitted. Waiting for confirmation...`);
         if (publicClient) {
           const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
@@ -649,8 +649,8 @@ export const ProSwapper: React.FC = () => {
       } else {
         setBorrowStep("select_token");
         setBorrowToken(null);
-        setSokaMessage(extractedAmount 
-          ? `You want to borrow ${extractedAmount} stablecoin. What stablecoin would you like to borrow against your BTC?` 
+        setSokaMessage(extractedAmount
+          ? `You want to borrow ${extractedAmount} stablecoin. What stablecoin would you like to borrow against your BTC?`
           : "What stablecoin would you like to borrow against your BTC?");
         return true;
       }
@@ -733,7 +733,7 @@ export const ProSwapper: React.FC = () => {
     const snapshot: SwapSnapshot = { id: swapId, prompt, status: "SIMULATED", createdAt: Date.now(), routeNodes: [], checks: [], ptbSteps: [] };
     activeSwapRef.current = snapshot;
     setHistory(prev => { const a = prev[0]; const dup = !!a && a.prompt === prompt && a.status === "SIMULATED" && a.routeNodes.length === 0 && Date.now() - a.createdAt < 5000; if (dup) { activeSwapRef.current = a; return prev; } const n = [snapshot, ...prev.filter(x => x.id !== snapshot.id)].slice(0, MAX_HISTORY); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
-    
+
     // Explicitly reset all execution and swap states to prevent stale state leaks
     setRouteNodes([]);
     setGuardianChecks([]);
@@ -778,7 +778,7 @@ export const ProSwapper: React.FC = () => {
         body: JSON.stringify({ prompt, senderAddress: walletAddress || ZERO_ADDRESS }),
       });
       const data = await res.json().catch(() => ({}));
-      
+
       if (!res.ok) {
         setRouteNodes([]);
         setGuardianChecks([]);
@@ -998,7 +998,7 @@ export const ProSwapper: React.FC = () => {
       <GenerativeInkCanvas />
 
       {/* Interactive Cursor Dye Bloom */}
-      <div 
+      <div
         ref={bloomRef}
         className="fixed pointer-events-none z-0 w-[480px] h-[480px] rounded-full mix-blend-multiply opacity-40 blur-3xl transition-transform duration-100 ease-out hidden md:block"
         style={{
@@ -1026,7 +1026,7 @@ export const ProSwapper: React.FC = () => {
               <div>
                 <div className="font-extrabold text-[15px] tracking-tight text-[#2C1924]" style={{ fontFamily: "var(--font-display)" }}>SOKA AI</div>
                 <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1.5 font-meta">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" /> 
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
                   Online · Mezo Network
                 </div>
               </div>
@@ -1063,73 +1063,65 @@ export const ProSwapper: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2 ml-0 sm:ml-12">
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("swap"); setIntentPrompt("Swap 0.05 BTC to MUSD"); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "swap" 
-                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
-                  }`}
+                <button
+                  onClick={() => { resetAllFeatures(); setActiveAction("swap"); setIntentPrompt("Swap 0.05 BTC to MUSD"); }}
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${activeAction === "swap"
+                    ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs"
+                    : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
+                    }`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "swap" 
-                      ? "bg-[#DF7AA7] text-white" 
-                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
-                  }`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${activeAction === "swap"
+                    ? "bg-[#DF7AA7] text-white"
+                    : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
+                    }`}>
                     <ArrowRightLeft className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180" />
                   </div>
                   <span className="text-[12.5px] font-semibold tracking-tight font-meta">Swap</span>
                 </button>
 
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("pool"); handleOpenPool(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "pool" 
-                      ? "bg-emerald-50/70 border-emerald-500 text-emerald-700 font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-emerald-400 hover:text-emerald-700 shadow-2xs hover:-translate-y-0.5"
-                  }`}
+                <button
+                  onClick={() => { resetAllFeatures(); setActiveAction("pool"); handleOpenPool(); }}
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${activeAction === "pool"
+                    ? "bg-emerald-50/70 border-emerald-500 text-emerald-700 font-bold shadow-xs"
+                    : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-emerald-400 hover:text-emerald-700 shadow-2xs hover:-translate-y-0.5"
+                    }`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "pool" 
-                      ? "bg-emerald-600 text-white" 
-                      : "bg-[#FAF8FA] text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
-                  }`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${activeAction === "pool"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-[#FAF8FA] text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
+                    }`}>
                     <Waves className="w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110" />
                   </div>
                   <span className="text-[12.5px] font-semibold tracking-tight font-meta">Pool</span>
                 </button>
 
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("bridge"); setIntentPrompt(""); setBridgeStep("form"); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "bridge" 
-                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
-                  }`}
+                <button
+                  onClick={() => { resetAllFeatures(); setActiveAction("bridge"); setIntentPrompt(""); setBridgeStep("form"); }}
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${activeAction === "bridge"
+                    ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs"
+                    : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
+                    }`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "bridge" 
-                      ? "bg-[#DF7AA7] text-white" 
-                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
-                  }`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${activeAction === "bridge"
+                    ? "bg-[#DF7AA7] text-white"
+                    : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
+                    }`}>
                     <Upload className="w-3.5 h-3.5 transition-transform duration-300 group-hover:-translate-y-0.5" />
                   </div>
                   <span className="text-[12.5px] font-semibold tracking-tight font-meta">Bridge</span>
                 </button>
 
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("transfer"); setIntentPrompt("Transfer 10 MUSD to [paste 0x address]"); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "transfer" 
-                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
-                  }`}
+                <button
+                  onClick={() => { resetAllFeatures(); setActiveAction("transfer"); setIntentPrompt("Transfer 10 MUSD to [paste 0x address]"); }}
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${activeAction === "transfer"
+                    ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs"
+                    : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
+                    }`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "transfer" 
-                      ? "bg-[#DF7AA7] text-white" 
-                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
-                  }`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${activeAction === "transfer"
+                    ? "bg-[#DF7AA7] text-white"
+                    : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
+                    }`}>
                     <Send className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
                   </div>
                   <span className="text-[12.5px] font-semibold tracking-tight font-meta">Transfer</span>
@@ -1146,8 +1138,8 @@ export const ProSwapper: React.FC = () => {
                         <ArrowRightLeft className="w-3.5 h-3.5 text-[#DF7AA7]" />
                         <span>Transaction Actions</span>
                       </div>
-                      <button 
-                        onClick={() => { setShowTransactionMenu(false); setActiveAction(null); }} 
+                      <button
+                        onClick={() => { setShowTransactionMenu(false); setActiveAction(null); }}
                         className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer"
                         title="Close sub-menu"
                       >
@@ -1155,29 +1147,29 @@ export const ProSwapper: React.FC = () => {
                       </button>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-meta">
-                      <button 
-                        onClick={() => handleSelectSubAction("deposit")} 
+                      <button
+                        onClick={() => handleSelectSubAction("deposit")}
                         className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5 text-emerald-600 transition-transform group-hover:-translate-y-0.5" />
                         <span className="text-xs font-bold">Deposit</span>
                       </button>
-                      <button 
-                        onClick={() => handleSelectSubAction("withdraw")} 
+                      <button
+                        onClick={() => handleSelectSubAction("withdraw")}
                         className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-amber-200/80 bg-amber-50/70 text-amber-800 hover:bg-amber-100 hover:border-amber-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Upload className="w-3.5 h-3.5 text-amber-600 transition-transform group-hover:-translate-y-0.5" />
                         <span className="text-xs font-bold">Withdraw</span>
                       </button>
-                      <button 
-                        onClick={() => handleSelectSubAction("send")} 
+                      <button
+                        onClick={() => handleSelectSubAction("send")}
                         className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-pink-200/80 bg-pink-50/70 text-[#DF7AA7] hover:bg-pink-100 hover:border-[#DF7AA7] hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <Send className="w-3.5 h-3.5 text-[#DF7AA7] transition-transform group-hover:translate-x-0.5" />
                         <span className="text-xs font-bold">Send</span>
                       </button>
-                      <button 
-                        onClick={() => handleSelectSubAction("receive")} 
+                      <button
+                        onClick={() => handleSelectSubAction("receive")}
                         className="group flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-purple-200/80 bg-purple-50/70 text-purple-800 hover:bg-purple-100 hover:border-purple-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
                       >
                         <ArrowDownToLine className="w-3.5 h-3.5 text-purple-600 transition-transform group-hover:translate-y-0.5" />
@@ -1245,13 +1237,13 @@ export const ProSwapper: React.FC = () => {
                         <div className="mb-4">
                           <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Collateral (BTC)</label>
                           <div className="relative">
-                            <input 
-                              type="number" 
-                              value={collateralAmount} 
-                              onChange={(e) => setCollateralAmount(e.target.value)} 
+                            <input
+                              type="number"
+                              value={collateralAmount}
+                              onChange={(e) => setCollateralAmount(e.target.value)}
                               disabled={borrowQuoteLoading}
-                              placeholder={borrowQuoteLoading ? "Calculating..." : "0.00"} 
-                              className={`w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all ${borrowQuoteLoading ? 'opacity-60 animate-pulse' : ''}`} 
+                              placeholder={borrowQuoteLoading ? "Calculating..." : "0.00"}
+                              className={`w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all ${borrowQuoteLoading ? 'opacity-60 animate-pulse' : ''}`}
                             />
                             {borrowQuoteLoading && (
                               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1259,22 +1251,22 @@ export const ProSwapper: React.FC = () => {
                               </div>
                             )}
                           </div>
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="font-mono text-[11px] text-[#845D74]">≈ ${borrowQuote ? collateralValueUsd.toFixed(2) : "—"} (live oracle)</span>
-                          <div className="flex gap-1 font-mono">
-                            {[25, 50, 75, 100].map(pct => (
-                              <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#2C1924]/10 text-[10px] font-bold text-[#845D74] hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
-                            ))}
+                          <div className="flex justify-between items-center mt-2">
+                            <span className="font-mono text-[11px] text-[#845D74]">≈ ${borrowQuote ? collateralValueUsd.toFixed(2) : "—"} (live oracle)</span>
+                            <div className="flex gap-1 font-mono">
+                              {[25, 50, 75, 100].map(pct => (
+                                <button key={pct} onClick={() => setCollateralAmount((1000 * pct / 100).toString())} className="px-2.5 py-1 rounded-lg bg-white border border-[#2C1924]/10 text-[10px] font-bold text-[#845D74] hover:border-[#DF7AA7] hover:text-[#DF7AA7] transition-all cursor-pointer">{pct}%</button>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      {borrowQuoteError && <div className="font-mono text-[11px] text-[#ef4444] mb-2">{borrowQuoteError}</div>}
-                      {collateralAmount && parseFloat(collateralAmount) > 0 && borrowQuote && (
-                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 mb-4">
-                          <div className="font-mono text-[12px] text-emerald-800">Borrow up to <span className="font-bold">{borrowQuote.maxBorrowAmount ?? "—"} {borrowToken}</span></div>
-                        </div>
-                      )}
-                      <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0 || borrowQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{borrowQuoteLoading ? "Quoting on-chain…" : "Review"}</button>
+                        {borrowQuoteError && <div className="font-mono text-[11px] text-[#ef4444] mb-2">{borrowQuoteError}</div>}
+                        {collateralAmount && parseFloat(collateralAmount) > 0 && borrowQuote && (
+                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 mb-4">
+                            <div className="font-mono text-[12px] text-emerald-800">Borrow up to <span className="font-bold">{borrowQuote.maxBorrowAmount ?? "—"} {borrowToken}</span></div>
+                          </div>
+                        )}
+                        <button onClick={handleBorrowAmountSubmit} disabled={!collateralAmount || parseFloat(collateralAmount) <= 0 || borrowQuoteLoading} className="w-full py-2.5 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer">{borrowQuoteLoading ? "Quoting on-chain…" : "Review"}</button>
                         <button onClick={() => setBorrowStep("select_token")} className="w-full py-1.5 mt-2 font-meta text-[11.5px] font-bold text-[#DF7AA7] hover:underline cursor-pointer">← Change token</button>
                       </>
                     )}
@@ -1769,19 +1761,19 @@ export const ProSwapper: React.FC = () => {
                             <button onClick={() => setBridgeDestType("wallet")} className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold font-meta transition-all cursor-pointer border ${bridgeDestType === "wallet" ? "bg-[#DF7AA7] text-white border-[#DF7AA7]" : "bg-[#FAF8FA] text-[#845D74] border-[#2C1924]/[0.08] hover:bg-white"}`}>My Wallet</button>
                             <button onClick={() => setBridgeDestType("custom")} className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold font-meta transition-all cursor-pointer border ${bridgeDestType === "custom" ? "bg-[#DF7AA7] text-white border-[#DF7AA7]" : "bg-[#FAF8FA] text-[#845D74] border-[#2C1924]/[0.08] hover:bg-white"}`}>Custom Address</button>
                           </div>
-                          
+
                           {bridgeDestType === "custom" ? (
                             <input type="text" value={bridgeCustomAddress} onChange={(e) => setBridgeCustomAddress(e.target.value)} placeholder="0x..." className="w-full px-3 py-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[12px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
                           ) : (
                             <div className="p-2 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.05] font-mono text-[11px] text-[#2C1924] flex items-center justify-between">
-                              <span>{walletAddress ? `${walletAddress.slice(0,8)}...${walletAddress.slice(-6)}` : "Not connected"}</span>
+                              <span>{walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : "Not connected"}</span>
                               {!walletAddress && <button onClick={openConnectModal} className="text-[#DF7AA7] hover:underline font-bold font-meta">Connect</button>}
                             </div>
                           )}
                         </div>
 
-                        <button 
-                          onClick={() => { 
+                        <button
+                          onClick={() => {
                             const addr = bridgeDestType === "wallet" ? walletAddress : bridgeCustomAddress;
                             const amt = bridgeAmount || "0";
                             const p = `Bridge ${amt} ${bridgeToken} to ${bridgeChain}${addr ? ` to ${addr}` : ""}`;
@@ -1789,7 +1781,7 @@ export const ProSwapper: React.FC = () => {
                             setIntentPrompt(p);
                             handleProcessIntent(p);
                           }}
-                          disabled={!bridgeAmount || parseFloat(bridgeAmount) <= 0 || (bridgeDestType === "wallet" && !walletAddress) || (bridgeDestType === "custom" && !bridgeCustomAddress)} 
+                          disabled={!bridgeAmount || parseFloat(bridgeAmount) <= 0 || (bridgeDestType === "wallet" && !walletAddress) || (bridgeDestType === "custom" && !bridgeCustomAddress)}
                           className="w-full py-2.5 mt-2 rounded-xl font-bold text-[13.5px] text-white bg-[#DF7AA7] hover:bg-[#D46A98] shadow-xs disabled:opacity-50 transition-all font-meta cursor-pointer"
                         >
                           Generate & Process Intent
@@ -1912,9 +1904,9 @@ export const ProSwapper: React.FC = () => {
                     {/* Action Buttons */}
                     <div className="flex items-stretch gap-2 font-meta">
                       {!bridgeTxDigest && (
-                        <button 
-                          onClick={handleExecuteBridge} 
-                          disabled={isBridging} 
+                        <button
+                          onClick={handleExecuteBridge}
+                          disabled={isBridging}
                           className="flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
                         >
                           {isBridging ? (
@@ -1926,17 +1918,17 @@ export const ProSwapper: React.FC = () => {
                           )}
                         </button>
                       )}
-                      <button 
-                        onClick={() => { 
-                          setBridgeStep("form"); 
-                          setBridgeQuote(null); 
-                        }} 
+                      <button
+                        onClick={() => {
+                          setBridgeStep("form");
+                          setBridgeQuote(null);
+                        }}
                         className="px-4 py-3 rounded-2xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-colors cursor-pointer shadow-2xs"
                       >
                         Edit
                       </button>
-                      <button 
-                        onClick={() => setBridgeQuote(null)} 
+                      <button
+                        onClick={() => setBridgeQuote(null)}
                         className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs"
                       >
                         {bridgeTxDigest ? "Close" : "Cancel"}
@@ -2041,11 +2033,10 @@ export const ProSwapper: React.FC = () => {
                       {[0, 1, 2, 3].map((step) => (
                         <div
                           key={step}
-                          className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                            processingStage >= step
-                              ? "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2]"
-                              : "bg-[#2C1924]/[0.08]"
-                          }`}
+                          className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${processingStage >= step
+                            ? "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2]"
+                            : "bg-[#2C1924]/[0.08]"
+                            }`}
                         />
                       ))}
                     </div>
@@ -2053,10 +2044,10 @@ export const ProSwapper: React.FC = () => {
                     <div className="flex items-center gap-2.5 font-meta text-[13px] font-bold text-[#2C1924]">
                       <span className="w-2.5 h-2.5 rounded-full bg-[#DF7AA7] animate-ping shrink-0" />
                       <span>
-                        {processingStage === 0 && "🧠 AI Soka đang phân tích ý định của bạn…"}
-                        {processingStage === 1 && "🔍 Đang kiểm tra số dư ví & dữ liệu on-chain…"}
-                        {processingStage === 2 && "⚡ Đang quét pool thanh khoản Mezo Swap…"}
-                        {processingStage >= 3 && "🛡️ Đang thẩm định an toàn với Risk Guardian…"}
+                        {processingStage === 0 && "Soka AI is analyzing your intent…"}
+                        {processingStage === 1 && "Checking wallet balance & on-chain data…"}
+                        {processingStage === 2 && "Scanning Mezo Swap liquidity pools…"}
+                        {processingStage >= 3 && "Verifying route safety with Risk Guardian…"}
                       </span>
                     </div>
                   </div>
@@ -2069,18 +2060,18 @@ export const ProSwapper: React.FC = () => {
           <div className="px-5 pb-4 pt-3.5 shrink-0 border-t border-[#2C1924]/[0.07] bg-white rounded-b-[26px] sm:rounded-b-[30px]">
             <form onSubmit={(e) => { e.preventDefault(); handleProcessIntent(); }} className="flex items-center gap-2.5">
               <div className="relative flex-1">
-                <input 
-                  type="text" 
-                  value={intentPrompt} 
-                  onChange={(e) => setIntentPrompt(e.target.value)} 
-                  placeholder={"Try \"Swap 0.05 BTC to MUSD, safest route\"\u2026"} 
-                  className="w-full px-4.5 py-3 sm:py-3.5 pr-10 rounded-xl bg-[#F8F7F8] border border-[#2C1924]/[0.08] focus:border-[#DF7AA7] focus:bg-white text-[#2C1924] font-medium text-[14.5px] outline-none placeholder:text-[#845D74]/60 shadow-2xs transition-all" 
+                <input
+                  type="text"
+                  value={intentPrompt}
+                  onChange={(e) => setIntentPrompt(e.target.value)}
+                  placeholder={"Try \"Swap 0.05 BTC to MUSD, safest route\"\u2026"}
+                  className="w-full px-4.5 py-3 sm:py-3.5 pr-10 rounded-xl bg-[#F8F7F8] border border-[#2C1924]/[0.08] focus:border-[#DF7AA7] focus:bg-white text-[#2C1924] font-medium text-[14.5px] outline-none placeholder:text-[#845D74]/60 shadow-2xs transition-all"
                 />
                 <span className="absolute right-3.5 bottom-1/2 translate-y-1/2 text-[11px] font-mono text-[#845D74]/60 pointer-events-none hidden sm:block">↵</span>
               </div>
-              <button 
-                type="submit" 
-                disabled={isProcessing} 
+              <button
+                type="submit"
+                disabled={isProcessing}
                 onClick={(e) => {
                   if (!intentPrompt.trim() && !isProcessing) {
                     e.preventDefault();
@@ -2095,19 +2086,19 @@ export const ProSwapper: React.FC = () => {
                 {isProcessing ? (
                   <RefreshCw className="w-4 h-4 animate-spin text-white" />
                 ) : (
-                  <ArrowUp 
-                    className="w-4.5 h-4.5 stroke-[2.5] transition-transform duration-200 group-hover:-translate-y-0.5 text-white" 
+                  <ArrowUp
+                    className="w-4.5 h-4.5 stroke-[2.5] transition-transform duration-200 group-hover:-translate-y-0.5 text-white"
                   />
                 )}
               </button>
             </form>
             <div className="flex flex-wrap gap-2 mt-2.5">
               {quickPrompts.map((q) => (
-                <button 
-                  key={q} 
-                  type="button" 
-                  disabled={isProcessing} 
-                  onClick={() => { setIntentPrompt(q); handleProcessIntent(q); }} 
+                <button
+                  key={q}
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => { setIntentPrompt(q); handleProcessIntent(q); }}
                   className="text-[11px] font-semibold font-meta text-[#2C1924]/75 hover:text-[#DF7AA7] bg-[#FAF8FA] hover:bg-white border border-[#2C1924]/[0.08] hover:border-[#DF7AA7]/40 rounded-full px-3 py-1 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   {q}
