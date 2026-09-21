@@ -5,7 +5,11 @@
 [![AI Engine](https://img.shields.io/badge/AI_Engine-OpenRouter_%2B_Deterministic-6366F1?style=for-the-badge)](https://openrouter.ai/)
 [![Status](https://img.shields.io/badge/Status-Beta_v2.0-8A2BE2?style=for-the-badge)](#)
 
+<<<<<<< HEAD
 **SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine on Mezo Testnet (Bitcoin L2 EVM). Users express what they want in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"*, or *"Trade ALL BTC for MUSD"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, searches optimal liquidity paths across Mezo Pools, runs every route through a **9-check On-Chain Risk Guardian**, and builds an unsigned EVM transaction ready for wallet signature — with zero manual slippage math, no token address hunting, and honest rejections (structured advise, never fabricated quotes) for anything outside system capabilities.
+=======
+**SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine. Users express what they want to trade in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *" swap 100 MUSD to BTC with a lowest slippage"*, or *"Swap 0.005BTC to mUSD"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, searches optimal liquidity paths across concentrated AMMs, runs every route through a **7-Layer On-Chain Risk Guardian**, and synthesizes an atomic transaction block ready for signature — with zero manual slippage math, no token address hunting, and complete protection against sandwich attacks.
+>>>>>>> a0cdd45ad898baab6c3e5275543bf20c261230d3
 
 ---
 
