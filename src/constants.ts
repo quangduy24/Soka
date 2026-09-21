@@ -1,6 +1,9 @@
 /**
  * Soka Intent Engine — Frontend Constants & Verified Tokens
- * Token definitions and utility helpers for Mezo Testnet.
+ * Offline fallback token list for Mezo Testnet. Source of truth is the
+ * backend (GET /api/tokens: whitelist + on-chain discovered tokens) — see
+ * mezoApi.getTokens(). This static list is only used when the backend is
+ * unreachable; never treat it as authoritative for execution.
  */
 
 export interface TokenInfo {

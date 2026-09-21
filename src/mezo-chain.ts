@@ -1,13 +1,15 @@
 /**
  * Soka Intent Engine — Mezo Chain Definition
  * viem custom chain definition for Mezo Testnet.
+ * All values come from src/config.ts (VITE_MEZO_* env), never hardcoded here.
  */
 
 import { defineChain } from 'viem';
+import { CHAIN } from './config';
 
 export const mezoTestnet = defineChain({
-  id: 31611,
-  name: 'Mezo Testnet',
+  id: CHAIN.id,
+  name: CHAIN.name,
   nativeCurrency: {
     name: 'Bitcoin',
     symbol: 'BTC',
@@ -15,18 +17,18 @@ export const mezoTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://rpc.test.mezo.org'],
-      webSocket: ['wss://rpc-ws.test.mezo.org'],
+      http: [CHAIN.rpcHttp],
+      webSocket: [CHAIN.rpcWs],
     },
     public: {
-      http: ['https://rpc.test.mezo.org'],
-      webSocket: ['wss://rpc-ws.test.mezo.org'],
+      http: [CHAIN.rpcHttp],
+      webSocket: [CHAIN.rpcWs],
     },
   },
   blockExplorers: {
     default: {
       name: 'Mezo Explorer',
-      url: 'https://explorer.test.mezo.org',
+      url: CHAIN.explorer,
     },
   },
   testnet: true,

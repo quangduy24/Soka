@@ -7,9 +7,20 @@
 import type { Address } from 'viem';
 import { resolveToken, isWhitelistedToken, resolveTokenAddress } from '../coin/tokenResolver.js';
 import { getPublicClient } from '../../utils/mezoClient.js';
-import { ZERO_ADDRESS, MEZO_EXPLORER_URL } from '../../config/index.js';
+import { ZERO_ADDRESS, HEX_BYTE_DIVISOR } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import type { RiskCheck, RiskReference } from '../../types/index.js';
+
+/** Display scores for token-safety outcomes (operator-visible, not thresholds). */
+const TOKEN_SAFETY_SCORES = {
+  native: 100,
+  whitelisted: 100,
+  unverified: 40,
+  holderVerified: 90,
+  noBytecode: 0,
+  hasBytecodeUnverified: 50,
+  rpcFailure: 40,
+} as const;
 
 /**
  * Runs token safety checks for a given token symbol or address on Mezo Testnet.
@@ -30,7 +41,7 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
       category: 'Token Safety',
       status: 'SAFE',
       message: 'Native Bitcoin (BTC) is the layer-1 gas token on Mezo',
-      value: 100,
+      value: TOKEN_SAFETY_SCORES.native,
       references: [
         {
           label: 'Native BTC',
@@ -59,7 +70,7 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
     message: whitelisted
       ? `${token?.symbol || symbolOrAddress} is a verified whitelisted Mezo token`
       : `${symbolOrAddress} is not in the verified Mezo whitelist — exercise caution`,
-    value: whitelisted ? 100 : 40,
+    value: whitelisted ? TOKEN_SAFETY_SCORES.whitelisted : TOKEN_SAFETY_SCORES.unverified,
     references: tokenRef,
   });
 
@@ -69,7 +80,7 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
       category: 'Concentration',
       status: 'SAFE',
       message: `${token?.symbol} has verified bridge/precompile backing with low concentration risk`,
-      value: 90,
+      value: TOKEN_SAFETY_SCORES.holderVerified,
       references: tokenRef,
     });
     return checks;
@@ -86,7 +97,7 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
         category: 'Token Safety',
         status: 'DANGER',
         message: `No contract bytecode found at address ${address} on Mezo Testnet`,
-        value: 0,
+        value: TOKEN_SAFETY_SCORES.noBytecode,
         references: tokenRef,
       });
     } else {
@@ -94,8 +105,8 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
         name: 'Contract Verification',
         category: 'Token Safety',
         status: 'WARNING',
-        message: `Smart contract deployed on Mezo Testnet (${bytecode.length / 2} bytes), but unverified`,
-        value: 50,
+        message: `Smart contract deployed on Mezo Testnet (${bytecode.length / HEX_BYTE_DIVISOR} bytes), but unverified`,
+        value: TOKEN_SAFETY_SCORES.hasBytecodeUnverified,
         references: tokenRef,
       });
     }
@@ -105,8 +116,8 @@ export async function checkTokenSafety(symbolOrAddress: string): Promise<RiskChe
       name: 'Contract Verification',
       category: 'Token Safety',
       status: 'WARNING',
-      message: 'Could not query contract bytecode from Mezo RPC',
-      value: 40,
+        message: 'Could not query contract bytecode from Mezo RPC',
+        value: TOKEN_SAFETY_SCORES.rpcFailure,
       references: tokenRef,
     });
   }

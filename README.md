@@ -5,7 +5,7 @@
 [![AI Engine](https://img.shields.io/badge/AI_Engine-OpenRouter_%2B_Deterministic-6366F1?style=for-the-badge)](https://openrouter.ai/)
 [![Status](https://img.shields.io/badge/Status-Beta_v2.0-8A2BE2?style=for-the-badge)](#)
 
-**SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine. Users express what they want to trade in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"*, or *"Trade ALL SUI for USDC"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, searches optimal liquidity paths across concentrated AMMs, runs every route through a **7-Layer On-Chain Risk Guardian**, and synthesizes an atomic transaction block ready for signature — with zero manual slippage math, no token address hunting, and complete protection against sandwich attacks.
+**SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine on Mezo Testnet (Bitcoin L2 EVM). Users express what they want in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"*, or *"Trade ALL BTC for MUSD"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, searches optimal liquidity paths across Mezo Pools, runs every route through a **9-check On-Chain Risk Guardian**, and builds an unsigned EVM transaction ready for wallet signature — with zero manual slippage math, no token address hunting, and honest rejections (structured advise, never fabricated quotes) for anything outside system capabilities.
 
 ---
 
@@ -39,14 +39,14 @@ flowchart TD
     C -->|Dynamic 'ALL' or 'MAX' or '%'| E[Balance Reader & Gas Reserve]
     E --> F[2. Smart Routing Engine]
     
-    F -->|Split Multi-Hop Paths| G[Cetus V3 & Concentrated Pools]
+    F -->|Split Multi-Hop Paths| G[Mezo Pools - Tigris Aerodrome Fork]
     G --> H[Optimal Route Nodes]
     
     H --> I[3. On-Chain Risk Guardian]
-    I -->|7 Layers: Price Impact, TVL, Mint Check, Oracle, Freshness| J{Risk Assessment}
+    I -->|9 Checks: Impact, Liquidity, Depth, Pool, Token, Supply, Size, Oracle, Chain| J{Risk Assessment}
     
     J -->|DANGER: Severe Risk| K[Block Execution & Show Warning Alert]
-    J -->|SAFE / WARNING| L[4. PTB / Transaction Assembler]
+    J -->|SAFE / WARNING| L[4. EVM Transaction Assembler]
     
     L --> M[Dry-Run Simulation & Gas Estimation]
     M --> N[5. AI Risk Advisor Summary]
@@ -60,20 +60,20 @@ flowchart TD
    - Supports shorthand values (`ALL`, `MAX`, percentages like `50%`), multivariant coin names, and full contract addresses.
 
 2. **Token Resolution & Safety Whitelist:**
-   - Evaluates symbols against a curated core whitelist (`BTC`, `MUSD`, `MEZO`, `SUI`, `USDC`, `USDT`, `DEEP`, `WAL`, etc.) and an extended 900+ token on-chain registry (`cetus-tokens.json`).
-   - If a symbol is ambiguous or non-whitelisted, SOKA presents verified alternatives with on-chain metadata instead of guessing.
+   - Evaluates symbols against a curated core whitelist (`BTC`, `wBTC`, `MEZO`, `MUSD`, `mUSDC`, `mUSDT`, `mDAI`, `mUSDe`, `mcbBTC`, `mFBTC`, `mSolvBTC`, `mswBTC`, `mT`) plus on-chain discovered tokens (`GET /api/tokens`).
+   - If a symbol is ambiguous or non-whitelisted, SOKA rejects with verified candidates and runnable examples instead of guessing — never a fabricated pair.
 
 3. **Smart Routing & Pathfinding:**
    - Evaluates multi-hop split routes across liquidity pools (`byAmountIn`, up to 20 split paths, depth 3).
    - Optimizes execution price, fee tiers, and minimizes price impact.
 
 4. **On-Chain Risk Guardian:**
-   - Queries live on-chain state, pool TVL, contract mint authority, token deployment age, and oracle feeds.
-   - Computes a mathematical risk score (0–100) and discrete health levels (`SAFE`, `WARNING`, `DANGER`).
+   - Queries live on-chain state: pool TVL and reserves, factory registration (all hops), token bytecode, pool share of total supply, trade-size-vs-liquidity, router-vs-oracle deviation, bridge/tx lockdown flags, and gas.
+   - Computes a mathematical risk score (0–100) and discrete health levels (`SAFE`, `WARNING`, `DANGER`). Unsafe quotes require explicit `acknowledgeRisk`.
 
-5. **Atomic Transaction Assembly & Simulation:**
-   - Compiles Programmable Transaction Blocks (PTB) with dynamic slippage boundaries and gas reserve deductions.
-   - Executes dry-run RPC calls to verify balance changes prior to asking for user wallet signatures.
+5. **Unsigned Transaction Assembly & Simulation:**
+   - Builds unsigned EVM calldata (approve + swap/transfer/bridge/liquidity) with slippage-protected minimums and gas reserve deductions. The backend never holds keys.
+   - Dry-runs the call chain via `eth_simulateV1` (chained state, approve → action) with `eth_call` fallback, and reports honest results (`simulated: true/false`) instead of assumed success.
 
 ---
 
@@ -89,19 +89,18 @@ SOKA features a fail-safe, 3-tier parsing architecture that guarantees zero serv
 ### Example Prompts Understood:
 - *"Swap 0.05 BTC to MUSD, safest route"* → Amount: `0.05`, Source: `BTC`, Dest: `MUSD`, Priority: `SAFE`
 - *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"* → Amount: `100`, Source: `MUSD`, Dest: `BTC`, Priority: `SAFE`
-- *"Trade ALL SUI for USDC with 0.5% slippage"* → Amount: `ALL`, Source: `SUI`, Dest: `USDC`, Constraint: `slippage: 0.5%`
-- *"Sell half of my DEEP into SUI"* → Amount: `50%`, Source: `DEEP`, Dest: `SUI`
+- *"Trade ALL BTC for MUSD with 0.5% slippage"* → Amount: `ALL`, Source: `BTC`, Dest: `MUSD`, Constraint: `slippage: 0.5%`
+- *"Sell half of my mUSDC into BTC"* → Amount: `50%`, Source: `mUSDC`, Dest: `BTC`
 
 ---
 
 ## ⚡ 3. Smart Routing & Liquidity Optimization
 
-SOKA connects to concentrated-liquidity AMM protocols and aggregators (Cetus Protocol Aggregator V3, DeepBook, Kriya, Turbos, FlowX, Aftermath, Bluefin, Mezo Pools):
+SOKA routes on Mezo Pools (Tigris Aerodrome fork on Mezo Testnet) with real on-chain quotes (`getAmountsOut` — no synthetic pricing):
 
-- **Multi-Hop Traversal:** If a direct pair lacks depth, the router finds intermediate hops (e.g. `BTC -> MUSD -> MEZO` or `DEEP -> SUI -> USDC`).
-- **Dynamic Slippage Calculation:** Rather than static fixed tolerances, SOKA calculates optimal slippage mathematically based on trade USD value, route liquidity depth, observed price impact, and hop complexity:
-  $$\text{Optimal Slippage} = f(\text{Price Impact}, \text{Pool Depth}, \text{Hop Count})$$
-- **Gas Reserve Deduction:** When swapping native gas assets (`BTC` or `SUI`) using `"ALL"` or `"MAX"`, SOKA automatically reserves an adequate buffer for transaction execution fees, preventing out-of-gas transaction failures.
+- **Multi-Hop Traversal:** If a direct pair lacks depth, the router finds intermediate hubs (`wBTC`, `mUSDC`, `mUSDT`, auto-discovered `MUSD`).
+- **Slippage Protection:** Minimum outputs and liquidity minimums are derived from the user slippage tolerance with basis-points math; `eth_simulateV1` dry-runs the chained calls before signing.
+- **Gas Reserve Deduction:** When swapping the native gas asset (`BTC`) using `"ALL"` or `"MAX"`, SOKA automatically reserves `GAS_RESERVE_BTC` for transaction fees, preventing out-of-gas failures.
 
 ---
 
@@ -131,20 +130,23 @@ Before any transaction can be signed, SOKA's deterministic **Risk Guardian** eva
    $$\text{Impact Ratio} = \frac{\text{Trade USD}}{\text{Pool TVL} / 2} \times 100\%$$
    *(Ratio $> 20\%$ blocks execution to protect against sandwich attacks).*
 
-3. **Pool Safety & Activity:**
-   Validates timestamp of recent pool transactions to prevent trading on abandoned or vampire-drained pools.
+3. **Pool Safety:**
+   Verifies every route hop against the factory registry (`isPool`, fail-closed) and checks measurable pool liquidity. Pool age/activity are intentionally NOT scored: factory pairs expose no creation timestamp on-chain, so any age value would be fabricated.
 
-4. **Token Safety & Minting Authority (Rug-Pull Prevention):**
-   Checks whether the token creator retains arbitrary mint capabilities. Renounced or burned minting rights pass; unconstrained owner keys trigger a safety lock.
+4. **Token Safety:**
+   Whitelist verification plus on-chain bytecode checks (no-code address = DANGER, unverified contract = WARNING). Mint-authority analysis is not performed — EVM bytecode inspection cannot prove renounced ownership, so it is not claimed.
 
 5. **Supply Concentration:**
-   Calculates the ratio of pool liquidity against total on-chain circulating supply. Pools with $< 0.05\%$ of circulating supply in liquidity indicate extreme dev hoarding.
+   Calculates pool liquidity as a share of on-chain total supply (`totalSupply × oracle price`), scored against the operator holder-concentration thresholds. Unverifiable inputs yield WARNING, never a hardcoded SAFE score.
 
-6. **Token Freshness (Honeypot Check):**
-   Monitors contract deployment timestamps on-chain. Tokens younger than 24 hours trigger elevated warning badges.
+6. **Trade Size vs Liquidity:**
+   Compares THIS trade's USD value against pool liquidity (size-aware; replaces fixed impact heuristics).
 
-7. **Oracle Health & Cross-Check:**
-   Verifies feed update timestamps against maximum staleness thresholds and checks for non-zero/positive values.
+7. **Oracle Health & Deviation:**
+   Verifies PriceOracle staleness and cross-checks the router-implied output value against oracle value.
+
+8. **Chain State:**
+   Reads bridge/tx lockdown flags and live gas price from the Maintenance precompile.
 
 ---
 
@@ -165,7 +167,7 @@ The SOKA frontend is built with React 19, Vite, and Tailwind CSS v4:
 - **Pro Swapper Console:**
   - Natural language intent input bar with instant auto-suggestions.
   - Interactive **Route Visualizer** displaying multi-hop path splits, DEX ratios, and fee tiers.
-  - **Guardian Radar**: Real-time multi-axis visualizer of the 7 safety layers.
+  - **Guardian Radar**: Real-time visualizer of the 9 on-chain safety checks.
   - **Swap History & Replay**: Persistent swap records with receipt links, execution status, and simulated dry-run details.
 
 ---
@@ -203,15 +205,16 @@ The primary unified pipeline endpoint.
     "checks": [ ... ]
   },
   "ptb": { ... },
-  "tokenLogos": { "source": "...", "dest": "..." }
+  "advise": null
 }
 ```
+Unknown, ambiguous, or unsafe intents return `422`/`403` with structured `advise` (message + missing fields + runnable examples) instead of fabricated quotes.
 
 ### `POST /api/parse-intent`
 Direct natural-language parser endpoint.
 ```json
 // Request
-{ "prompt": "Trade 100 SUI to USDC" }
+{ "prompt": "Trade 100 mUSDC to BTC" }
 
 // Response
 {
@@ -220,12 +223,13 @@ Direct natural-language parser endpoint.
   "validation_status": "VALID"
 }
 ```
+Unparseable prompts throw `422` with `advise` (never a fallback swap).
 
 ### `POST /api/calculate-optimal-route`
-Finds optimal liquidity route for given token addresses and amount.
+Finds optimal liquidity route for given token addresses and amount (real `getAmountsOut` quotes; `NO_LIQUIDITY` when pools are dry).
 
 ### `POST /api/evaluate-guardian-risk`
-Evaluates the 7 on-chain safety layers for an assembled route.
+Evaluates the 9 on-chain safety checks for an assembled route. Requires a real `amount` (no assumed size).
 
 ### `POST /api/risk-summary` & `POST /api/risk-advice`
 Generates human-readable risk summaries and guidance from raw checks using AI.
@@ -234,7 +238,10 @@ Generates human-readable risk summaries and guidance from raw checks using AI.
 Retrieves formatted on-chain token balance for an address.
 
 ### `POST /api/execute-swap`
-Assembles signed transaction bytes for the final swap PTB.
+Builds an unsigned EVM swap transaction from a fresh on-chain quote (backend never signs). Blocked `403` by the guardian unless `acknowledgeRisk` is passed.
+
+### `POST /api/transfer` · `GET /api/capabilities` · `GET /api/tokens` · `GET /api/gas-price` · `POST /api/pools/quote-paired`
+Direct transfers (EVM recipients only), the capability registry, the supported token list (whitelist + on-chain discovered), live gas, and reserve-proportional paired-leg quotes.
 
 ---
 
@@ -254,38 +261,43 @@ Assembles signed transaction bytes for the final swap PTB.
 │   │   │   └── middleware.ts     # Zod validation & rate limiter
 │   │   ├── config/
 │   │   │   ├── index.ts          # Environment & threshold configs
-│   │   │   └── constant.ts       # Core Token Whitelist
+│   │   │   ├── constant.ts       # Core Token Whitelist
+│   │   │   └── capabilities.ts   # Executable/advisory/unsupported registry
 │   │   ├── services/
 │   │   │   ├── llm/
 │   │   │   │   ├── intentParser.ts  # OpenRouter + Rule parser
 │   │   │   │   ├── riskAdvisor.ts   # Risk synthesis & summaries
 │   │   │   │   └── tokenAdvisor.ts  # Fuzzy match & candidate advisor
 │   │   │   ├── router/
-│   │   │   │   ├── cetusRouter.ts   # Aggregator V3 liquidity pathfinder
-│   │   │   │   └── ptbBuilder.ts    # Programmable Transaction Block builder
+│   │   │   │   ├── mezoRouter.ts    # Mezo Pools route pathfinder
+│   │   │   │   └── mezoTxBuilder.ts # Unsigned EVM tx builder
 │   │   │   ├── risk/
-│   │   │   │   └── LiquidityRiskGuardian.ts # 7-layer risk engine
+│   │   │   │   └── LiquidityRiskGuardian.ts # 9-check risk engine
 │   │   │   ├── safety/
-│   │   │   │   ├── PoolSafety.ts    # Pool age & activity checker
-│   │   │   │   └── TokenSafety.ts   # Mint authority & honeypot detector
+│   │   │   │   ├── PoolSafety.ts    # Factory verification (fail-closed)
+│   │   │   │   └── TokenSafety.ts   # Whitelist + bytecode checks
+│   │   │   ├── transfer/
+│   │   │   │   └── transferService.ts # Unsigned transfer builder
 │   │   │   └── coin/
-│   │   │       ├── tokenResolver.ts # 900+ token registry lookup
+│   │   │       ├── tokenResolver.ts # Whitelist + on-chain discovery
 │   │   │       ├── coinService.ts   # On-chain RPC balance reader
 │   │   │       └── alternativeSource.ts # Wallet funding scanner
 │   │   └── utils/
 │   │       ├── logger.ts         # Winston structured logger
-│   │       └── suiClient.ts      # RPC client singleton
+│   │       └── mezoClient.ts     # RPC client singleton + eth_simulateV1
+│
+├── test/                         # Unit + integration tests (npm run test:*)
 │
 └── src/                          # Frontend Application (React 19)
     ├── main.tsx                  # Root providers & client setup
-    ├── App.tsx                   # Route definitions
-    ├── cetus-tokens.json         # 900+ token metadata registry
+    ├── App.tsx                   # Route definitions (/ and /app)
+    ├── config.ts                 # Frontend runtime config (VITE_* env)
     └── components/
         └── pro/
             ├── ProLanding.tsx    # Editorial landing page
-            ├── ProSwapper.tsx    # Interactive terminal & console
+            ├── ProSwapper.tsx    # Intent terminal console
             ├── ProRouteVisualizer.tsx # Visual route path graph
-            ├── ProGuardianRadar.tsx   # 7-layer radar visualizer
+            ├── ProGuardianRadar.tsx   # 9-check radar visualizer
             ├── GenerativeInkCanvas.tsx# Fluid background canvas
             └── HistoryPanel.tsx  # Swap session history
 ```
@@ -315,11 +327,14 @@ Configure your environment variables:
 ```env
 # AI Model Configuration (Optional but recommended)
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=openai/gpt-4o-mini
 
-# Network & RPC
-SUI_RPC_ENDPOINT=https://fullnode.mainnet.sui.io:443
+# Network & RPC (Mezo Testnet)
+MEZO_RPC_ENDPOINT=https://rpc.test.mezo.org
+MEZO_CHAIN_ID=31611
 LOG_LEVEL=info
+
+# Frontend: WalletConnect client ID (public, required)
+VITE_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 ```
 > *Note: SOKA includes a deterministic offline parser. If no AI keys are set, trading intent parsing falls back to the internal rule engine automatically.*
 

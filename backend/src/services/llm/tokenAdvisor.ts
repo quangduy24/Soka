@@ -7,6 +7,7 @@
 
 import { generateLlmCompletion } from './llmClient.js';
 import { logger } from '../../utils/logger.js';
+import { LLM_DEFAULTS } from '../../config/index.js';
 import type { TokenCandidate } from '../coin/tokenResolver.js';
 
 export interface TokenMatchSummary {
@@ -43,8 +44,8 @@ export async function summarizeTokenMatches(
     const text = await generateLlmCompletion({
       systemPrompt,
       userPrompt: userMsg,
-      temperature: 0.3,
-      maxTokens: 150,
+      temperature: LLM_DEFAULTS.advisorTemperature,
+      maxTokens: LLM_DEFAULTS.advisorShortMaxTokens,
       responseMimeType: 'text/plain',
     });
 

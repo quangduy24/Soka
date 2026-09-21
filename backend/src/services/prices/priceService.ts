@@ -19,6 +19,7 @@ import {
   ZERO_ADDRESS,
   MEZO_SWAP_ROUTER,
   MEZO_SWAP_FACTORY,
+  DEFAULT_DECIMALS,
 } from '../../config/index.js';
 import { readContract } from '../../utils/mezoClient.js';
 import { getDecimals } from '../../utils/erc20Utils.js';
@@ -161,6 +162,19 @@ export async function getTokenUsdPrice(symbolOrAddress: string): Promise<TokenPr
     return hit;
   }
 
+  // 1.5. Stablecoins: hardcode to $1 on testnet to prevent weird AMM ratio LTV math
+  if (symbol.toUpperCase().includes('USD')) {
+    const hit: TokenPrice = {
+      symbol,
+      address,
+      priceUsd: 1.0,
+      source: 'oracle',
+      updatedAt: Math.floor(Date.now() / 1000),
+    };
+    writeCache(cacheKey, hit);
+    return hit;
+  }
+
   // 2. Other tokens: on-chain router quote of exactly 1 unit -> wBTC.
   // Falls back to a two-hop quote via MUSD when no direct pool exists.
   try {
@@ -195,12 +209,10 @@ export async function getTokenUsdPrice(symbolOrAddress: string): Promise<TokenPr
     const direct = await quoteToBtc(normalized);
     let btcPerToken = direct;
     if (btcPerToken == null) {
+      // No direct pool: try a two-hop quote via MUSD as an intermediate only.
+      // The returned price always describes the REQUESTED token — never
+      // relabel an unknown token as MUSD.
       await ensureMusdRegistered().catch(() => undefined);
-      const refreshed = resolveToken(symbolOrAddress) || resolveToken('MUSD');
-      if (refreshed && refreshed.symbol.toUpperCase() === 'MUSD') {
-        symbol = 'MUSD';
-        address = refreshed.address;
-      }
       const musd = resolveToken('MUSD');
       if (musd && musd.address.toLowerCase() !== normalized.toLowerCase()) {
         btcPerToken = await quoteTwoHop(normalized, musd.address as Address);
@@ -248,7 +260,8 @@ async function quoteToBtc(token: Address): Promise<number | null> {
     } as any)) as bigint[];
     const outBtc = amounts?.[amounts.length - 1];
     if (outBtc === undefined || outBtc <= 0n) return null;
-    const perToken = Number(formatUnits(outBtc, 18));
+    const btcDecimals = await getDecimals(MEZO_PRECOMPILES.btcToken).catch(() => DEFAULT_DECIMALS);
+    const perToken = Number(formatUnits(outBtc, btcDecimals));
     return Number.isFinite(perToken) && perToken > 0 ? perToken : null;
   } catch {
     return null;
@@ -282,7 +295,8 @@ async function quoteTwoHop(token: Address, musd: Address): Promise<number | null
     } as any)) as bigint[];
     const outBtc = second?.[second.length - 1];
     if (outBtc === undefined || outBtc <= 0n) return null;
-    const perToken = Number(formatUnits(outBtc, 18));
+    const btcDecimals = await getDecimals(MEZO_PRECOMPILES.btcToken).catch(() => DEFAULT_DECIMALS);
+    const perToken = Number(formatUnits(outBtc, btcDecimals));
     return Number.isFinite(perToken) && perToken > 0 ? perToken : null;
   } catch {
     return null;

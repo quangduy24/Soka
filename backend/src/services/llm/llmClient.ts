@@ -5,10 +5,10 @@
 
 import {
   OPENROUTER_API_KEY,
-  OPENROUTER_MODEL,
   OPENROUTER_BASE_URL,
   OPENROUTER_MODEL_CANDIDATES,
   LLM_TIMEOUT_MS,
+  LLM_DEFAULTS,
 } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
@@ -24,16 +24,16 @@ export interface LlmCallOptions {
  * Calls OpenRouter chat completion API using native fetch.
  */
 async function callOpenRouterRest(model: string, options: LlmCallOptions): Promise<string> {
-  const key = OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+  const key = OPENROUTER_API_KEY;
   if (!key) throw new Error('OPENROUTER_API_KEY is not configured');
 
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${OPENROUTER_BASE_URL}${LLM_DEFAULTS.chatPath}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${key}`,
-      'HTTP-Referer': 'https://soka-intent-engine.app',
-      'X-Title': 'Soka Intent Engine',
+      'HTTP-Referer': LLM_DEFAULTS.refererUrl,
+      'X-Title': LLM_DEFAULTS.appTitle,
     },
     body: JSON.stringify({
       model,
@@ -41,8 +41,8 @@ async function callOpenRouterRest(model: string, options: LlmCallOptions): Promi
         { role: 'system', content: options.systemPrompt },
         { role: 'user', content: options.userPrompt },
       ],
-      temperature: options.temperature ?? 0.2,
-      max_tokens: options.maxTokens ?? 1024,
+      temperature: options.temperature ?? LLM_DEFAULTS.temperature,
+      max_tokens: options.maxTokens ?? LLM_DEFAULTS.maxTokens,
     }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   });
@@ -68,7 +68,7 @@ async function callOpenRouterRest(model: string, options: LlmCallOptions): Promi
  * Executes an LLM completion via OpenRouter, trying candidate models in order.
  */
 export async function generateLlmCompletion(options: LlmCallOptions): Promise<string> {
-  if (OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY) {
+  if (OPENROUTER_API_KEY) {
     for (const model of OPENROUTER_MODEL_CANDIDATES) {
       try {
         return await callOpenRouterRest(model, options);

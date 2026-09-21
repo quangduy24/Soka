@@ -9,12 +9,19 @@ import {
   MEZO_SWAP_ROUTER,
   MEZO_SWAP_FACTORY,
   MEZO_PRECOMPILES,
-  RISK_THRESHOLDS,
   ZERO_ADDRESS,
+  TOKEN_WHITELIST,
+  DEFAULT_DECIMALS,
+  DEFAULT_SLIPPAGE_PCT,
+  EVM_ADDRESS_LENGTH,
+  INTENT_CONFIG,
+  TX_CONFIG,
+  DISPLAY_DECIMALS,
 } from '../../config/index.js';
 import { getPublicClient } from '../../utils/mezoClient.js';
 import { getDecimals, getSymbol } from '../../utils/erc20Utils.js';
 import { getTokenUsdPrice } from '../prices/priceService.js';
+import { resolveToken } from '../coin/tokenResolver.js';
 import { logger } from '../../utils/logger.js';
 import type { RouteResult, RouteNode, PoolDetails, RouteHop } from '../../types/index.js';
 import routerAbi from '../../abi/mezoSwapRouter.json' with { type: 'json' };
@@ -30,12 +37,20 @@ interface RouteCandidate {
   poolDetails: PoolDetails | null;
 }
 
-// Intermediate hub tokens for multi-hop routes
-const HUB_TOKENS: Address[] = [
-  MEZO_PRECOMPILES.btcToken,
-  (process.env.TOKEN_MUSDC_ADDRESS || '0xe1a26db653708A2AD8F824E92Db9852410e33A59') as Address,
-  (process.env.TOKEN_MUSDT_ADDRESS || '0x629320719a6190bd145C277226fd45e7648F950A') as Address,
-];
+/**
+ * Intermediate hub tokens for multi-hop routes, resolved from the live
+ * whitelist (plus on-chain discovered MUSD) instead of hardcoded addresses.
+ */
+function getHubTokens(): Address[] {
+  const hubs: Address[] = [MEZO_PRECOMPILES.btcToken];
+  for (const symbol of ['mUSDC', 'mUSDT', 'MUSD']) {
+    const token = resolveToken(symbol) ?? TOKEN_WHITELIST.find((t) => t.symbol === symbol);
+    if (token && !hubs.some((h) => h.toLowerCase() === token.address.toLowerCase())) {
+      hubs.push(token.address);
+    }
+  }
+  return hubs;
+}
 
 /**
  * Resolves zero address (native BTC) to wrapped BTC for contract interaction.
@@ -44,6 +59,9 @@ export function normalizeTokenAddress(address: string): Address {
   const lower = address.toLowerCase();
   if (lower === ZERO_ADDRESS.toLowerCase() || lower === 'btc') {
     return MEZO_PRECOMPILES.btcToken;
+  }
+  if (!address.startsWith('0x') || address.length !== 42) {
+    throw new Error(`Unresolved or invalid token address: ${address}`);
   }
   return address as Address;
 }
@@ -55,7 +73,7 @@ export async function findOptimalRoute(
   sourceTokenAddress: string,
   destTokenAddress: string,
   amountInFormatted: string,
-  slippageTolerancePercent = 0.5
+  slippageTolerancePercent = DEFAULT_SLIPPAGE_PCT
 ): Promise<RouteResult> {
   const isNativeIn = sourceTokenAddress.toLowerCase() === ZERO_ADDRESS.toLowerCase();
   const isNativeOut = destTokenAddress.toLowerCase() === ZERO_ADDRESS.toLowerCase();
@@ -63,8 +81,8 @@ export async function findOptimalRoute(
   const tokenIn = normalizeTokenAddress(sourceTokenAddress);
   const tokenOut = normalizeTokenAddress(destTokenAddress);
 
-  const sourceDecimals = await getDecimals(tokenIn).catch(() => 18);
-  const destDecimals = await getDecimals(tokenOut).catch(() => 18);
+  const sourceDecimals = await getDecimals(tokenIn).catch(() => DEFAULT_DECIMALS);
+  const destDecimals = await getDecimals(tokenOut).catch(() => DEFAULT_DECIMALS);
 
   const parsedAmountIn = parseUnits(amountInFormatted, sourceDecimals);
 
@@ -83,7 +101,7 @@ export async function findOptimalRoute(
     [mkHop(tokenIn, tokenOut, true)],
   ];
 
-  for (const hub of HUB_TOKENS) {
+  for (const hub of getHubTokens()) {
     if (hub.toLowerCase() !== tokenIn.toLowerCase() && hub.toLowerCase() !== tokenOut.toLowerCase()) {
       candidatePaths.push([
         mkHop(tokenIn, hub, false),
@@ -129,11 +147,11 @@ export async function findOptimalRoute(
               address: MEZO_SWAP_ROUTER,
               baseToken: { address: tokenIn, symbol: await getSymbol(tokenIn).catch(() => 'SRC'), name: 'Source Token' },
               quoteToken: { address: tokenOut, symbol: await getSymbol(tokenOut).catch(() => 'DEST'), name: 'Dest Token' },
-              // Valued after the best route is selected; empty means unknown.
-              priceUsd: '',
+              // Valued after the best route is selected; null means unknown.
+              priceUsd: null,
               liquidity: null,
-              // 24h volume is not observable on-chain; 0 means unknown.
-              volume24h: 0,
+              // 24h volume is not observable on-chain; null means unknown.
+              volume24h: null,
               stable: hops[0].stable,
             },
           };
@@ -167,7 +185,7 @@ export async function findOptimalRoute(
         args: [tokenIn, tokenOut, firstHop.stable],
       } as any)
       .catch(() => null);
-    if (typeof resolved === 'string' && resolved.startsWith('0x') && resolved.length === 42) {
+    if (typeof resolved === 'string' && resolved.startsWith('0x') && resolved.length === EVM_ADDRESS_LENGTH) {
       pairAddress = resolved as Address;
     }
     const reserves = (await client
@@ -208,7 +226,7 @@ export async function findOptimalRoute(
         .catch(() => null)) as bigint | number | null;
       if (feeRaw != null) {
         const bps = Number(feeRaw);
-        if (Number.isFinite(bps) && bps >= 0) feePct = bps / 100;
+        if (Number.isFinite(bps) && bps >= 0) feePct = bps / TX_CONFIG.bpsToPctDivisor;
       }
     }
   } catch (err) {
@@ -218,9 +236,10 @@ export async function findOptimalRoute(
   const expectedOutputFormatted = Number(formatUnits(bestRoute.amountOut, destDecimals));
   const minOutputFormatted = expectedOutputFormatted * (1 - slippageTolerancePercent / 100);
 
+  const hopShare = TX_CONFIG.singleRouteRatio / bestRoute.hops.length;
   const routeNodes: RouteNode[] = bestRoute.hops.map((hop, index) => ({
     dex: 'Mezo Swap',
-    ratio: 100,
+    ratio: hopShare,
     // Fee resolved on-chain above; omitted when unknown instead of guessed.
     ...(feePct != null ? { fee: feePct } : {}),
     weight: index + 1,
@@ -254,9 +273,12 @@ export async function findOptimalRoute(
 }
 
 /**
- * Calculates synthetic price impact percentage.
+ * Hop-count price-impact heuristic. Trade size is accepted for API stability
+ * but the heuristic is intentionally size-independent — callers must treat it
+ * as a lower bound and prefer oracle-anchored deviation when available.
+ * Tuned via PRICE_IMPACT_PER_HOP / PRICE_IMPACT_CAP, never hardcoded.
  */
-function calculateSimulatedPriceImpact(hopsCount: number, amountIn: bigint): number {
-  const baseImpact = 0.05 * hopsCount;
-  return Math.min(baseImpact, 1.5);
+function calculateSimulatedPriceImpact(hopsCount: number, _amountIn: bigint): number {
+  const baseImpact = INTENT_CONFIG.impactPerHopPct * hopsCount;
+  return Math.min(baseImpact, INTENT_CONFIG.impactCapPct);
 }

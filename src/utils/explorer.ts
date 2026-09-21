@@ -5,9 +5,10 @@
 
 import type { RiskReference } from '../types/shared';
 
+// Static member access so Vite inlines the value at transform time
+// (dynamic/optional-chained import.meta access is left undefined in browsers).
 const MEZO_EXPLORER_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MEZO_EXPLORER_URL) ||
-  'https://explorer.test.mezo.org';
+  import.meta.env.VITE_MEZO_EXPLORER_URL || 'https://explorer.test.mezo.org';
 
 export const mezoExplorerUrl = (ref: RiskReference): string => {
   switch (ref.type) {

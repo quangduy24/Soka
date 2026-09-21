@@ -1,22 +1,36 @@
 /**
  * Soka Intent Engine — Liquidity Risk Guardian
  *
- * Full 7-check risk assessment engine for swap routes on Mezo Testnet:
+ * Full risk assessment engine for swap routes on Mezo Testnet:
  * 1. Price Impact / Slippage Risk
  * 2. Low Liquidity Pool Risk
- * 3. Price Discrepancy / Oracle Deviation
- * 4. Liquidity Fragmentation & Depth Risk
- * 5. Pool Safety Check
- * 6. Token Safety (Source and Destination)
- * 7. Supply Concentration
+ * 3. Liquidity Depth & Fragmentation
+ * 4. Pool Safety (DEX, liquidity health, factory verification)
+ * 5. Token Safety (Source and Destination)
+ * 6. Supply Concentration (on-chain pool share of total supply)
+ * 7. Trade Size vs Liquidity (size-aware)
+ * 8. Oracle Deviation (router-implied vs oracle value)
+ * 9. Chain State (lockdown flags + gas)
  *
  * Returns a detailed RiskAssessment with score (0-100), risk level, and recommendations.
  */
 
-import { RISK_THRESHOLDS } from '../../config/index.js';
+import {
+  RISK_THRESHOLDS,
+  MEZO_PRECOMPILES,
+  INTENT_CONFIG,
+  TX_CONFIG,
+  DISPLAY_DECIMALS,
+  ZERO_ADDRESS,
+  DEFAULT_DECIMALS,
+} from '../../config/index.js';
+import { formatUnits, type Address } from 'viem';
+import { getTotalSupply, getDecimals } from '../../utils/erc20Utils.js';
 import { checkTokenSafety } from '../safety/TokenSafety.js';
 import { checkPoolSafety, poolReferences } from '../safety/PoolSafety.js';
 import { resolveToken } from '../coin/tokenResolver.js';
+import { getTokenUsdPrice } from '../prices/priceService.js';
+import { getPublicClient } from '../../utils/mezoClient.js';
 import { logger, createTimer } from '../../utils/logger.js';
 import type {
   RiskAssessment,
@@ -28,6 +42,39 @@ import type {
   RiskReference,
 } from '../../types/index.js';
 
+/** Minimal Maintenance-precompile views for lockdown + gas checks. */
+const MAINTENANCE_VIEWS = [
+  {
+    name: 'getBridgeLockdown',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'bool' }, { type: 'bool' }],
+  },
+  {
+    name: 'getTxLockdown',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'bool' }],
+  },
+  {
+    name: 'getMinGasPrice',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
+
+/** Parses "x.xx%" (or a plain number) into a float; NaN when unparseable. */
+function parsePct(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const n = parseFloat(String(value).replace('%', '').trim());
+  return Number.isFinite(n) ? n : null;
+}
+
 export class LiquidityRiskGuardian {
   /**
    * Perform full risk assessment on a proposed swap route.
@@ -37,7 +84,7 @@ export class LiquidityRiskGuardian {
     destSymbol: string;
     amount: string;
     route: any[];
-    executionImpact: string;
+    executionImpact: string | null;
     expectedOutput?: number;
     poolDetails?: PoolDetails | null;
   }): Promise<RiskAssessment> {
@@ -89,8 +136,20 @@ export class LiquidityRiskGuardian {
     allChecks.push(...sourceTokenChecks, ...destTokenChecks);
 
     // ─── Check 6: Supply Concentration ─────────────────────────
-    const concentrationCheck = this.checkSupplyConcentration(destSymbol, route);
+    const concentrationCheck = await this.checkSupplyConcentration(destSymbol, route, poolDetails);
     allChecks.push(concentrationCheck);
+
+    // ─── Check 7: Trade Size vs Liquidity (size-aware) ───────────
+    const tradeSizeCheck = await this.checkTradeSize(amount, sourceSymbol, route, poolDetails);
+    allChecks.push(tradeSizeCheck);
+
+    // ─── Check 8: Oracle Deviation (router-implied vs oracle price) ──
+    const oracleCheck = await this.checkOracleDeviation(amount, sourceSymbol, destSymbol, expectedOutput);
+    allChecks.push(oracleCheck);
+
+    // ─── Check 9: Chain State (lockdown + gas) ───────────────────
+    const chainCheck = await this.checkChainState();
+    allChecks.push(chainCheck);
 
     // ─── Calculate Final Score ─────────────────────────────────
     const assessment = this.calculateFinalAssessment(allChecks, priceImpactCheck, depthCheck);
@@ -99,11 +158,21 @@ export class LiquidityRiskGuardian {
   }
 
   /**
-   * Check 1: Price Impact / Slippage Risk
+   * Check 1: Price Impact / Slippage Risk (null impact is unknown, not zero)
    */
-  checkPriceImpact(executionImpact: string, route: any[]): RiskCheck {
-    const impact = parseFloat(executionImpact.replace('%', '')) || 0;
+  checkPriceImpact(executionImpact: string | null, route: any[]): RiskCheck {
+    const impact = parsePct(executionImpact);
     const { warn, reject } = RISK_THRESHOLDS.priceImpact;
+
+    if (impact == null) {
+      return {
+        name: 'Price Impact',
+        category: 'Market Risk',
+        status: 'WARNING',
+        message: 'Price impact is not computable for this route — assumed non-zero',
+        threshold: warn,
+      };
+    }
 
     if (impact >= reject) {
       return {
@@ -158,7 +227,7 @@ export class LiquidityRiskGuardian {
       };
     }
 
-    if (poolLiquidity < minLiquidity * 0.5) {
+    if (poolLiquidity < minLiquidity * INTENT_CONFIG.liquidityDangerRatio) {
       return {
         name: 'Pool Liquidity',
         category: 'Pool Safety',
@@ -216,31 +285,326 @@ export class LiquidityRiskGuardian {
   }
 
   /**
-   * Check 4: Supply Concentration
+   * Check 4: Supply Concentration — real on-chain metric.
+   * share% = pool liquidity / (totalSupply × price). A single pool holding a
+   * large fraction of supply is concentrated. Boundaries reuse the operator
+   * holder-concentration thresholds (percent). Unverifiable → WARNING, never SAFE.
    */
-  checkSupplyConcentration(destSymbol: string, route: any[]): RiskCheck {
+  async checkSupplyConcentration(destSymbol: string, route: any[], poolDetails?: PoolDetails | null): Promise<RiskCheck> {
     const token = resolveToken(destSymbol);
-    const isWhitelisted = token !== null;
-
-    if (isWhitelisted) {
+    if (!token) {
+      return {
+        name: 'Supply Concentration',
+        category: 'Concentration',
+        status: 'WARNING',
+        message: `Unwhitelisted asset ${destSymbol} may exhibit concentrated liquidity`,
+        threshold: RISK_THRESHOLDS.holderConcentration.warn,
+      };
+    }
+    try {
+      const poolLiquidity = poolDetails?.liquidity ?? route?.[0]?.liquidityUsd ?? null;
+      const price = await getTokenUsdPrice(token.symbol);
+      const isNative = token.address === ZERO_ADDRESS;
+      if (poolLiquidity == null || poolLiquidity <= 0 || price.priceUsd == null || isNative) {
+        return {
+          name: 'Supply Concentration',
+          category: 'Concentration',
+          status: 'WARNING',
+          message: `Pool share of ${token.symbol} supply is unverifiable on-chain${isNative ? ' (native gas asset has no fixed supply metric)' : ''}`,
+          threshold: RISK_THRESHOLDS.holderConcentration.warn,
+        };
+      }
+      const [supplyRaw, decimals] = await Promise.all([
+        getTotalSupply(token.address as Address).catch(() => null),
+        getDecimals(token.address as Address).catch(() => DEFAULT_DECIMALS),
+      ]);
+      if (supplyRaw == null || supplyRaw <= 0n) {
+        return {
+          name: 'Supply Concentration',
+          category: 'Concentration',
+          status: 'WARNING',
+          message: `Total supply of ${token.symbol} is unreadable — concentration unknown`,
+          threshold: RISK_THRESHOLDS.holderConcentration.warn,
+        };
+      }
+      const supplyUsd = Number(formatUnits(supplyRaw, decimals)) * price.priceUsd;
+      if (!Number.isFinite(supplyUsd) || supplyUsd <= 0) {
+        return {
+          name: 'Supply Concentration',
+          category: 'Concentration',
+          status: 'WARNING',
+          message: `Supply valuation of ${token.symbol} failed — concentration unknown`,
+          threshold: RISK_THRESHOLDS.holderConcentration.warn,
+        };
+      }
+      const sharePct = (poolLiquidity / supplyUsd) * INTENT_CONFIG.scoreScale;
+      const { warn, reject } = RISK_THRESHOLDS.holderConcentration;
+      if (sharePct >= reject) {
+        return {
+          name: 'Supply Concentration',
+          category: 'Concentration',
+          status: 'DANGER',
+          message: `Pool holds ${sharePct.toFixed(DISPLAY_DECIMALS.usd)}% of ${token.symbol} supply — highly concentrated`,
+          value: sharePct,
+          threshold: reject,
+        };
+      }
+      if (sharePct >= warn) {
+        return {
+          name: 'Supply Concentration',
+          category: 'Concentration',
+          status: 'WARNING',
+          message: `Pool holds ${sharePct.toFixed(DISPLAY_DECIMALS.usd)}% of ${token.symbol} supply`,
+          value: sharePct,
+          threshold: warn,
+        };
+      }
       return {
         name: 'Supply Concentration',
         category: 'Concentration',
         status: 'SAFE',
-        message: `${destSymbol} distribution verified with low concentration risk`,
-        value: 15,
+        message: `Pool holds ${sharePct.toFixed(DISPLAY_DECIMALS.usd)}% of ${token.symbol} supply — well distributed`,
+        value: sharePct,
+        threshold: warn,
+      };
+    } catch (err) {
+      logger.warn(`Supply concentration check failed: ${(err as Error).message}`);
+      return {
+        name: 'Supply Concentration',
+        category: 'Concentration',
+        status: 'WARNING',
+        message: `Concentration read failed for ${destSymbol} — treated as unknown`,
         threshold: RISK_THRESHOLDS.holderConcentration.warn,
       };
     }
+  }
 
-    return {
-      name: 'Supply Concentration',
-      category: 'Concentration',
-      status: 'WARNING',
-      message: `Unwhitelisted asset ${destSymbol} may exhibit concentrated liquidity`,
-      value: 65,
-      threshold: RISK_THRESHOLDS.holderConcentration.warn,
-    };
+  /**
+   * Check 7: Trade Size vs Liquidity — the size-aware check. Compares the USD
+   * value of THIS trade against pool liquidity instead of using a fixed impact.
+   */
+  async checkTradeSize(
+    amount: string,
+    sourceSymbol: string,
+    route: any[],
+    poolDetails?: PoolDetails | null
+  ): Promise<RiskCheck> {
+    const poolLiquidity = poolDetails?.liquidity ?? route?.[0]?.liquidityUsd ?? null;
+    const size = parseFloat(amount);
+    if (!Number.isFinite(size) || size <= 0 || poolLiquidity == null || poolLiquidity <= 0) {
+      return {
+        name: 'Trade Size vs Liquidity',
+        category: 'Market Risk',
+        status: 'WARNING',
+        message: 'Trade size cannot be valued against pool liquidity — size impact unknown',
+      };
+    }
+    try {
+      const price = await getTokenUsdPrice(sourceSymbol);
+      if (price.priceUsd == null) {
+        return {
+          name: 'Trade Size vs Liquidity',
+          category: 'Market Risk',
+          status: 'WARNING',
+          message: `No oracle price for ${sourceSymbol} — trade-size impact unknown`,
+        };
+      }
+      const ratio = (size * price.priceUsd) / poolLiquidity;
+      const { danger, warn } = RISK_THRESHOLDS.liquidityImpact;
+      const pct = (ratio * INTENT_CONFIG.scoreScale).toFixed(DISPLAY_DECIMALS.usd);
+      if (ratio >= danger) {
+        return {
+          name: 'Trade Size vs Liquidity',
+          category: 'Market Risk',
+          status: 'DANGER',
+          message: `Trade is ${pct}% of pool liquidity — expect severe slippage`,
+          value: ratio,
+          threshold: danger,
+        };
+      }
+      if (ratio >= warn) {
+        return {
+          name: 'Trade Size vs Liquidity',
+          category: 'Market Risk',
+          status: 'WARNING',
+          message: `Trade is ${pct}% of pool liquidity — slippage likely`,
+          value: ratio,
+          threshold: warn,
+        };
+      }
+      return {
+        name: 'Trade Size vs Liquidity',
+        category: 'Market Risk',
+        status: 'SAFE',
+        message: `Trade is ${pct}% of pool liquidity — size impact negligible`,
+        value: ratio,
+        threshold: warn,
+      };
+    } catch (err) {
+      logger.warn(`Trade-size check failed: ${(err as Error).message}`);
+      return {
+        name: 'Trade Size vs Liquidity',
+        category: 'Market Risk',
+        status: 'WARNING',
+        message: 'Trade-size valuation failed — size impact unknown',
+      };
+    }
+  }
+
+  /**
+   * Check 8: Oracle Deviation — compares the router-implied output value with
+   * the oracle-implied value. A large gap signals a mispriced or thin route.
+   */
+  async checkOracleDeviation(
+    amount: string,
+    sourceSymbol: string,
+    destSymbol: string,
+    expectedOutput?: number
+  ): Promise<RiskCheck> {
+    const size = parseFloat(amount);
+    if (!Number.isFinite(size) || size <= 0 || expectedOutput == null || !Number.isFinite(expectedOutput)) {
+      return {
+        name: 'Oracle Deviation',
+        category: 'Market Risk',
+        status: 'WARNING',
+        message: 'Quoted output unavailable — oracle deviation cannot be verified',
+      };
+    }
+    try {
+      const [priceIn, priceOut] = await Promise.all([
+        getTokenUsdPrice(sourceSymbol),
+        getTokenUsdPrice(destSymbol),
+      ]);
+      if (priceIn.priceUsd == null || priceOut.priceUsd == null) {
+        return {
+          name: 'Oracle Deviation',
+          category: 'Market Risk',
+          status: 'WARNING',
+          message: 'Oracle price missing for one leg — deviation unverifiable',
+        };
+      }
+      const inUsd = size * priceIn.priceUsd;
+      if (inUsd <= 0) {
+        return {
+          name: 'Oracle Deviation',
+          category: 'Market Risk',
+          status: 'WARNING',
+          message: 'Input value is zero — deviation unverifiable',
+        };
+      }
+      const deviation = (Math.abs(expectedOutput * priceOut.priceUsd - inUsd) / inUsd) * INTENT_CONFIG.scoreScale;
+      const { warn, reject } = RISK_THRESHOLDS.priceImpact;
+      if (deviation >= reject) {
+        return {
+          name: 'Oracle Deviation',
+          category: 'Market Risk',
+          status: 'DANGER',
+          message: `Route output deviates ${deviation.toFixed(DISPLAY_DECIMALS.usd)}% from oracle value`,
+          value: deviation,
+          threshold: reject,
+        };
+      }
+      if (deviation >= warn) {
+        return {
+          name: 'Oracle Deviation',
+          category: 'Market Risk',
+          status: 'WARNING',
+          message: `Route output deviates ${deviation.toFixed(DISPLAY_DECIMALS.usd)}% from oracle value`,
+          value: deviation,
+          threshold: warn,
+        };
+      }
+      return {
+        name: 'Oracle Deviation',
+        category: 'Market Risk',
+        status: 'SAFE',
+        message: `Route output tracks oracle value (${deviation.toFixed(DISPLAY_DECIMALS.usd)}% deviation)`,
+        value: deviation,
+        threshold: warn,
+      };
+    } catch (err) {
+      logger.warn(`Oracle deviation check failed: ${(err as Error).message}`);
+      return {
+        name: 'Oracle Deviation',
+        category: 'Market Risk',
+        status: 'WARNING',
+        message: 'Oracle deviation check failed — deviation unknown',
+      };
+    }
+  }
+
+  /**
+   * Check 9: Chain State — reads the Maintenance precompile lockdown flags and
+   * the live gas price. Unreadable flags are reported, never assumed open.
+   */
+  async checkChainState(): Promise<RiskCheck> {
+    try {
+      const client = getPublicClient();
+      const [bridgeLockdown, txLockdown, gasPrice] = await Promise.all([
+        client.readContract({
+          address: MEZO_PRECOMPILES.maintenance,
+          abi: MAINTENANCE_VIEWS as any,
+          functionName: 'getBridgeLockdown',
+        } as any).catch(() => null) as Promise<readonly [boolean, boolean] | null>,
+        client.readContract({
+          address: MEZO_PRECOMPILES.maintenance,
+          abi: MAINTENANCE_VIEWS as any,
+          functionName: 'getTxLockdown',
+        } as any).catch(() => null) as Promise<boolean | null>,
+        client.getGasPrice().catch(() => null),
+      ]);
+      if (txLockdown === true) {
+        return {
+          name: 'Chain State',
+          category: 'Network Risk',
+          status: 'DANGER',
+          message: 'Transaction lockdown is ACTIVE on Mezo — on-chain execution will revert',
+        };
+      }
+      if (bridgeLockdown != null && (bridgeLockdown[0] || bridgeLockdown[1])) {
+        return {
+          name: 'Chain State',
+          category: 'Network Risk',
+          status: 'WARNING',
+          message: 'Bridge lockdown is partially active — bridge-outs may revert',
+        };
+      }
+      if (gasPrice != null) {
+        const gwei = Number(gasPrice) / 1e9;
+        if (Number.isFinite(gwei) && gwei > TX_CONFIG.gasWarnGwei) {
+          return {
+            name: 'Chain State',
+            category: 'Network Risk',
+            status: 'WARNING',
+            message: `Network gas is elevated (${gwei.toFixed(1)} gwei) — execution will be expensive`,
+            value: gwei,
+            threshold: TX_CONFIG.gasWarnGwei,
+          };
+        }
+      }
+      if (bridgeLockdown == null && txLockdown == null && gasPrice == null) {
+        return {
+          name: 'Chain State',
+          category: 'Network Risk',
+          status: 'WARNING',
+          message: 'Chain state is unreadable — lockdown status unknown',
+        };
+      }
+      return {
+        name: 'Chain State',
+        category: 'Network Risk',
+        status: 'SAFE',
+        message: 'No lockdown active; network gas is within normal range',
+      };
+    } catch (err) {
+      logger.warn(`Chain-state check failed: ${(err as Error).message}`);
+      return {
+        name: 'Chain State',
+        category: 'Network Risk',
+        status: 'WARNING',
+        message: 'Chain-state check failed — lockdown status unknown',
+      };
+    }
   }
 
   /**
@@ -251,7 +615,7 @@ export class LiquidityRiskGuardian {
     priceImpactCheck: RiskCheck,
     depthCheck: RiskCheck
   ): RiskAssessment {
-    let score = 100;
+    let score = INTENT_CONFIG.scoreStart;
     for (const check of checks) {
       if (check.status === 'DANGER') {
         score -= RISK_THRESHOLDS.scoreDeductions.DANGER;
@@ -259,7 +623,7 @@ export class LiquidityRiskGuardian {
         score -= RISK_THRESHOLDS.scoreDeductions.WARNING;
       }
     }
-    score = Math.max(0, Math.min(100, score));
+    score = Math.max(INTENT_CONFIG.scoreMin, Math.min(INTENT_CONFIG.scoreMax, score));
 
     let riskLevel: RiskLevel = 'LOW';
     if (score < RISK_THRESHOLDS.riskLevel.high) riskLevel = 'CRITICAL';
@@ -276,12 +640,13 @@ export class LiquidityRiskGuardian {
       recommendation = 'Proceed with caution: review warning indicators before signing.';
     }
 
+    const oracleCheck = checks.find((c) => c.name === 'Oracle Deviation');
     return {
       safe,
       score,
       riskLevel,
-      slippagePercent: (priceImpactCheck.value as number) || 0.1,
-      priceDeviationPercent: 0.1,
+      slippagePercent: (priceImpactCheck.value as number) ?? 0,
+      priceDeviationPercent: (oracleCheck?.value as number) ?? 0,
       depthRisk: depthCheck.status === 'DANGER' ? 'HIGH' : depthCheck.status === 'WARNING' ? 'MEDIUM' : 'LOW',
       recommendation,
       checks,
@@ -299,7 +664,7 @@ export class LiquidityRiskGuardian {
     };
 
     return {
-      risk_probability: (100 - assessment.score) / 100,
+      risk_probability: (INTENT_CONFIG.scoreMax - assessment.score) / INTENT_CONFIG.scoreScale,
       risk_level: assessment.riskLevel,
       execution_blocked: !assessment.safe,
       checks: {

@@ -5,9 +5,23 @@
 
 import type { Address } from 'viem';
 import { TOKEN_WHITELIST, ZERO_ADDRESS, type WhitelistToken } from '../../config/constant.js';
+import {
+  API_PAGINATION,
+  DEFAULT_DECIMALS,
+  EVM_ADDRESS_LENGTH,
+  NATIVE_ALIASES,
+  NATIVE_SYMBOL,
+  UNKNOWN_TOKEN_NAME,
+  UNKNOWN_TOKEN_SYMBOL,
+} from '../../config/index.js';
 import { getDecimals, getSymbol, getName } from '../../utils/erc20Utils.js';
 import { logger } from '../../utils/logger.js';
 import type { TokenInfo } from '../../types/index.js';
+
+/** Shared EVM address check (0x + 40 hex chars). */
+export function isEvmAddress(value: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
+}
 
 export interface TokenCandidate {
   symbol: string;
@@ -63,9 +77,9 @@ export function resolveToken(symbolOrAddress: string): WhitelistToken | null {
   );
   if (byAlias) return byAlias;
 
-  // 4. Native BTC alias fallback
-  if (input === 'btc' || input === 'bitcoin' || input === 'sat' || input === 'sats') {
-    return TOKEN_WHITELIST[0];
+  // 4. Native BTC alias fallback (never assume list order)
+  if (NATIVE_ALIASES.includes(input)) {
+    return TOKEN_WHITELIST.find((t) => t.symbol === NATIVE_SYMBOL) ?? null;
   }
 
   // 5. On-chain discovered tokens (verified at discovery time)
@@ -74,17 +88,28 @@ export function resolveToken(symbolOrAddress: string): WhitelistToken | null {
 
 /**
  * Resolves a token symbol, name, or address to an EVM contract address.
+ * @deprecated Prefer resolveTokenAddressStrict: this fallback maps unknown
+ * symbols to the zero address, which previously caused misdirected BTC swaps.
  */
 export function resolveTokenAddress(symbolOrAddress: string): string {
+  return resolveTokenAddressStrict(symbolOrAddress) ?? ZERO_ADDRESS;
+}
+
+/**
+ * Strict address resolution. Returns null for unknown symbols instead of the
+ * zero address so callers can reject with a fallback advise (unknown_token).
+ * Raw EVM addresses pass through after format validation.
+ */
+export function resolveTokenAddressStrict(symbolOrAddress: string): string | null {
+  if (!symbolOrAddress) return null;
   const token = resolveToken(symbolOrAddress);
   if (token) return token.address;
 
-  // If already a valid hex address, return as-is
-  if (symbolOrAddress.startsWith('0x') && symbolOrAddress.length === 42) {
-    return symbolOrAddress;
+  if (isEvmAddress(symbolOrAddress)) {
+    return symbolOrAddress.trim();
   }
 
-  return ZERO_ADDRESS;
+  return null;
 }
 
 /**
@@ -94,16 +119,16 @@ export async function getTokenDecimalsAsync(symbolOrAddress: string): Promise<nu
   const token = resolveToken(symbolOrAddress);
   if (token) return token.decimals;
 
-  if (symbolOrAddress.startsWith('0x') && symbolOrAddress.length === 42) {
+  if (isEvmAddress(symbolOrAddress)) {
     try {
-      return await getDecimals(symbolOrAddress as Address);
+      return await getDecimals(symbolOrAddress.trim() as Address);
     } catch {
-      logger.warn(`Failed to fetch decimals for ${symbolOrAddress}, defaulting to 18`);
-      return 18;
+      logger.warn(`Failed to fetch decimals for ${symbolOrAddress}, defaulting to ${DEFAULT_DECIMALS}`);
+      return DEFAULT_DECIMALS;
     }
   }
 
-  return 18;
+  return DEFAULT_DECIMALS;
 }
 
 /**
@@ -130,13 +155,13 @@ export async function resolveTokenInfo(symbolOrAddress: string): Promise<TokenIn
   }
 
   // Fallback for unwhitelisted on-chain ERC-20 address
-  if (symbolOrAddress.startsWith('0x') && symbolOrAddress.length === 42) {
-    const addr = symbolOrAddress as Address;
+  if (isEvmAddress(symbolOrAddress)) {
+    const addr = symbolOrAddress.trim() as Address;
     try {
       const [symbol, name, decimals] = await Promise.all([
-        getSymbol(addr).catch(() => 'UNKNOWN'),
-        getName(addr).catch(() => 'Unknown Token'),
-        getDecimals(addr).catch(() => 18),
+        getSymbol(addr).catch(() => UNKNOWN_TOKEN_SYMBOL),
+        getName(addr).catch(() => UNKNOWN_TOKEN_NAME),
+        getDecimals(addr).catch(() => DEFAULT_DECIMALS),
       ]);
       return {
         symbol,
@@ -164,7 +189,7 @@ export function resolveTokenLogo(addressOrSymbol: string): string | undefined {
 /**
  * Searches for similar tokens when a user query does not yield an exact match.
  */
-export function searchTokenCandidates(query: string, limit = 5): TokenCandidate[] {
+export function searchTokenCandidates(query: string, limit = API_PAGINATION.tokenSearchLimit): TokenCandidate[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 

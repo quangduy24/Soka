@@ -14,8 +14,19 @@
  */
 
 import { formatUnits, parseUnits, isAddress, encodeFunctionData, type Address, type Abi } from 'viem';
-import { MEZO_SWAP_ROUTER, MEZO_SWAP_FACTORY, MEZO_CHAIN_ID, MARKET_CONFIG, RISK_THRESHOLDS } from '../../config/index.js';
-import { readContract } from '../../utils/mezoClient.js';
+import {
+  MEZO_SWAP_ROUTER,
+  MEZO_SWAP_FACTORY,
+  MEZO_CHAIN_ID,
+  MARKET_CONFIG,
+  RISK_THRESHOLDS,
+  TX_CONFIG,
+  ZERO_ADDRESS,
+  DEFAULT_DECIMALS,
+  DEFAULT_SLIPPAGE_PCT,
+  API_PAGINATION,
+} from '../../config/index.js';
+import { readContract, simulateCalls } from '../../utils/mezoClient.js';
 import { getDecimals, getSymbol, getName, getBalanceOf, getAllowance, buildApproveTx } from '../../utils/erc20Utils.js';
 import { getTokenUsdPrice, type TokenPrice } from '../prices/priceService.js';
 import { resolveToken } from '../coin/tokenResolver.js';
@@ -147,7 +158,7 @@ async function readPoolFee(pair: Address, stable: boolean | null): Promise<numbe
     });
     const bps = Number(raw);
     // Tigris fees are expressed in basis points (e.g. 30 = 0.3%).
-    return Number.isFinite(bps) && bps >= 0 ? bps / 100 : null;
+    return Number.isFinite(bps) && bps >= 0 ? bps / TX_CONFIG.bpsToPctDivisor : null;
   } catch {
     return null;
   }
@@ -155,7 +166,7 @@ async function readPoolFee(pair: Address, stable: boolean | null): Promise<numbe
 
 async function buildLeg(address: Address, reserveRaw: bigint): Promise<PoolTokenLeg> {
   const [decimals, symbol, price] = await Promise.all([
-    getDecimals(address).catch(() => 18),
+    getDecimals(address).catch(() => DEFAULT_DECIMALS),
     getSymbol(address)
       .catch(() => resolveToken(address)?.symbol || 'UNKNOWN'),
     getTokenUsdPrice(address),
@@ -206,7 +217,7 @@ async function buildPoolInfo(pair: Address, wallet?: Address): Promise<PoolInfo 
       const [bal, supply, lpDecimals] = await Promise.all([
         getBalanceOf(pair, wallet),
         readContract<bigint>({ address: pair, abi: erc20Abi, functionName: 'totalSupply' }),
-        getDecimals(pair).catch(() => 18),
+        getDecimals(pair).catch(() => DEFAULT_DECIMALS),
       ]);
       userLpBalance = formatUnits(bal, lpDecimals);
       if (supply > 0n) {
@@ -243,7 +254,7 @@ export async function listPools(params: {
   offset?: number;
   walletAddress?: string;
 }): Promise<PoolListResult> {
-  const limit = Math.min(Math.max(params.limit ?? 20, 1), MARKET_CONFIG.poolsMaxScan);
+  const limit = Math.min(Math.max(params.limit ?? API_PAGINATION.poolsDefaultLimit, 1), MARKET_CONFIG.poolsMaxScan);
   const offset = Math.max(params.offset ?? 0, 0);
   const wallet =
     params.walletAddress && isAddress(params.walletAddress)
@@ -264,26 +275,26 @@ export async function listPools(params: {
   const totalPairs = Number(totalRaw);
   const end = Math.min(offset + limit, totalPairs, offset + MARKET_CONFIG.poolsMaxScan);
 
-  const pairs: Address[] = [];
+  const pairPromises: Promise<Address | null>[] = [];
   for (let i = offset; i < end; i++) {
-    try {
-      const pair = await readContract<Address>({
+    pairPromises.push(
+      readContract<Address>({
         address: MEZO_SWAP_FACTORY,
         abi: factoryAbi,
         functionName: 'allPools',
         args: [BigInt(i)],
-      });
-      if (pair && isAddress(pair)) pairs.push(pair);
-    } catch (err) {
-      logger.warn(`Failed to read allPools(${i}): ${(err as Error).message}`);
-    }
+      }).catch((err) => {
+        logger.warn(`Failed to read allPools(${i}): ${(err as Error).message}`);
+        return null;
+      })
+    );
   }
+  const resolvedPairs = await Promise.all(pairPromises);
+  const pairs: Address[] = resolvedPairs.filter((p): p is Address => p !== null && isAddress(p));
 
-  const pools: PoolInfo[] = [];
-  for (const pair of pairs) {
-    const info = await buildPoolInfo(pair, wallet);
-    if (info) pools.push(info);
-  }
+  const poolPromises = pairs.map((pair) => buildPoolInfo(pair, wallet));
+  const resolvedPools = await Promise.all(poolPromises);
+  const pools: PoolInfo[] = resolvedPools.filter((info): info is PoolInfo => info !== null);
 
   const result: PoolListResult = { totalPairs, offset, limit, pools, cachedAt: Date.now() };
   listCache.set(cacheKey, { value: result, expiresAt: Date.now() + MARKET_CONFIG.poolsCacheTtlMs });
@@ -314,6 +325,58 @@ export async function getPoolDetail(pairAddress: string, walletAddress?: string)
  * Read-only add-liquidity preview via router.quoteAddLiquidity.
  * Pair with buildAddLiquidityTx for execution.
  */
+/**
+ * Reserve-proportional paired amount: given amountA of tokenA, returns the
+ * matching amountB of tokenB at live reserves. Lets callers quote a single
+ * input leg instead of guessing a 1:1 ratio across different decimals/prices.
+ */
+export async function quotePairedAmount(params: {
+  tokenA: string;
+  tokenB: string;
+  stable: boolean;
+  amountA: string;
+}): Promise<{ amountB: string; reserveA: string; reserveB: string; poolAddress: string }> {
+  const { tokenA, tokenB, stable, amountA } = params;
+  if (!isAddress(tokenA) || !isAddress(tokenB)) {
+    throw new Error('quotePairedAmount requires valid tokenA/tokenB addresses');
+  }
+  const [decA, decB] = await Promise.all([
+    getDecimals(tokenA as Address),
+    getDecimals(tokenB as Address),
+  ]);
+  const parsedA = parseUnits(amountA, decA);
+  if (parsedA <= 0n) throw new Error('quotePairedAmount requires a positive amountA');
+  const pair = await readContract<Address>({
+    address: MEZO_SWAP_FACTORY,
+    abi: factoryAbi,
+    functionName: 'getPool',
+    args: [tokenA, tokenB, stable],
+  }).catch((err) => {
+    throw new Error(`Failed to resolve pool: ${(err as Error).message}`);
+  });
+  if (!pair || pair === ZERO_ADDRESS) {
+    throw new Error('No registered pool exists for these tokens and pool type');
+  }
+  const legs = await readPairLegs(pair);
+  if (!legs || legs.reserve0 <= 0n || legs.reserve1 <= 0n) {
+    throw new Error('Pool reserves are empty or unreadable — cannot proportion the paired leg');
+  }
+  const aIsTok0 = (tokenA as string).toLowerCase() === legs.token0.toLowerCase();
+  const reserveA = aIsTok0 ? legs.reserve0 : legs.reserve1;
+  const reserveB = aIsTok0 ? legs.reserve1 : legs.reserve0;
+  // Scale across decimals: amountB = amountA * reserveB/reserveA * 10^(decB-decA).
+  const scaled = (parsedA * reserveB) / reserveA;
+  const decShift = decB - decA;
+  const amountB = decShift >= 0 ? scaled * 10n ** BigInt(decShift) : scaled / 10n ** BigInt(-decShift);
+  if (amountB <= 0n) throw new Error('Paired amount rounds to zero — increase amountA');
+  return {
+    amountB: formatUnits(amountB, decB),
+    reserveA: formatUnits(reserveA, decA),
+    reserveB: formatUnits(reserveB, decB),
+    poolAddress: pair,
+  };
+}
+
 export async function quoteAddLiquidity(params: {
   tokenA: string;
   tokenB: string;
@@ -340,7 +403,7 @@ export async function quoteAddLiquidity(params: {
   }).catch((err) => {
     throw new Error(`Failed to resolve pool: ${(err as Error).message}`);
   });
-  if (!pair || pair === '0x0000000000000000000000000000000000000000') {
+  if (!pair || pair === ZERO_ADDRESS) {
     throw new Error('No registered pool exists for these tokens and pool type');
   }
 
@@ -383,7 +446,7 @@ export async function quoteRemoveLiquidity(params: {
   ]);
   if (stable == null) throw new Error('Failed to read pool type');
   const [decA, decB] = await Promise.all([getDecimals(token0), getDecimals(token1)]);
-  const lpDecimals = await getDecimals(pair).catch(() => 18);
+  const lpDecimals = await getDecimals(pair).catch(() => DEFAULT_DECIMALS);
   const parsedLiquidity = parseUnits(liquidity, lpDecimals);
 
   const [amountA, amountB] = (await readContract<readonly [bigint, bigint]>({
@@ -405,10 +468,16 @@ export async function quoteRemoveLiquidity(params: {
 }
 
 function deadlineTs(): bigint {
-  return BigInt(Math.floor(Date.now() / 1000) + 1200);
+  return BigInt(Math.floor(Date.now() / 1000) + TX_CONFIG.deadlineSec);
 }
 
-function envelope(to: Address, data: `0x${string}`, value: string, txSteps: TxStep[]): ExecuteSwapResult {
+async function envelope(
+  to: Address,
+  data: `0x${string}`,
+  value: string,
+  txSteps: TxStep[],
+  sender: Address
+): Promise<ExecuteSwapResult> {
   const serializedData = JSON.stringify({
     to,
     data,
@@ -416,6 +485,32 @@ function envelope(to: Address, data: `0x${string}`, value: string, txSteps: TxSt
     chainId: MEZO_CHAIN_ID,
     gasLimit: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
   });
+  let simulation: ExecuteSwapResult['simulation'] = {
+    success: true,
+    gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+    simulated: false,
+  };
+  try {
+    const sim = await simulateCalls(
+      sender,
+      txSteps
+        .filter((s) => s.data)
+        .map((s) => ({ to: s.to as Address, data: s.data as `0x${string}`, value: BigInt(s.value || '0') }))
+    );
+    simulation = {
+      success: sim.success,
+      gasUsed: sim.gasUsed ?? RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+      simulated: sim.simulated,
+      ...(sim.error ? { error: sim.error } : {}),
+    };
+  } catch (err) {
+    simulation = {
+      success: false,
+      gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+      simulated: false,
+      error: `Simulation failed: ${(err as Error).message}`,
+    };
+  }
   return {
     to,
     data,
@@ -425,7 +520,7 @@ function envelope(to: Address, data: `0x${string}`, value: string, txSteps: TxSt
     ptbSteps: txSteps,
     transactionData: serializedData,
     transactionBytes: Buffer.from(serializedData).toString('base64'),
-    simulation: { success: true, gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString() },
+    simulation,
     routeSummary: {
       inputAmount: '',
       inputToken: '',
@@ -449,7 +544,7 @@ async function approveStep(
   } catch {
     // Fall through and include the approval step when unreadable.
   }
-  const approvePayload = buildApproveTx(token, MEZO_SWAP_ROUTER, amount * 10n);
+  const approvePayload = buildApproveTx(token, MEZO_SWAP_ROUTER, amount * TX_CONFIG.approveMultiplier);
   txSteps.push({
     index: txSteps.length + 1,
     action: 'APPROVE',
@@ -460,10 +555,17 @@ async function approveStep(
   });
 }
 
+/** Applies a slippage haircut to a raw amount (basis-points math, no floats). */
+function applySlippage(raw: bigint, slippagePct: number): bigint {
+  const bps = BigInt(Math.round(slippagePct * TX_CONFIG.pctToBpsScale));
+  const denom = BigInt(TX_CONFIG.pctToBpsScale) * BigInt(TX_CONFIG.pctToBpsScale);
+  return (raw * (denom - bps)) / denom;
+}
+
 /**
  * Builds unsigned addLiquidity calldata (with approvals) for real execution.
- * Minimums default to the quoted amounts (no slippage buffer); callers that
- * need protection should derive minimums from a fresh quote instead.
+ * Minimums are derived from the desired amounts with a slippage haircut —
+ * never zero-protection and never desired-as-minimum.
  */
 export async function buildAddLiquidityTx(params: {
   senderAddress: string;
@@ -472,8 +574,9 @@ export async function buildAddLiquidityTx(params: {
   stable: boolean;
   amountADesired: string;
   amountBDesired: string;
+  slippagePercent?: number;
 }): Promise<ExecuteSwapResult> {
-  const { senderAddress, tokenA, tokenB, stable, amountADesired, amountBDesired } = params;
+  const { senderAddress, tokenA, tokenB, stable, amountADesired, amountBDesired, slippagePercent = DEFAULT_SLIPPAGE_PCT } = params;
   if (!isAddress(senderAddress) || !isAddress(tokenA) || !isAddress(tokenB)) {
     throw new Error('buildAddLiquidityTx requires valid sender/token addresses');
   }
@@ -484,6 +587,8 @@ export async function buildAddLiquidityTx(params: {
   const parsedA = parseUnits(amountADesired, decA);
   const parsedB = parseUnits(amountBDesired, decB);
   if (parsedA <= 0n || parsedB <= 0n) throw new Error('Liquidity amounts must be positive');
+  const minA = applySlippage(parsedA, slippagePercent);
+  const minB = applySlippage(parsedB, slippagePercent);
 
   const txSteps: TxStep[] = [];
   await approveStep(tokenA as Address, senderAddress as Address, parsedA, 'token A', txSteps);
@@ -492,7 +597,7 @@ export async function buildAddLiquidityTx(params: {
   const data = encodeFunctionData({
     abi: routerAbi,
     functionName: 'addLiquidity',
-    args: [tokenA, tokenB, stable, parsedA, parsedB, parsedA, parsedB, senderAddress, deadlineTs()],
+    args: [tokenA, tokenB, stable, parsedA, parsedB, minA, minB, senderAddress, deadlineTs()],
   });
 
   txSteps.push({
@@ -504,7 +609,7 @@ export async function buildAddLiquidityTx(params: {
     value: '0',
   });
 
-  return envelope(MEZO_SWAP_ROUTER, data, '0', txSteps);
+  return envelope(MEZO_SWAP_ROUTER, data, '0', txSteps, senderAddress as Address);
 }
 
 /**
@@ -514,8 +619,9 @@ export async function buildRemoveLiquidityTx(params: {
   senderAddress: string;
   poolAddress: string;
   liquidity: string;
+  slippagePercent?: number;
 }): Promise<ExecuteSwapResult> {
-  const { senderAddress, poolAddress, liquidity } = params;
+  const { senderAddress, poolAddress, liquidity, slippagePercent = DEFAULT_SLIPPAGE_PCT } = params;
   if (!isAddress(senderAddress) || !isAddress(poolAddress)) {
     throw new Error('buildRemoveLiquidityTx requires valid sender/pool addresses');
   }
@@ -525,9 +631,20 @@ export async function buildRemoveLiquidityTx(params: {
     readContract<Address>({ address: pair, abi: pairAbi, functionName: 'token1' }),
     readContract<boolean>({ address: pair, abi: pairAbi, functionName: 'stable' }),
   ]);
-  const lpDecimals = await getDecimals(pair).catch(() => 18);
+  const lpDecimals = await getDecimals(pair).catch(() => DEFAULT_DECIMALS);
   const parsedLiquidity = parseUnits(liquidity, lpDecimals);
   if (parsedLiquidity <= 0n) throw new Error('Liquidity amount must be positive');
+
+  // Quote the expected output legs on-chain, then haircut with slippage —
+  // minimums of zero would accept any sandwich outcome.
+  const [quotedA, quotedB] = await quoteRemoveLiquidity({ poolAddress: pair, liquidity }).then(
+    async (q) => {
+      const [d0, d1] = await Promise.all([getDecimals(token0).catch(() => DEFAULT_DECIMALS), getDecimals(token1).catch(() => DEFAULT_DECIMALS)]);
+      return [parseUnits(q.quotedAmountA, d0), parseUnits(q.quotedAmountB, d1)];
+    }
+  );
+  const minA = applySlippage(quotedA, slippagePercent);
+  const minB = applySlippage(quotedB, slippagePercent);
 
   const txSteps: TxStep[] = [];
   await approveStep(pair, senderAddress as Address, parsedLiquidity, 'LP token', txSteps);
@@ -535,7 +652,7 @@ export async function buildRemoveLiquidityTx(params: {
   const data = encodeFunctionData({
     abi: routerAbi,
     functionName: 'removeLiquidity',
-    args: [token0, token1, stable, parsedLiquidity, 0n, 0n, senderAddress, deadlineTs()],
+    args: [token0, token1, stable, parsedLiquidity, minA, minB, senderAddress, deadlineTs()],
   });
 
   txSteps.push({
@@ -547,5 +664,5 @@ export async function buildRemoveLiquidityTx(params: {
     value: '0',
   });
 
-  return envelope(MEZO_SWAP_ROUTER, data, '0', txSteps);
+  return envelope(MEZO_SWAP_ROUTER, data, '0', txSteps, senderAddress as Address);
 }

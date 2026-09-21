@@ -6,6 +6,7 @@
 
 import { generateLlmCompletion } from './llmClient.js';
 import { logger } from '../../utils/logger.js';
+import { RISK_THRESHOLDS, LLM_DEFAULTS, INTENT_CONFIG } from '../../config/index.js';
 import type { RiskCheck, RouteNode } from '../../types/index.js';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -27,14 +28,14 @@ export interface RiskSummaryResult {
 }
 
 function computeRiskLevel(checks: RiskCheck[]): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-  let score = 100;
+  let score = INTENT_CONFIG.scoreStart;
   for (const c of checks) {
-    if (c.status === 'DANGER') score -= 25;
-    else if (c.status === 'WARNING') score -= 10;
+    if (c.status === 'DANGER') score -= RISK_THRESHOLDS.scoreDeductions.DANGER;
+    else if (c.status === 'WARNING') score -= RISK_THRESHOLDS.scoreDeductions.WARNING;
   }
-  if (score >= 80) return 'LOW';
-  if (score >= 60) return 'MEDIUM';
-  if (score >= 30) return 'HIGH';
+  if (score >= RISK_THRESHOLDS.riskLevel.low) return 'LOW';
+  if (score >= RISK_THRESHOLDS.riskLevel.medium) return 'MEDIUM';
+  if (score >= RISK_THRESHOLDS.riskLevel.high) return 'HIGH';
   return 'CRITICAL';
 }
 
@@ -127,8 +128,8 @@ Trade: ${amount} ${sourceToken} -> ${destToken}`;
     const rawOutput = await generateLlmCompletion({
       systemPrompt,
       userPrompt: userMsg,
-      temperature: 0.2,
-      maxTokens: 1024,
+      temperature: LLM_DEFAULTS.temperature,
+      maxTokens: LLM_DEFAULTS.maxTokens,
     });
 
     const cleaned = rawOutput.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -178,8 +179,8 @@ Advise the user in 1-2 friendly sentences regarding the detected risks. No markd
     const text = await generateLlmCompletion({
       systemPrompt,
       userPrompt: userMsg,
-      temperature: 0.3,
-      maxTokens: 150,
+      temperature: LLM_DEFAULTS.advisorTemperature,
+      maxTokens: LLM_DEFAULTS.advisorShortMaxTokens,
       responseMimeType: 'text/plain',
     });
     if (text?.trim()) return `⚠️ ${text.trim()}`;

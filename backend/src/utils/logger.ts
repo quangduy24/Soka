@@ -4,7 +4,7 @@
  */
 
 import winston from 'winston';
-import { LOG_LEVEL, NODE_ENV } from '../config/index.js';
+import { LOG_LEVEL, NODE_ENV, LOG_BODY_MAX_LEN } from '../config/index.js';
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
@@ -61,7 +61,7 @@ export function createTimer(label: string) {
  */
 export function logRequest(method: string, path: string, body?: any) {
   logger.debug(`→ ${method} ${path}`, {
-    body: body ? JSON.stringify(body).slice(0, 200) : undefined,
+    body: body ? JSON.stringify(body).slice(0, LOG_BODY_MAX_LEN) : undefined,
   });
 }
 

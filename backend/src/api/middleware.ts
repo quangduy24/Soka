@@ -5,7 +5,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { ZodSchema, ZodError } from 'zod';
-import { RATE_LIMIT } from '../config/index.js';
+import { RATE_LIMIT, MS_TO_SEC } from '../config/index.js';
 import { logger, logRequest, logResponse } from '../utils/logger.js';
 
 // ─── Request Validation Middleware ─────────────────────────────
@@ -87,27 +87,29 @@ export function rateLimiter(req: Request, res: Response, next: NextFunction) {
     logger.warn('Rate limit exceeded', { ip, count: entry.count });
     return res.status(429).json({
       error: 'Too many requests. Please try again later.',
-      retryAfter: Math.ceil((entry.resetAt - now) / 1000),
+      retryAfter: Math.ceil((entry.resetAt - now) / MS_TO_SEC),
     });
   }
 
   // Set rate limit headers
   res.setHeader('X-RateLimit-Limit', RATE_LIMIT.maxRequests);
   res.setHeader('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT.maxRequests - entry.count));
-  res.setHeader('X-RateLimit-Reset', Math.ceil(entry.resetAt / 1000));
+  res.setHeader('X-RateLimit-Reset', Math.ceil(entry.resetAt / MS_TO_SEC));
 
   next();
 }
 
 // Periodic cleanup of expired entries
-setInterval(() => {
+const rateLimitCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of rateLimitStore.entries()) {
     if (now > entry.resetAt) {
       rateLimitStore.delete(ip);
     }
   }
-}, 60_000);
+}, RATE_LIMIT.cleanupIntervalMs);
+// Do not keep the process alive for housekeeping alone.
+rateLimitCleanupTimer.unref?.();
 
 // ─── Request Logging Middleware ────────────────────────────────
 

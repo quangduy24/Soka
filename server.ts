@@ -17,7 +17,7 @@ import { createServer as createViteServer } from "vite";
 import { apiRouter } from "./backend/src/api/routes.js";
 import { rateLimiter, requestLogger, errorHandler } from "./backend/src/api/middleware.js";
 import { logger } from "./backend/src/utils/logger.js";
-import { SERVER_PORT, NODE_ENV, validateConfig, MEZO_CHAIN_ID, CORS_ORIGINS } from "./backend/src/config/index.js";
+import { SERVER_PORT, NODE_ENV, validateConfig, MEZO_CHAIN_ID, CORS_ORIGINS, API_BODY_LIMIT, SERVER_HOST } from "./backend/src/config/index.js";
 
 async function startServer() {
   validateConfig();
@@ -25,7 +25,7 @@ async function startServer() {
   const app = express();
 
   // ─── Core Middleware ─────────────────────────────────────────
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: API_BODY_LIMIT }));
 
   // CORS: same-origin by default; opt-in origins via CORS_ORIGIN env.
   app.use('/api', (req, res, next) => {
@@ -88,7 +88,7 @@ async function startServer() {
   }
 
   // ─── Start Server ────────────────────────────────────────────
-  app.listen(SERVER_PORT, "0.0.0.0", () => {
+  app.listen(SERVER_PORT, SERVER_HOST, () => {
     logger.info(`🚀 Soka Intent Engine running on http://localhost:${SERVER_PORT}`, {
       env: NODE_ENV,
       network: 'Mezo Testnet',
@@ -102,9 +102,13 @@ async function startServer() {
         'POST /api/balance',
         'POST /api/execute-swap',
         'POST /api/process-intent',
+        'POST /api/transfer',
         'POST /api/bridge-out',
         'GET  /api/bridge-info',
         'POST /api/mezo-rpc',
+        'GET  /api/capabilities',
+        'GET  /api/tokens',
+        'GET  /api/gas-price',
         'GET  /api/prices',
         'GET  /api/pools',
         'GET  /api/pools/:address',

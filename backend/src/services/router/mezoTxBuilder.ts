@@ -10,8 +10,12 @@ import {
   MEZO_SWAP_FACTORY,
   MEZO_CHAIN_ID,
   RISK_THRESHOLDS,
+  TX_CONFIG,
+  DEFAULT_SLIPPAGE_PCT,
+  ZERO_ADDRESS,
 } from '../../config/index.js';
 import { getDecimals, getAllowance, buildApproveTx } from '../../utils/erc20Utils.js';
+import { simulateCalls, type SimulateCall } from '../../utils/mezoClient.js';
 import { normalizeTokenAddress } from './mezoRouter.js';
 import type { ExecuteSwapResult, TxStep, RouteHop } from '../../types/index.js';
 import rawRouterAbi from '../../abi/mezoSwapRouter.json' with { type: 'json' };
@@ -26,6 +30,8 @@ export interface BuildSwapTxParams {
   destSymbol: string;
   amount: string;
   slippagePercent?: number;
+  /** Dry-run the call chain (default: only for real senders, never quote-only zero address) */
+  simulate?: boolean;
   routerData?: {
     routes: RouteHop[];
     amountIn: string;
@@ -48,9 +54,10 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
     sourceSymbol,
     destSymbol,
     amount,
-    slippagePercent = 0.5,
-    routerData,
-  } = params;
+  slippagePercent = DEFAULT_SLIPPAGE_PCT,
+  routerData,
+  simulate = senderAddress.toLowerCase() !== ZERO_ADDRESS.toLowerCase(),
+} = params;
 
   // Native BTC is routed through the wBTC precompile (an ERC-20 mirror of the
   // native balance). The Tigris router exposes no payable ETH-style swaps, so
@@ -69,10 +76,13 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
   if (routerData?.amountOut) {
     expectedAmountOut = BigInt(routerData.amountOut);
   }
-  const minAmountOut = (expectedAmountOut * BigInt(Math.floor((100 - slippagePercent) * 100))) / 10000n;
+  const minAmountOut =
+    (expectedAmountOut *
+      BigInt(Math.floor((TX_CONFIG.pctToBpsScale - slippagePercent) * TX_CONFIG.pctToBpsScale))) /
+    TX_CONFIG.slippageBpsDenominator;
 
-  // Set execution deadline (current timestamp + 20 minutes)
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+  // Execution deadline from operator config (default 20 minutes)
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + TX_CONFIG.deadlineSec);
 
   // Format routes for the Tigris router (from/to/stable/factory per hop)
   const routes: { from: Address; to: Address; stable: boolean; factory: Address }[] =
@@ -93,7 +103,7 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
   try {
     const currentAllowance = await getAllowance(tokenIn, senderAddress, MEZO_SWAP_ROUTER);
     if (currentAllowance < parsedAmountIn) {
-      const approvePayload = buildApproveTx(tokenIn, MEZO_SWAP_ROUTER, parsedAmountIn * 10n);
+      const approvePayload = buildApproveTx(tokenIn, MEZO_SWAP_ROUTER, parsedAmountIn * TX_CONFIG.approveMultiplier);
       txSteps.push({
         index: txSteps.length + 1,
         action: 'APPROVE',
@@ -105,7 +115,7 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
     }
   } catch {
     // If allowance read fails, add the approval step as standard safety measure
-    const approvePayload = buildApproveTx(tokenIn, MEZO_SWAP_ROUTER, parsedAmountIn * 10n);
+    const approvePayload = buildApproveTx(tokenIn, MEZO_SWAP_ROUTER, parsedAmountIn * TX_CONFIG.approveMultiplier);
     txSteps.push({
       index: txSteps.length + 1,
       action: 'APPROVE',
@@ -140,6 +150,39 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
     gasLimit: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
   });
 
+  // Honest dry-run: chained approve → swap against live state. Quote-only
+  // (zero-address) builds skip simulation and report an estimate instead.
+  let simulation: ExecuteSwapResult['simulation'] = {
+    success: true,
+    gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+    simulated: false,
+  };
+  if (simulate) {
+    try {
+      const calls: SimulateCall[] = txSteps
+        .filter((s) => s.data)
+        .map((s) => ({
+          to: s.to as Address,
+          data: s.data as `0x${string}`,
+          value: BigInt(s.value || '0'),
+        }));
+      const sim = await simulateCalls(senderAddress, calls);
+      simulation = {
+        success: sim.success,
+        gasUsed: sim.gasUsed ?? RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+        simulated: sim.simulated,
+        ...(sim.error ? { error: sim.error } : {}),
+      };
+    } catch (err) {
+      simulation = {
+        success: false,
+        gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+        simulated: false,
+        error: `Simulation failed: ${(err as Error).message}`,
+      };
+    }
+  }
+
   return {
     to: targetContract,
     data: txCalldata,
@@ -149,10 +192,7 @@ export async function buildMezoSwapTx(params: BuildSwapTxParams): Promise<Execut
     ptbSteps: txSteps, // alias for frontend UI
     transactionData: serializedTxData,
     transactionBytes: Buffer.from(serializedTxData).toString('base64'),
-    simulation: {
-      success: true,
-      gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
-    },
+    simulation,
     routeSummary: {
       inputAmount: amount,
       inputToken: sourceSymbol,

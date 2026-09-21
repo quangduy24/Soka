@@ -2,6 +2,7 @@ import React from 'react';
 import { Layers, ArrowRight, ExternalLink, Zap, Percent, Shield, AlertTriangle } from 'lucide-react';
 import type { RouteNode } from '../../types/shared';
 import { addressExplorerUrl } from '../../utils/explorer';
+import { UI_LIMITS } from '../../config';
 
 interface ProRouteVisualizerProps {
   sourceSymbol: string;
@@ -34,9 +35,10 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
   };
 
   const getImpactColor = (impactStr: string) => {
-    const val = parseFloat(impactStr.replace('%', '')) || 0;
-    if (val >= 5.0) return 'text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/20';
-    if (val >= 2.0) return 'text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/20';
+    const val = parseFloat(impactStr.replace('%', ''));
+    if (!Number.isFinite(val)) return 'text-[#845D74] bg-[#845D74]/10 border-[#845D74]/20';
+    if (val >= UI_LIMITS.impactDangerPct) return 'text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/20';
+    if (val >= UI_LIMITS.impactAmberPct) return 'text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/20';
     return 'text-[#10b981] bg-[#10b981]/10 border-[#10b981]/20';
   };
 
@@ -122,7 +124,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
                           {node.dex || 'Mezo Pools'}
                         </span>
                         <span className="text-[10px] font-meta text-[#845D74] bg-[#FAF8FA] border border-[#2C1924]/10 px-2 py-0.5 rounded-full">
-                          Split: {node.ratio || 100}%
+                          Split: {node.ratio != null ? `${node.ratio}%` : '—'}
                         </span>
                       </div>
                       {poolId && (
@@ -162,7 +164,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
           <span className="text-[10px] font-meta text-[#845D74] uppercase">Price Impact</span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${getImpactColor(executionImpact)}`}>
-              {executionImpact || '0.05%'}
+              {executionImpact || '—'}
             </span>
           </div>
         </div>
@@ -171,7 +173,7 @@ export const ProRouteVisualizer: React.FC<ProRouteVisualizerProps> = ({
           <span className="text-[10px] font-meta text-[#845D74] uppercase">Optimal Slippage</span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-xs font-mono font-bold text-[#2C1924] bg-white border border-[#2C1924]/10 px-2 py-0.5 rounded-lg">
-              {slippage || '0.50%'}
+              {slippage || '—'}
             </span>
           </div>
         </div>

@@ -19,7 +19,7 @@ interface HistoryPanelProps {
 
 /* ── tiny helpers ─────────────────────────────────────────────── */
 
-const PairBadge: React.FC<{ a?: string; b?: string }> = ({ a = 'SUI', b = 'USDC' }) => {
+const PairBadge: React.FC<{ a?: string; b?: string }> = ({ a = 'BTC', b = 'MUSD' }) => {
   const short = (s: string) => {
     const tail = s.split('::').pop() || s;
     return tail.length > 6 ? tail.slice(0, 3).toUpperCase() : tail.toUpperCase();

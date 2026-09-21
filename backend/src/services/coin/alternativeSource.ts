@@ -7,7 +7,7 @@
 import { getAllBalances } from './coinService.js';
 import { resolveTokenLogo } from './tokenResolver.js';
 import { getTokenUsdPrice } from '../prices/priceService.js';
-import { TOKEN_WHITELIST } from '../../config/constant.js';
+import { TOKEN_WHITELIST, NATIVE_SYMBOL, ALT_SOURCE_MIN_USD, ALT_SOURCE_RATIO, API_PAGINATION, DISPLAY_DECIMALS } from '../../config/index.js';
 
 export interface AlternativeSource {
   symbol: string;
@@ -30,14 +30,14 @@ export async function findAlternativeSources(params: {
   intendedAmount: string;
   limit?: number;
 }): Promise<AlternativeSource[]> {
-  const { walletAddress, destAddress, intendedSourceAddress, intendedAmount, limit = 5 } = params;
+  const { walletAddress, destAddress, intendedSourceAddress, intendedAmount, limit = API_PAGINATION.tokenSearchLimit } = params;
 
   const balances = await getAllBalances(walletAddress);
 
   // Target approximate USD value from the real on-chain price (unknown -> no suggestions)
   const intendedSymbol = TOKEN_WHITELIST.find(
     (t) => t.address.toLowerCase() === intendedSourceAddress.toLowerCase()
-  )?.symbol || 'BTC';
+  )?.symbol || NATIVE_SYMBOL;
   const intendedPrice = await getTokenUsdPrice(intendedSymbol);
   if (intendedPrice.priceUsd == null) return [];
   const targetUsd = parseFloat(intendedAmount) * intendedPrice.priceUsd;
@@ -60,8 +60,8 @@ export async function findAlternativeSources(params: {
     if (tokenPrice.priceUsd == null || tokenPrice.priceUsd <= 0) continue;
     const usdValue = balanceNum * tokenPrice.priceUsd;
 
-    if (usdValue >= Math.max(1, targetUsd * 0.1)) {
-      const neededAmount = (targetUsd / (tokenPrice.priceUsd as number)).toFixed(4);
+    if (usdValue >= Math.max(ALT_SOURCE_MIN_USD, targetUsd * ALT_SOURCE_RATIO)) {
+      const neededAmount = (targetUsd / (tokenPrice.priceUsd as number)).toFixed(DISPLAY_DECIMALS.pool);
       candidates.push({
         symbol: b.symbol,
         tokenAddress: b.tokenAddress,

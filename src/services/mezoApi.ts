@@ -53,21 +53,78 @@ export interface ExecuteTxResult {
     value?: string;
   }>;
   transactionData: string;
+  guardian?: GuardianResult | null;
+  simulation?: {
+    success: boolean;
+    gasUsed: string;
+    simulated: boolean;
+    error?: string;
+  };
   routeSummary: {
     inputAmount: string;
     inputToken: string;
     expectedOutput: string;
     outputToken: string;
-    priceImpact: string;
+    priceImpact: string | null;
   };
 }
 
+export interface AdviseExample {
+  prompt: string;
+  description: string;
+}
+
+export interface FallbackAdvise {
+  error: 'unclear_intent' | 'unsupported_action' | 'unknown_token' | 'missing_field';
+  message: string;
+  missing: string[];
+  supportedActions: string[];
+  examples: AdviseExample[];
+}
+
+export interface GuardianResult {
+  safe: boolean;
+  score: number;
+  riskLevel: string;
+  checks: Array<{
+    name: string;
+    status: 'SAFE' | 'NEUTRAL' | 'WARNING' | 'DANGER';
+    message: string;
+    value?: number;
+    threshold?: number;
+    category?: string;
+  }>;
+}
+
+/** Rejection from the backend pipeline — always carries user-facing advise. */
+export class ApiRejectError extends Error {
+  readonly status: number;
+  readonly advise: FallbackAdvise | null;
+  readonly tokenSuggestion: { missingSymbol: string; candidates: unknown[] } | null;
+  readonly guardian: GuardianResult | null;
+  readonly payload: any;
+
+  constructor(status: number, body: any, fallback: string) {
+    super((body as any)?.error || fallback);
+    this.name = 'ApiRejectError';
+    this.status = status;
+    this.advise = (body as any)?.advise ?? null;
+    this.tokenSuggestion = (body as any)?.tokenSuggestion ?? null;
+    this.guardian = (body as any)?.guardian ?? null;
+    this.payload = body;
+  }
+}
+
+// Static member access so Vite inlines the value at transform time.
 const API_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+  import.meta.env.VITE_API_URL ||
   (typeof window !== 'undefined' ? '' : 'http://localhost:3000');
 
 async function parseError(res: Response, fallback: string): Promise<Error> {
   const err = await res.json().catch(() => ({ error: res.statusText }));
+  if ((err as any)?.advise || (err as any)?.guardian || (err as any)?.tokenSuggestion) {
+    return new ApiRejectError(res.status, err, fallback);
+  }
   const details = Array.isArray((err as any)?.details)
     ? (err as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join('; ')
     : typeof (err as any)?.details === 'string'
@@ -141,12 +198,14 @@ export const mezoApi = {
   },
 
   /**
-   * Processes a natural language trading or bridging intent.
+   * Processes a natural language intent. Rejections throw ApiRejectError with
+   * structured advise (422) or guardian results (403) — never a fake quote.
    */
   async processIntent(params: {
     prompt: string;
     senderAddress: string;
     slippage?: number;
+    acknowledgeRisk?: boolean;
   }): Promise<any> {
     const res = await fetch(`${API_BASE}/api/process-intent`, {
       method: 'POST',
@@ -160,7 +219,7 @@ export const mezoApi = {
   },
 
   /**
-   * Executes a direct swap by building the unsigned transaction payload.
+   * Builds the unsigned swap payload (fresh on-chain quote + guardian gate).
    */
   async executeSwap(params: {
     senderAddress: string;
@@ -168,6 +227,7 @@ export const mezoApi = {
     destSymbol: string;
     amount: string;
     slippage?: number;
+    acknowledgeRisk?: boolean;
   }): Promise<ExecuteTxResult> {
     const res = await fetch(`${API_BASE}/api/execute-swap`, {
       method: 'POST',
@@ -178,6 +238,59 @@ export const mezoApi = {
     if (!res.ok) throw await parseError(res, 'Failed to build swap transaction');
 
     return res.json();
+  },
+
+  /**
+   * Builds an unsigned direct transfer (never a swap).
+   */
+  async transfer(params: {
+    senderAddress: string;
+    tokenSymbol?: string;
+    tokenAddress?: string;
+    amount: string;
+    recipient: string;
+  }): Promise<ExecuteTxResult> {
+    const res = await fetch(`${API_BASE}/api/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) throw await parseError(res, 'Failed to build transfer');
+
+    return res.json();
+  },
+
+  /**
+   * System capability registry: executable / advisory / unsupported actions.
+   */
+  async getCapabilities(): Promise<{ capabilities: Array<{ action: string; status: string; summary: string; requires: string[]; examples: AdviseExample[]; unavailableReason?: string }> }> {
+    return getJson('/api/capabilities');
+  },
+
+  /**
+   * Supported token list: backend whitelist plus on-chain discovered tokens.
+   */
+  async getTokens(): Promise<{ tokens: Array<{ symbol: string; name: string; address: string; decimals: number; isStable: boolean; aliases: string[]; source: string }> }> {
+    return getJson('/api/tokens');
+  },
+
+  /**
+   * Live network gas price with the operator warning threshold.
+   */
+  async getGasPrice(): Promise<{ gasPriceWei: string; gasPriceGwei: number | null; warnAboveGwei: number; elevated: boolean | null }> {
+    return getJson('/api/gas-price');
+  },
+
+  /**
+   * LLM-generated risk summary for a set of guardian checks.
+   */
+  async getRiskSummary(body: { sourceToken: string; destToken: string; amount: string; guardianChecks: unknown[]; routeNodes?: unknown[] }): Promise<any> {
+    return getJson('/api/risk-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   },
 };
 
@@ -239,6 +352,13 @@ export const marketApi = {
       body: JSON.stringify(body),
     });
   },
+  quotePaired(body: { tokenA: string; tokenB: string; stable: boolean; amountA: string }): Promise<{ amountB: string; reserveA: string; reserveB: string; poolAddress: string }> {
+    return getJson('/api/pools/quote-paired', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   addLiquidity(body: { senderAddress: string; tokenA: string; tokenB: string; stable: boolean; amountADesired: string; amountBDesired: string }): Promise<ExecuteTxResult> {
     return getJson('/api/pools/add-liquidity', {
       method: 'POST',
@@ -255,6 +375,20 @@ export const marketApi = {
   },
   borrowQuote(body: { walletAddress?: string; collateralSymbol: string; collateralAmount: string; debtSymbol: string }): Promise<any> {
     return getJson('/api/borrow-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  borrowReverseQuote(body: { walletAddress?: string; collateralSymbol: string; desiredDebtAmount: string; debtSymbol: string }): Promise<any> {
+    return getJson('/api/borrow-reverse-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  borrowExecute(body: { senderAddress: string; collateralSymbol: string; collateralAmount: string; debtSymbol: string }): Promise<any> {
+    return getJson('/api/borrow-execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

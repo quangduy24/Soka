@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, AlertTriangle, XCircle, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Skull } from 'lucide-react';
 import type { RiskCheck } from '../../types/shared';
 import { mezoExplorerUrl } from '../../utils/explorer';
+import { GUARDIAN_BANDS } from '../../config';
 
 interface ProGuardianRadarProps {
   score: number;
@@ -10,16 +11,16 @@ interface ProGuardianRadarProps {
 }
 
 export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
-  score = 95,
-  riskLevel = 'LOW',
+  score,
+  riskLevel,
   checks = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const getScoreColor = (sc: number) => {
-    if (sc >= 80) return 'text-[#10b981] border-[#10b981]/30 bg-[#10b981]/10';
-    if (sc >= 60) return 'text-[#06b6d4] border-[#06b6d4]/30 bg-[#06b6d4]/10';
-    if (sc >= 30) return 'text-[#f59e0b] border-[#f59e0b]/30 bg-[#f59e0b]/10';
+    if (sc >= GUARDIAN_BANDS.low) return 'text-[#10b981] border-[#10b981]/30 bg-[#10b981]/10';
+    if (sc >= GUARDIAN_BANDS.medium) return 'text-[#06b6d4] border-[#06b6d4]/30 bg-[#06b6d4]/10';
+    if (sc >= GUARDIAN_BANDS.high) return 'text-[#f59e0b] border-[#f59e0b]/30 bg-[#f59e0b]/10';
     return 'text-[#ef4444] border-[#ef4444]/30 bg-[#ef4444]/10';
   };
 
@@ -72,7 +73,7 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
         <div className="flex flex-col">
           <span className="text-[10px] font-meta text-[#845D74] uppercase">Deterministic Safety Score</span>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className={`text-2xl font-mono font-extrabold ${score >= 80 ? 'text-[#10b981]' : score >= 60 ? 'text-[#06b6d4]' : score >= 30 ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
+            <span className={`text-2xl font-mono font-extrabold ${score >= GUARDIAN_BANDS.low ? 'text-[#10b981]' : score >= GUARDIAN_BANDS.medium ? 'text-[#06b6d4]' : score >= GUARDIAN_BANDS.high ? 'text-[#f59e0b]' : 'text-[#ef4444]'}`}>
               {score}
             </span>
             <span className="text-xs font-mono text-[#845D74]">/ 100</span>
@@ -80,7 +81,7 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
         </div>
 
         <div className={`px-3 py-1.5 rounded-xl border font-mono text-xs font-bold ${getScoreColor(score)}`}>
-          {riskLevel || (score >= 80 ? 'LOW RISK' : score >= 60 ? 'MODERATE' : 'ELEVATED RISK')}
+          {riskLevel || (score >= GUARDIAN_BANDS.low ? 'LOW RISK' : score >= GUARDIAN_BANDS.medium ? 'MODERATE' : 'ELEVATED RISK')}
         </div>
       </div>
 
@@ -107,7 +108,7 @@ export const ProGuardianRadar: React.FC<ProGuardianRadarProps> = ({
           onClick={() => setIsExpanded(!isExpanded)}
           className="w-full flex items-center justify-between py-1 text-xs font-meta text-[#845D74] hover:text-[#DF7AA7] transition-colors cursor-pointer"
         >
-          <span>7-Point On-Chain Audit Details ({checks.length || 7} checks)</span>
+          <span>On-Chain Audit Details ({checks.length} checks)</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5 text-[#845D74]" />}
         </button>
 

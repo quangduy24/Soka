@@ -70,6 +70,14 @@ export const TOKEN_WHITELIST: WhitelistToken[] = [
   },
   // Stablecoins
   {
+    symbol: 'MUSD',
+    name: 'Mezo USD',
+    address: (process.env.MEZO_MUSD_ADDRESS || '0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503') as `0x${string}`,
+    decimals: 18,
+    isStable: true,
+    aliases: ['musd', 'mezo usd'],
+  },
+  {
     symbol: 'mUSDC',
     name: 'Mezo USD Coin',
     address: (process.env.TOKEN_MUSDC_ADDRESS || '0xe1a26db653708A2AD8F824E92Db9852410e33A59') as `0x${string}`,

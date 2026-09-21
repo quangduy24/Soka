@@ -112,6 +112,7 @@ export const ProSwapper: React.FC = () => {
   // Borrow state - chat flow
   const [borrowToken, setBorrowToken] = useState<"MUSD" | "MUSDC" | null>(null);
   const [collateralAmount, setCollateralAmount] = useState("");
+  const [desiredBorrowAmount, setDesiredBorrowAmount] = useState<string>("");
   const [borrowStep, setBorrowStep] = useState<"idle" | "select_token" | "enter_amount" | "review" | "success">("idle");
   const [borrowAcknowledged, setBorrowAcknowledged] = useState(false);
   // Vault state - chat flow
@@ -207,11 +208,47 @@ export const ProSwapper: React.FC = () => {
     setBorrowAcknowledged(false);
     setSokaMessage("Which token would you like to borrow? Select MUSD or MUSDC:");
   };
-  const handleSelectBorrowToken = (token: "MUSD" | "MUSDC") => {
-    setBorrowToken(token);
+
+  const calculateBorrowCollateral = async (amount: string, token: "MUSD" | "MUSDC") => {
     setBorrowStep("enter_amount");
-    setSokaMessage(`You selected ${token}. How much BTC would you like to deposit as collateral?`);
+    setBorrowQuoteLoading(true);
+    setSokaMessage(`Calculating exact collateral needed for ${amount} ${token}...`);
+    
+    try {
+      const reverseQuote = await marketApi.borrowReverseQuote({
+        walletAddress: walletAddress || undefined,
+        collateralSymbol: "BTC",
+        desiredDebtAmount: amount,
+        debtSymbol: token
+      });
+      
+      setCollateralAmount(reverseQuote.requiredCollateralAmount);
+      setSokaMessage(`You want to borrow ${amount} ${token}. The required collateral has been automatically calculated.`);
+      setBorrowQuoteLoading(false);
+    } catch (err: any) {
+      setBorrowQuoteLoading(false);
+      setBorrowQuoteError(err.message || "Failed to calculate required collateral.");
+      
+      if (err.advise) {
+        setSokaMessage(err.advise.message || "Unable to calculate borrow requirements due to an issue.");
+      } else {
+        setSokaMessage(`Failed to calculate collateral for ${amount} ${token}. Please enter it manually.`);
+      }
+    }
   };
+
+  const handleSelectBorrowToken = async (token: "MUSD" | "MUSDC") => {
+    setBorrowToken(token);
+    setBorrowQuote(null);
+    setBorrowQuoteError(null);
+    if (desiredBorrowAmount) {
+      await calculateBorrowCollateral(desiredBorrowAmount, token);
+    } else {
+      setBorrowStep("enter_amount");
+      setSokaMessage(`You selected ${token}. How much BTC would you like to deposit as collateral?`);
+    }
+  };
+
   const handleBorrowAmountSubmit = async () => {
     if (!collateralAmount || parseFloat(collateralAmount) <= 0 || !borrowToken) return;
     setBorrowQuoteLoading(true);
@@ -236,10 +273,7 @@ export const ProSwapper: React.FC = () => {
       setBorrowQuoteLoading(false);
     }
   };
-  const handleBorrowConfirm = () => {
-    // No lending pool contract exists on Mezo testnet: never fabricate success.
-    setSokaMessage(`Borrow execution is unavailable: no lending pool contract exists on Mezo testnet. Your quote (${borrowQuote?.maxBorrowAmount ?? "—"} ${borrowToken ?? ""}) remains advisory only.`);
-  };
+
   const handleBorrowCancel = () => {
     setBorrowStep("idle");
     setCollateralAmount("");
@@ -247,6 +281,7 @@ export const ProSwapper: React.FC = () => {
     setBorrowAcknowledged(false);
     setBorrowQuote(null);
     setBorrowQuoteError(null);
+    setTxDigest(null);
     setSokaMessage("Borrow cancelled. Is there anything else I can help you with?");
   };
   // Borrow figures always come from the live quote (never local estimates).
@@ -340,6 +375,32 @@ export const ProSwapper: React.FC = () => {
     if (chainId !== mezoTestnet.id) {
       throw new Error(`Wrong network: switch your wallet to Mezo Testnet (chain ${mezoTestnet.id})`);
     }
+
+    // Execute multi-step transactions (like Approve -> Swap) sequentially
+    if (tx.txSteps && Array.isArray(tx.txSteps) && tx.txSteps.length > 0) {
+      let finalHash = "";
+      for (const step of tx.txSteps) {
+        setSokaMessage(`Please confirm transaction: ${step.description || step.action} (${step.index}/${tx.txSteps.length})`);
+        const target = step.to as `0x${string}`;
+        const txData = (step.data || "0x") as `0x${string}`;
+        const txVal = BigInt(step.value || "0");
+        const gasLim = step.gasLimit ? BigInt(step.gasLimit) : undefined;
+        
+        const hash = await sendTransactionAsync({ to: target, data: txData, value: txVal, gas: gasLim });
+        if (!hash) throw new Error(`No transaction hash returned for step ${step.index}`);
+        
+        setSokaMessage(`Transaction submitted. Waiting for confirmation...`);
+        if (publicClient) {
+          const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+          if (receipt.status === 'reverted') throw new Error(`Step ${step.index} reverted on-chain: ${hash}`);
+        }
+        finalHash = hash;
+      }
+      setTxDigest(finalHash);
+      setSokaMessage(`Transaction successful!`);
+      return finalHash;
+    }
+
     let target = (tx.to || tx.target) as `0x${string}`;
     let txData = (tx.data || "0x") as `0x${string}`;
     let txVal = BigInt(tx.value || "0");
@@ -405,12 +466,18 @@ export const ProSwapper: React.FC = () => {
     setLiqQuoteLoading(true);
     setLiqQuoteError(null);
     try {
+      let amountB = liquidityAmount;
+      const resA = parseFloat(pool.token0.reserve);
+      const resB = parseFloat(pool.token1.reserve);
+      if (resA > 0 && resB > 0) {
+        amountB = (parseFloat(liquidityAmount) * (resB / resA)).toFixed(6);
+      }
       const quote = await marketApi.quoteAddLiquidity({
         tokenA: pool.token0.address,
         tokenB: pool.token1.address,
         stable: pool.stable ?? false,
         amountADesired: liquidityAmount,
-        amountBDesired: liquidityAmount,
+        amountBDesired: amountB,
       });
       setLiqQuote({ ...quote, poolAddress: pool.address, tokenA: pool.token0, tokenB: pool.token1 });
       setSokaMessage(`📋 Add-liquidity Preview (live quote):\n\n• Pool: ${poolDisplayName(pool)}\n• You supply: ${quote.quotedAmountA} ${pool.token0.symbol} + ${quote.quotedAmountB} ${pool.token1.symbol}\n• LP tokens: ${quote.liquidityTokens}\n\nUse Confirm below to sign with your wallet.`);
@@ -501,7 +568,7 @@ export const ProSwapper: React.FC = () => {
   useEffect(() => { const ii = searchParams.get("intent"); if (ii) handleProcessIntent(ii); }, [searchParams]);
 
   // Parse user intent and route to appropriate feature
-  const parseUserIntent = (prompt: string) => {
+  const parseUserIntent = async (prompt: string) => {
     const lowerPrompt = prompt.toLowerCase();
 
     // Extract amount from prompt (e.g., "1000", "1000 USDC", "1000$")
@@ -515,38 +582,7 @@ export const ProSwapper: React.FC = () => {
       return true;
     }
 
-    // Vault/Deposit intents - only when vault/stake/earn is explicitly mentioned
-    if (lowerPrompt.includes("vault") || lowerPrompt.includes("stake") || lowerPrompt.includes("earn yield") || lowerPrompt.includes("earn interest") || lowerPrompt.includes("provide liquidity")) {
-      const btcMatch = lowerPrompt.match(/btc|bitcoin/);
-      const mushMatch = lowerPrompt.match(/mush/);
-      const usdcMatch = lowerPrompt.match(/usdc/);
-      const mezoMatch = lowerPrompt.match(/mezo/);
-      const musdMatch = lowerPrompt.match(/musd/);
-      const tbtcMatch = lowerPrompt.match(/tbtc/);
-
-      resetAllFeatures();
-      setActiveAction("vault");
-      setVaultStep("list");
-      setSokaMessage("Live Mezo Swap pools as yield venues are loading on-chain. Select a venue to supply liquidity and mint real LP tokens.");
-
-      // Auto-select venue if tokens mentioned (matches against live pools)
-      const mentions = [btcMatch && "btc", mushMatch && "mush", usdcMatch && "usdc", mezoMatch && "mezo", musdMatch && "musd", tbtcMatch && "tbtc"].filter(Boolean) as string[];
-
-      if (mentions.length > 0) {
-        setTimeout(() => {
-          const venue = pools.find((p) =>
-            mentions.some((m) => p.token0.symbol.toLowerCase().includes(m) || p.token1.symbol.toLowerCase().includes(m))
-          ) ?? pools[0];
-          if (!venue) {
-            setSokaMessage("No live pools are available yet. Check that the backend is running and the factory is reachable.");
-            return;
-          }
-          handleSelectVault(venue.address);
-          if (extractedAmount) setDepositAmount(extractedAmount);
-        }, 500);
-      }
-      return true;
-    }
+    // Vault intents are now handled by the backend's LLM intent parser.
 
     // Deposit money (nạp tiền) - show transaction deposit flow
     if (lowerPrompt.includes("deposit") || lowerPrompt.includes("nạp") || lowerPrompt.includes("put money") || lowerPrompt.includes("add money") || lowerPrompt.includes("add funds")) {
@@ -567,18 +603,30 @@ export const ProSwapper: React.FC = () => {
       setBorrowStep("enter_amount");
       setBorrowAcknowledged(false);
 
+      if (extractedAmount) {
+        setDesiredBorrowAmount(extractedAmount);
+      } else {
+        setDesiredBorrowAmount("");
+      }
+
       if (musdMatch) {
         setBorrowToken("MUSD");
-        setCollateralAmount(extractedAmount || "");
-        setSokaMessage(`You want to borrow ${extractedAmount || ""} MUSD. Please enter collateral amount in BTC:`);
       } else if (musdcMatch) {
         setBorrowToken("MUSDC");
-        setCollateralAmount(extractedAmount || "");
-        setSokaMessage(`You want to borrow ${extractedAmount || ""} MUSDC. Please enter collateral amount in BTC:`);
       } else {
         setBorrowStep("select_token");
         setBorrowToken(null);
-        setSokaMessage("I can help you borrow tokens. Which token would you like to borrow? Select MUSD or MUSDC:");
+        setSokaMessage(extractedAmount 
+          ? `You want to borrow ${extractedAmount} stablecoin. What stablecoin would you like to borrow against your BTC?` 
+          : "What stablecoin would you like to borrow against your BTC?");
+        return true;
+      }
+
+      if (extractedAmount) {
+        await calculateBorrowCollateral(extractedAmount, musdMatch ? "MUSD" : "MUSDC");
+      } else {
+        setCollateralAmount("");
+        setSokaMessage(`You want to borrow ${musdMatch ? "MUSD" : "MUSDC"}. How much BTC will you deposit as collateral?${walletAddress ? "" : " (Connect a wallet to use balance percentages.)"}`);
       }
       return true;
     }
@@ -643,7 +691,7 @@ export const ProSwapper: React.FC = () => {
     setSubmittedUserPrompt(prompt);
 
     // Try to parse intent locally first
-    const handled = parseUserIntent(prompt);
+    const handled = await parseUserIntent(prompt);
     if (handled) {
       setIntentPrompt("");
       return;
@@ -664,9 +712,10 @@ export const ProSwapper: React.FC = () => {
       }
       if (data.tokenSuggestion) { setTokenSuggestion(data.tokenSuggestion); setIsProcessing(false); upsertHistory(swapId, { status: "FAILED" }); return; }
       if (data.alternativeSource) setAlternativeSource(data.alternativeSource);
+      if (data.advise && data.advise.message) { setSokaMessage(data.advise.message); }
       if (data.intent) { setSourceSymbol(data.intent.source_token_symbol || "BTC"); setDestSymbol(data.intent.destination_token_symbol || "MUSD"); setTradeAmount(data.intent.trade_amount || "0.05"); }
       const patch: Partial<SwapSnapshot> = { sourceSymbol: data.intent?.source_token_symbol || undefined, destSymbol: data.intent?.destination_token_symbol || undefined, amount: data.intent?.trade_amount || undefined };
-      if (data.route) { setRouteNodes(data.route.route || []); setExpectedOutput(Number(data.route.expected_output || 0).toFixed(4)); setExecutionImpact(data.route.execution_impact || "0.05%"); patch.routeNodes = data.route.route || []; patch.expectedOutput = Number(data.route.expected_output || 0).toFixed(4); patch.executionImpact = data.route.execution_impact || "0.05%"; }
+      if (data.route) { setRouteNodes(data.route.route || []); setExpectedOutput(parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString()); setExecutionImpact(data.route.execution_impact || "0.05%"); patch.routeNodes = data.route.route || []; patch.expectedOutput = parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString(); patch.executionImpact = data.route.execution_impact || "0.05%"; }
       if (data.guardian) { setGuardianSafe(data.guardian.safe); setGuardianScore(data.guardian.score || 90); setGuardianRiskLevel(data.guardian.riskLevel || "LOW"); setGuardianChecks(data.guardian.checks || []); patch.guardianSafe = !!data.guardian.safe; patch.guardianScore = data.guardian.score || 90; patch.guardianRiskLevel = data.guardian.riskLevel || "LOW"; patch.checks = data.guardian.checks || []; }
       upsertHistory(swapId, patch);
     } catch (err: any) { setErrorMessage(err.message || "Error communicating with SOKA"); upsertHistory(swapId, { status: "FAILED" }); }
@@ -802,75 +851,75 @@ export const ProSwapper: React.FC = () => {
               {/* Action Buttons */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2 ml-0 sm:ml-12">
                 <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("transaction"); setShowTransactionMenu(true); }} 
+                  onClick={() => { resetAllFeatures(); setActiveAction("swap"); setIntentPrompt("Swap 0.05 BTC to MUSD"); }} 
                   className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "transaction" 
+                    activeAction === "swap" 
                       ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
                       : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "transaction" 
+                    activeAction === "swap" 
                       ? "bg-[#DF7AA7] text-white" 
                       : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
                   }`}>
                     <ArrowRightLeft className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180" />
                   </div>
-                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Transaction</span>
-                </button>
-
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("borrow"); handleOpenBorrow(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "borrow" 
-                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
-                  }`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "borrow" 
-                      ? "bg-[#DF7AA7] text-white" 
-                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
-                  }`}>
-                    <Landmark className="w-3.5 h-3.5 transition-transform duration-300 group-hover:-translate-y-0.5" />
-                  </div>
-                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Borrow</span>
-                </button>
-
-                <button 
-                  onClick={() => { resetAllFeatures(); setActiveAction("vault"); handleOpenVault(); }} 
-                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
-                    activeAction === "vault" 
-                      ? "bg-emerald-50/70 border-emerald-500 text-emerald-700 font-bold shadow-xs" 
-                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-emerald-400 hover:text-emerald-700 shadow-2xs hover:-translate-y-0.5"
-                  }`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "vault" 
-                      ? "bg-emerald-600 text-white" 
-                      : "bg-[#FAF8FA] text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
-                  }`}>
-                    <Vault className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-12" />
-                  </div>
-                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Vault</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Swap</span>
                 </button>
 
                 <button 
                   onClick={() => { resetAllFeatures(); setActiveAction("pool"); handleOpenPool(); }} 
                   className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
                     activeAction === "pool" 
+                      ? "bg-emerald-50/70 border-emerald-500 text-emerald-700 font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-emerald-400 hover:text-emerald-700 shadow-2xs hover:-translate-y-0.5"
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
+                    activeAction === "pool" 
+                      ? "bg-emerald-600 text-white" 
+                      : "bg-[#FAF8FA] text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
+                  }`}>
+                    <Waves className="w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110" />
+                  </div>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Pool</span>
+                </button>
+
+                <button 
+                  onClick={() => { resetAllFeatures(); setActiveAction("bridge"); setIntentPrompt("Bridge 0.01 BTC to Ethereum [paste 0x address]"); }} 
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
+                    activeAction === "bridge" 
                       ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
                       : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
                   }`}
                 >
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
-                    activeAction === "pool" 
+                    activeAction === "bridge" 
                       ? "bg-[#DF7AA7] text-white" 
                       : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
                   }`}>
-                    <Waves className="w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110" />
+                    <Upload className="w-3.5 h-3.5 transition-transform duration-300 group-hover:-translate-y-0.5" />
                   </div>
-                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Pool</span>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Bridge</span>
+                </button>
+
+                <button 
+                  onClick={() => { resetAllFeatures(); setActiveAction("transfer"); setIntentPrompt("Transfer 10 MUSD to [paste 0x address]"); }} 
+                  className={`group relative flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border transition-all duration-200 select-none cursor-pointer ${
+                    activeAction === "transfer" 
+                      ? "bg-[#FFF6F9] border-[#DF7AA7] text-[#DF7AA7] font-bold shadow-xs" 
+                      : "bg-white hover:bg-[#FAF8FA] border-[#2C1924]/[0.08] text-[#2C1924] font-medium hover:border-[#DF7AA7]/50 hover:text-[#DF7AA7] shadow-2xs hover:-translate-y-0.5"
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 shadow-2xs shrink-0 ${
+                    activeAction === "transfer" 
+                      ? "bg-[#DF7AA7] text-white" 
+                      : "bg-[#FAF8FA] text-[#DF7AA7] group-hover:bg-[#DF7AA7] group-hover:text-white"
+                  }`}>
+                    <Send className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </div>
+                  <span className="text-[12.5px] font-semibold tracking-tight font-meta">Transfer</span>
                 </button>
               </div>
 
@@ -982,7 +1031,21 @@ export const ProSwapper: React.FC = () => {
                       <>
                         <div className="mb-4">
                           <label className="font-meta text-[11px] font-bold uppercase tracking-wider text-[#845D74] mb-1.5 block">Collateral (BTC)</label>
-                          <input type="number" value={collateralAmount} onChange={(e) => setCollateralAmount(e.target.value)} placeholder="0.00" className="w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all" />
+                          <div className="relative">
+                            <input 
+                              type="number" 
+                              value={collateralAmount} 
+                              onChange={(e) => setCollateralAmount(e.target.value)} 
+                              disabled={borrowQuoteLoading}
+                              placeholder={borrowQuoteLoading ? "Calculating..." : "0.00"} 
+                              className={`w-full px-4 py-2.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.09] font-mono text-[17px] text-[#2C1924] outline-none placeholder:text-[#845D74]/50 focus:border-[#DF7AA7] focus:bg-white transition-all ${borrowQuoteLoading ? 'opacity-60 animate-pulse' : ''}`} 
+                            />
+                            {borrowQuoteLoading && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <RefreshCw className="w-4 h-4 text-[#DF7AA7] animate-spin" />
+                              </div>
+                            )}
+                          </div>
                         <div className="flex justify-between items-center mt-2">
                           <span className="font-mono text-[11px] text-[#845D74]">≈ ${borrowQuote ? collateralValueUsd.toFixed(2) : "—"} (live oracle)</span>
                           <div className="flex gap-1 font-mono">
@@ -1030,46 +1093,17 @@ export const ProSwapper: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 mb-4 font-meta text-[11.5px] text-amber-900">
-                          Execution unavailable: no lending pool contract exists on Mezo testnet. Quotes are advisory only.
+                        <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 mb-4 font-meta text-[11.5px] text-emerald-800">
+                          This calculation is advisory. Proceed to the Mezo Portal to execute this borrow transaction on-chain.
                         </div>
-                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 cursor-pointer mb-4 select-none" onClick={() => setBorrowAcknowledged(!borrowAcknowledged)}>
-                          <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center transition-colors ${borrowAcknowledged ? "bg-emerald-600 border-emerald-600" : "bg-white border-amber-300"}`}>
-                            {borrowAcknowledged && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                          <span className="font-meta text-[11.5px] font-semibold text-amber-900">I acknowledge the liquidation risk</span>
-                        </div>
+
                         <div className="flex gap-2.5 font-meta">
-                          <button onClick={handleBorrowCancel} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">Cancel</button>
-                          <button onClick={handleBorrowConfirm} disabled={!borrowAcknowledged} className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs disabled:opacity-50 transition-all cursor-pointer">Confirm</button>
+                          <button onClick={handleBorrowCancel} className="flex-1 py-2.5 rounded-xl border border-[#2C1924]/10 bg-white font-bold text-[13px] text-[#845D74] hover:bg-[#FAF8FA] transition-all cursor-pointer">Close</button>
+                          <a href="https://mezo.org/borrow" target="_blank" rel="noopener noreferrer" className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer text-center block leading-[1.6]">
+                            Go to Mezo Portal
+                          </a>
                         </div>
                       </>
-                    )}
-
-                    {/* Step 4: Success */}
-                    {borrowStep === "success" && (
-                      <div className="text-center py-4">
-                        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shadow-xs">
-                          <CheckCircle2 className="w-7 h-7 text-emerald-600" />
-                        </div>
-                        <div className="font-display text-[18px] font-bold text-[#2C1924] mb-1">Borrow Successful!</div>
-                        <div className="font-meta text-[13px] text-[#845D74] mb-3">Your position is now active on Mezo</div>
-                        <div className="p-3.5 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.08] inline-block mb-4 shadow-2xs">
-                          <div className="grid grid-cols-2 gap-4 text-left">
-                            <div>
-                              <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Borrowed</div>
-                              <div className="font-display text-[15px] font-bold text-[#DF7AA7]">{borrowAmount.toFixed(2)} {borrowToken}</div>
-                            </div>
-                            <div>
-                              <div className="font-meta text-[10px] text-[#845D74] uppercase tracking-wider font-bold">Collateral</div>
-                              <div className="font-display text-[15px] font-bold text-[#2C1924]">{collateralAmount} BTC</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-3 justify-center font-meta">
-                          <button onClick={handleBorrowCancel} className="px-5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 font-bold text-[12px] hover:bg-rose-100/80 transition-all cursor-pointer">Cancel Position</button>
-                        </div>
-                      </div>
                     )}
                   </div>
                 </div>
@@ -1552,7 +1586,7 @@ export const ProSwapper: React.FC = () => {
                       <a href={txExplorerUrl(txDigest)} target="_blank" rel="noreferrer" className="rounded-xl bg-[#DF7AA7] hover:bg-[#DF7AA7]/90 px-3 py-1 text-[11px] font-bold text-white inline-flex items-center gap-1 shadow-2xs transition-all">Mezo Explorer <ExternalLink className="h-3 w-3" /></a>
                     </div>
                   )}
-                  {hasRiskWarnings && (
+                  {hasRiskWarnings && !txDigest && (
                     <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 cursor-pointer select-none hover:bg-rose-50 transition-all shadow-2xs" onClick={() => setHasConfirmedSettings(!hasConfirmedSettings)}>
                       <button role="checkbox" aria-checked={hasConfirmedSettings} onClick={(e) => { e.stopPropagation(); setHasConfirmedSettings(!hasConfirmedSettings); }} className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-colors ${hasConfirmedSettings ? "bg-[#10b981] border-[#10b981]" : "bg-white border-rose-300"}`}>
                         <Check className="w-3 h-3 text-white" />
@@ -1561,11 +1595,13 @@ export const ProSwapper: React.FC = () => {
                     </div>
                   )}
                   <div className="flex items-stretch gap-2 font-meta">
-                    <button onClick={handleExecuteSwap} disabled={isExecuting || (!guardianSafe && !hasConfirmedSettings)} className={`flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all cursor-pointer ${!guardianSafe && !hasConfirmedSettings ? "bg-white/50 text-[#845D74]/50 border border-[#2C1924]/10 cursor-not-allowed" : "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99]"}`}>
-                      {isExecuting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Signing...</> : !address ? <><Wallet className="w-4 h-4" /> Connect Wallet</> : !guardianSafe && !hasConfirmedSettings ? <span>Acknowledge Risk</span> : <><span>Execute ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-4 h-4" /></>}
-                    </button>
+                    {!txDigest && (
+                      <button onClick={handleExecuteSwap} disabled={isExecuting || (hasRiskWarnings && !hasConfirmedSettings)} className={`flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 transition-all cursor-pointer ${hasRiskWarnings && !hasConfirmedSettings ? "bg-white/50 text-[#845D74]/50 border border-[#2C1924]/10 cursor-not-allowed" : "bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99]"}`}>
+                        {isExecuting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Signing...</> : !address ? <><Wallet className="w-4 h-4" /> Connect Wallet</> : hasRiskWarnings && !hasConfirmedSettings ? <span>Acknowledge Risk</span> : <><span>Execute ({tradeAmount} {sourceSymbol} → {destSymbol})</span><ArrowRight className="w-4 h-4" /></>}
+                      </button>
+                    )}
                     <button onClick={() => setShowDetails(v => !v)} className="px-4 py-3 rounded-2xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-colors cursor-pointer shadow-2xs">{showDetails ? "Hide" : "Details"}</button>
-                    <button onClick={handleCancelSwap} className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs">Cancel</button>
+                    <button onClick={handleCancelSwap} className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs">{txDigest ? "Close" : "Cancel"}</button>
                   </div>
                   {showDetails && (
                     <div className="flex flex-col gap-3 w-full max-h-[350px] overflow-y-auto custom-scrollbar rounded-2xl pr-1">

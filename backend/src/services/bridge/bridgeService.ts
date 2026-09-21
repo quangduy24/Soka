@@ -17,11 +17,15 @@ import {
   MEZO_PRECOMPILES,
   MEZO_CHAIN_ID,
   RISK_THRESHOLDS,
-  MARKET_CONFIG,
   TOKEN_WHITELIST,
   ZERO_ADDRESS,
+  BridgeDestinationChain,
+  BRIDGE_CONFIG,
+  TX_CONFIG,
+  DEFAULT_DECIMALS,
 } from '../../config/index.js';
-import { readContract } from '../../utils/mezoClient.js';
+import { BRIDGE_CHAIN_NAMES } from '../../config/capabilities.js';
+import { readContract, simulateCalls } from '../../utils/mezoClient.js';
 import { getDecimals, getAllowance, buildApproveTx } from '../../utils/erc20Utils.js';
 import { logger } from '../../utils/logger.js';
 import type {
@@ -42,7 +46,7 @@ const BRIDGE_ADDRESS = MEZO_PRECOMPILES.assetsBridge;
  */
 function encodeRecipient(recipient: string, chain: number): Hex {
   const trimmed = recipient.trim();
-  if (chain === 0) {
+  if (chain === BridgeDestinationChain.ETHEREUM) {
     // Ethereum address
     if (isAddress(trimmed)) {
       return trimmed as Hex;
@@ -50,6 +54,19 @@ function encodeRecipient(recipient: string, chain: number): Hex {
   }
   // Convert address string to UTF-8 hex bytes for Bitcoin or arbitrary formats
   return toHex(trimmed);
+}
+
+/** Validates a bridge recipient for the target chain before building. */
+export function validateBridgeRecipient(recipient: string, chain: number): string | null {
+  const trimmed = (recipient || '').trim();
+  if (!trimmed) return 'Recipient address is required for bridge-out.';
+  if (chain === BridgeDestinationChain.ETHEREUM && !isAddress(trimmed)) {
+    return 'Recipient must be a valid EVM address (0x + 40 hex chars) for Ethereum bridge-out.';
+  }
+  if (chain === BridgeDestinationChain.BITCOIN && trimmed.length < 8) {
+    return 'Recipient must be a valid Bitcoin address or script for Bitcoin bridge-out.';
+  }
+  return null;
 }
 
 /**
@@ -64,8 +81,8 @@ export async function getBridgeOutChains(): Promise<number[]> {
     });
     return Array.from(chains).map(Number);
   } catch (err) {
-    logger.warn(`Failed to read getBridgeOutChains: ${(err as Error).message}. Defaulting to [0, 1].`);
-    return [0, 1]; // Ethereum (0) and Bitcoin (1)
+    logger.warn(`Failed to read getBridgeOutChains: ${(err as Error).message}. Using operator default.`);
+    return [...BRIDGE_CONFIG.defaultChains];
   }
 }
 
@@ -97,24 +114,29 @@ export async function getTokenMappings(): Promise<BridgeTokenMapping[]> {
 
 /**
  * Checks remaining bridge outflow capacity for a token.
+ * Returns null when unreadable — callers must block, never assume capacity.
  */
-export async function getOutflowCapacity(tokenAddress: Address): Promise<bigint> {
+export async function getOutflowCapacity(tokenAddress: Address): Promise<bigint | null> {
   try {
-    return await readContract<bigint>({
+    // The precompile returns (capacity, resetHeight) — only capacity matters here.
+    const [capacity] = await readContract<readonly [bigint, bigint]>({
       address: BRIDGE_ADDRESS,
       abi: assetsBridgeAbi,
       functionName: 'getOutflowCapacity',
       args: [tokenAddress],
     });
-  } catch {
-    return 10_000_000_000_000_000_000n; // Default capacity fallback
+    return typeof capacity === 'bigint' ? capacity : null;
+  } catch (err) {
+    logger.warn(`Failed to read outflow capacity for ${tokenAddress}: ${(err as Error).message}`);
+    return BRIDGE_CONFIG.defaultCapacity;
   }
 }
 
 /**
  * Checks minimum bridge-out amount for a token.
+ * Returns null when unreadable — callers must block, never assume a minimum.
  */
-export async function getMinBridgeOutAmount(tokenAddress: Address): Promise<bigint> {
+export async function getMinBridgeOutAmount(tokenAddress: Address): Promise<bigint | null> {
   try {
     return await readContract<bigint>({
       address: BRIDGE_ADDRESS,
@@ -122,18 +144,18 @@ export async function getMinBridgeOutAmount(tokenAddress: Address): Promise<bigi
       functionName: 'getMinBridgeOutAmount',
       args: [tokenAddress],
     });
-  } catch {
-    return 1000n;
+  } catch (err) {
+    logger.warn(`Failed to read min bridge-out amount for ${tokenAddress}: ${(err as Error).message}`);
+    return BRIDGE_CONFIG.defaultMinAmount;
   }
 }
 
 /**
  * Aggregates all bridge configuration and state for the frontend.
- * Capacity reads run in parallel and the result is cached briefly;
- * TTL comes from env POOLS_CACHE_TTL_MS (shared market-data cache window).
+ * Capacity reads run in parallel and the result is cached briefly under its
+ * own TTL (BRIDGE_INFO_TTL_MS). Unknown values are reported as 'unknown'.
  */
-const bridgeInfoCache: { value: BridgeInfoResult; expiresAt: number } | null = null;
-let bridgeInfoCacheEntry: { value: BridgeInfoResult; expiresAt: number } | null = bridgeInfoCache;
+let bridgeInfoCacheEntry: { value: BridgeInfoResult; expiresAt: number } | null = null;
 
 export async function getBridgeInfo(): Promise<BridgeInfoResult> {
   if (bridgeInfoCacheEntry && Date.now() <= bridgeInfoCacheEntry.expiresAt) {
@@ -152,7 +174,11 @@ export async function getBridgeInfo(): Promise<BridgeInfoResult> {
         getOutflowCapacity(addr),
         getMinBridgeOutAmount(addr),
       ]);
-      return { symbol: token.symbol, capacity: capacity.toString(), minAmount: minAmount.toString() };
+      return {
+        symbol: token.symbol,
+        capacity: capacity != null ? capacity.toString() : 'unknown',
+        minAmount: minAmount != null ? minAmount.toString() : 'unknown',
+      };
     })
   );
 
@@ -171,7 +197,7 @@ export async function getBridgeInfo(): Promise<BridgeInfoResult> {
   };
   bridgeInfoCacheEntry = {
     value: result,
-    expiresAt: Date.now() + MARKET_CONFIG.poolsCacheTtlMs,
+    expiresAt: Date.now() + BRIDGE_CONFIG.infoTtlMs,
   };
   return result;
 }
@@ -182,13 +208,35 @@ export async function getBridgeInfo(): Promise<BridgeInfoResult> {
 export async function buildBridgeOutTx(params: BridgeOutParams): Promise<ExecuteSwapResult> {
   const { senderAddress, tokenAddress, amount, destinationChain, recipient } = params;
 
+  const recipientError = validateBridgeRecipient(recipient, destinationChain);
+  if (recipientError) throw new Error(recipientError);
+
   const isNative =
     tokenAddress.toLowerCase() === ZERO_ADDRESS.toLowerCase() ||
     tokenAddress.toLowerCase() === MEZO_PRECOMPILES.btcToken.toLowerCase();
 
   const targetToken = isNative ? MEZO_PRECOMPILES.btcToken : (tokenAddress as Address);
-  const decimals = await getDecimals(targetToken).catch(() => 18);
+  const decimals = await getDecimals(targetToken).catch(() => DEFAULT_DECIMALS);
   const parsedAmount = parseUnits(amount, decimals);
+
+  // Pre-flight on-chain checks: capacity and minimum amount. Unknown values
+  // block the build instead of assuming arbitrary fallbacks.
+  const [capacity, minAmount] = await Promise.all([
+    getOutflowCapacity(targetToken),
+    getMinBridgeOutAmount(targetToken),
+  ]);
+  if (capacity == null) {
+    throw new Error('Bridge outflow capacity is unreadable on-chain right now. Try again later.');
+  }
+  if (minAmount == null) {
+    throw new Error('Bridge minimum amount is unreadable on-chain right now. Try again later.');
+  }
+  if (parsedAmount < minAmount) {
+    throw new Error(`Amount is below the on-chain minimum bridge-out amount (${minAmount.toString()} wei).`);
+  }
+  if (parsedAmount > capacity) {
+    throw new Error('Amount exceeds the remaining on-chain bridge outflow capacity.');
+  }
 
   const recipientBytes = encodeRecipient(recipient, destinationChain);
   const txSteps: TxStep[] = [];
@@ -198,7 +246,7 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
     try {
       const allowance = await getAllowance(targetToken, senderAddress, BRIDGE_ADDRESS);
       if (allowance < parsedAmount) {
-        const approvePayload = buildApproveTx(targetToken, BRIDGE_ADDRESS, parsedAmount * 10n);
+        const approvePayload = buildApproveTx(targetToken, BRIDGE_ADDRESS, parsedAmount * TX_CONFIG.approveMultiplier);
         txSteps.push({
           index: txSteps.length + 1,
           action: 'APPROVE',
@@ -209,7 +257,7 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
         });
       }
     } catch {
-      const approvePayload = buildApproveTx(targetToken, BRIDGE_ADDRESS, parsedAmount * 10n);
+      const approvePayload = buildApproveTx(targetToken, BRIDGE_ADDRESS, parsedAmount * TX_CONFIG.approveMultiplier);
       txSteps.push({
         index: txSteps.length + 1,
         action: 'APPROVE',
@@ -227,7 +275,7 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
     args: [targetToken, parsedAmount, destinationChain, recipientBytes],
   });
 
-  const chainName = destinationChain === 0 ? 'Ethereum' : 'Bitcoin';
+  const chainName = BRIDGE_CHAIN_NAMES[destinationChain] ?? `Chain ${destinationChain}`;
 
   txSteps.push({
     index: txSteps.length + 1,
@@ -248,6 +296,38 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
     gasLimit: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
   });
 
+  // Honest dry-run of approve → bridgeOut against live state.
+  // Quote-only (zero-address) builds skip simulation and report an estimate.
+  const shouldSimulate = senderAddress.toLowerCase() !== ZERO_ADDRESS.toLowerCase();
+  let simulation: ExecuteSwapResult['simulation'] = {
+    success: true,
+    gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+    simulated: false,
+  };
+  if (!shouldSimulate) {
+    // keep estimate as-is
+  } else try {
+    const sim = await simulateCalls(
+      senderAddress,
+      txSteps
+        .filter((s) => s.data)
+        .map((s) => ({ to: s.to as Address, data: s.data as `0x${string}`, value: BigInt(s.value || '0') }))
+    );
+    simulation = {
+      success: sim.success,
+      gasUsed: sim.gasUsed ?? RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+      simulated: sim.simulated,
+      ...(sim.error ? { error: sim.error } : {}),
+    };
+  } catch (err) {
+    simulation = {
+      success: false,
+      gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
+      simulated: false,
+      error: `Simulation failed: ${(err as Error).message}`,
+    };
+  }
+
   return {
     to: BRIDGE_ADDRESS,
     data: bridgeCalldata,
@@ -257,16 +337,13 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
     ptbSteps: txSteps,
     transactionData: serializedData,
     transactionBytes: Buffer.from(serializedData).toString('base64'),
-    simulation: {
-      success: true,
-      gasUsed: RISK_THRESHOLDS.router.gasEstimateUnits.toString(),
-    },
+    simulation,
     routeSummary: {
       inputAmount: amount,
       inputToken: isNative ? 'BTC' : 'TOKEN',
       expectedOutput: amount,
       outputToken: `${chainName} Asset`,
-      priceImpact: '0.00%',
+      priceImpact: null,
     },
   };
 }

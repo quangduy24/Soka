@@ -21,6 +21,9 @@ report_bugs.md
 task_dev1_backend.md
 task_dev2_frontend.md
 
-# Test suite
+# Test artifacts
+test-results/
 test/
-
+*test
+docs/
+*docs

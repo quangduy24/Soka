@@ -79,10 +79,10 @@ Giao diện Terminal là trung tâm hoạt động chính, kết hợp cơ chế
 - **Bộ chuyển đổi Route (Overview / Terminal):**
   - Tab `Overview`: Chuyển về Landing Page.
   - Tab `Terminal`: Nút kích hoạt đang sáng thể hiện đang trong buồng lái điều khiển.
-- **Đồng hồ phí mạng lưới (Gas Price):** Hiển thị trực tiếp mức phí mạng lưới hiện tại (mặc định: `750 MIST`).
+- **Đồng hồ phí mạng lưới (Gas Price):** Hiển thị trực tiếp mức phí mạng lưới live từ `GET /api/gas-price` (đơn vị Gwei, cảnh báo khi vượt `GAS_WARN_GWEI`); khi chưa đọc được thì hiển thị `—`, không dùng số giả.
 - **Liên kết Mezo Explorer:** Nút bấm mở trình khám phá khối Mezo trên tab mới để kiểm tra giao dịch.
 - **Nút Kết Nối Ví (Wallet Connect / Wallet Menu):**
-  - *Khi chưa kết nối:* Nút "Connect Wallet" hiển thị icon ví. Khi bấm sẽ mở modal `ConnectModal` hỗ trợ ví Sui / Mezo.
+  - *Khi chưa kết nối:* Nút "Connect Wallet" hiển thị icon ví. Khi bấm sẽ mở modal RainbowKit cho ví EVM trên Mezo Testnet (chain 31611).
   - *Khi đã kết nối:* Hiển thị địa chỉ ví rút gọn (dạng `0x1a...8b2c`) và số dư khả dụng. Nhấp vào sẽ mở menu ngữ cảnh cho phép:
     - Sao chép nhanh địa chỉ ví vào Clipboard.
     - Xem thông tin mạng lưới đang kết nối.
@@ -99,10 +99,10 @@ Chatbox được xây dựng theo phong cách kính mờ 3 chiều với các hi
 #### A. Thanh công cụ đầu Chatbox (Terminal Header)
 Gồm biểu tượng SOKA AI có trạng thái hoạt động và 5 nút chức năng cốt lõi:
 
-1. **Nút `Transaction` (Giao dịch Hoán đổi):** Mở danh sách các cặp hoán đổi phổ biến và thiết lập trượt giá nhanh.
-2. **Nút `Borrow` (Vay thế chấp tài sản):** Kích hoạt luồng 4 bước vay MUSD từ tài sản đảm bảo Bitcoin.
-3. **Nút `Vault` (Kho sinh lời tự động):** Kích hoạt luồng quản lý tiền gửi tiết kiệm và tối ưu lợi tức.
-4. **Nút `Pool` (Cung cấp & Quản lý thanh khoản):** Kích hoạt hệ sinh thái LP Pools trên Mezo.
+1. **Nút `Transaction`:** Mở submenu Deposit / Withdraw / Send / Receive. Chỉ `Send` dẫn tới intent thực thi được (`TRANSFER` — build unsigned tx để ví ký); các mục còn lại trả advise trung thực kèm ví dụ đúng.
+2. **Nút `Borrow` (Báo giá vay, read-only):** Luồng `select_token → enter_amount → review` cho báo giá ước tính (max borrow, liquidation price, LTV, APR từ quote hoặc "not configured"). Không có execution vì chưa có lending pool contract (`LENDING_POOL_ADDRESS` trống).
+3. **Nút `Vault` (Venues = live pools):** Danh sách venues là pools thật từ factory (TVL/reserves/fee/user LP). Không có APY/lock period/vault contract riêng.
+4. **Nút `Pool` (Cung cấp & Quản lý thanh khoản):** Add/Remove liquidity thật qua unsigned tx (minimums có slippage haircut). Nút Add Incentive chỉ hiện thông báo gauges chưa wired.
 5. **Nút `History` (Lịch sử giao dịch):** Mở thanh trượt bên phải hiển thị nhật ký các intent đã thực hiện.
 
 ---
@@ -133,22 +133,20 @@ Gồm biểu tượng SOKA AI có trạng thái hoạt động và 5 nút chức
 
 ---
 
-#### B. Luồng Vay Thế Chấp (Borrow Workflow - 4 Steps)
+#### B. Luồng Báo Giá Vay (Borrow Workflow — estimate only, 3 Steps)
 Được kích hoạt khi bấm nút `Borrow` hoặc nhập prompt liên quan đến vay:
-- **Step 1 (Select Collateral):** Người dùng chọn loại tài sản đem thế chấp (BTC, tBTC, v.v.). Thẻ hiển thị tỷ lệ LTV (Loan-to-Value), lãi suất vay và hạn mức khả dụng.
-- **Step 2 (Lock Collateral):** Nhập số lượng tài sản muốn ký quỹ vào smart contract. Có các phím tắt chọn nhanh `25%`, `50%`, `75%`, `MAX`.
-- **Step 3 (Mint / Borrow MUSD):** Nhập số lượng stablecoin MUSD muốn đúc ra dựa trên định giá tài sản thế chấp an toàn. Thanh đo rủi ro Liquidation Price hiển thị trực quan theo thời gian thực.
-- **Step 4 (Success / Confirmation):** Tóm tắt hợp đồng vay đã kích hoạt, số tiền giải ngân về ví và nút quản lý khoản nợ.
+- **Step 1 (Select token):** Chọn khoản vay MUSD hoặc MUSDC. Không hiển thị APR tĩnh — lãi suất chỉ lấy từ live quote (hoặc "not configured by operator").
+- **Step 2 (Enter collateral):** Nhập số BTC thế chấp. Các nút `25%/50%/75%/100%` tính trên số dư BTC thật của ví (yêu cầu connect ví), không phải base cố định. Hệ thống cảnh báo khi nhập vượt balance.
+- **Step 3 (Review estimate):** Hiển thị max borrow (ghi nhãn estimate), collateral + USD value, Max/Liq LTV, Rate, Liquidation Price (tại max borrow — vay ít hơn thì liq thực thấp hơn). Không có bước Success/Confirm-on-chain vì chưa có lending pool contract.
 
 ---
 
-#### C. Luồng Kho Sinh Lời (Yield Vault Workflow)
+#### C. Luồng Kho Sinh Lời (Yield Vault Workflow — venues là live pools)
 Được kích hoạt khi bấm nút `Vault`:
-- **Chuyển đổi Tab linh hoạt:** Người dùng có thể chuyển đổi giữa `Deposit` (Gửi vốn sinh lãi) và `Withdraw` (Rút vốn gốc + lãi).
-- **Số liệu thống kê trực quan:** Hiển thị tỷ suất sinh lời thực tế (Current APY), Tổng giá trị khóa (TVL), và thời gian khóa tối thiểu (Lock Period).
-- **Ô nhập vốn & Thanh tỷ lệ nhanh:** Hỗ trợ nhập số lẻ hoặc chọn tỷ lệ nhanh theo số dư khả dụng trong ví.
-- **Ước tính lợi nhuận tự động:** Tính toán trước số tiền lãi dự kiến nhận được theo mốc 30 ngày, 90 ngày hoặc 1 năm.
-- **Nút Xác nhận Ký gửi (Confirm Vault Action):** Kích hoạt giao dịch smart contract gửi token vào vault an toàn.
+- **Danh sách venues:** Pools thật từ Mezo Swap factory (Type/Stable-Volatile, Fee, TVL, Reserves, Your LP). Không có APY, lock period hay vault contract riêng (`VAULT_ADDRESS` trống).
+- **Nhập vốn 1 leg:** Nhập số lượng token đầu vào; leg còn lại được tính theo reserves live qua `POST /api/pools/quote-paired` (không đoán tỉ lệ 1:1).
+- **Review quote:** Hiển thị paired amounts + LP tokens dự kiến từ `quote-liquidity` on-chain.
+- **Confirm & Sign:** Ký `addLiquidity` (minimums có slippage haircut) bằng ví; LP tokens về ví thật.
 
 ---
 
@@ -189,19 +187,20 @@ Nằm cố định ở chân Chatbox, thiết kế mờ ảo chống che khuất
   - **Nút Đóng (Close / Esc):** Đóng ngăn kéo quay lại màn hình chính.
 
 #### B. Đồ Thị Tuyến Đường Tương Tác (`ProRouteVisualizer`)
-- Hiển thị cấu trúc đồ thị mạng lưới đa node (Multi-hop routing graph).
-- Mỗi nút đại diện cho một DEX hoặc Pool thanh khoản (ví dụ: MezoSwap, Uniswap v3, Cetus).
-- Đường nối động biểu diễn luồng di chuyển của dòng vốn và tỷ lệ phần trăm phân bổ dòng tiền nhằm triệt tiêu tối đa trượt giá.
+- Hiển thị cấu trúc tuyến đường Mezo Swap (mỗi hop một pool thật: fee đọc từ factory, depth từ reserves định giá oracle, link explorer).
+- Tỉ lệ phân bổ hiển thị theo số liệu router (không hardcode 100% mỗi hop); impact/fee unknown hiển thị `—`, không đoán.
 
 #### C. Biểu Đồ An Ninh Rủi Ro (`ProGuardianRadar`)
-- Mô hình đánh giá toàn diện gồm 7 tiêu chuẩn an ninh on-chain:
-  1. *Liquidity Depth:* Chiều sâu thanh khoản của cặp token.
-  2. *Sandwich Protection:* Cơ chế bảo vệ trước bot giao dịch kẹp lệnh.
-  3. *Price Deviation:* Độ lệch giá so với Oracle tin cậy.
-  4. *Contract Audit:* Tình trạng kiểm toán của hợp đồng thông minh.
-  5. *Mint Authority:* Quyền đúc thêm token của chủ dự án.
-  6. *Freeze Risk:* Khả năng đóng băng ví của token.
-  7. *Fee Anomaly:* Bất thường về phí giao dịch ẩn.
+- Mô hình đánh giá gồm 9 checks on-chain thật:
+  1. *Price Impact:* impact từ route quote (null → WARNING, không coi là 0).
+  2. *Pool Liquidity:* TVL pool vs ngưỡng env.
+  3. *Liquidity Depth:* số hops vs `RISK_MAX_HOPS`.
+  4. *Pool Safety:* DEX + liquidity health + factory `isPool` fail-closed (verify mọi hop).
+  5. *Token Safety:* whitelist + bytecode on-chain.
+  6. *Supply Concentration:* pool share của total supply (unverifiable → WARNING).
+  7. *Trade Size vs Liquidity:* size trade hiện tại so với TVL (size-aware).
+  8. *Oracle Deviation:* output router-implied vs oracle.
+  9. *Chain State:* lockdown flags + gas live từ Maintenance precompile.
 
 ---
 
@@ -212,10 +211,10 @@ Nằm cố định ở chân Chatbox, thiết kế mờ ảo chống che khuất
 | **Bàn phím** | `Enter` (tại ô nhập) | Gửi câu lệnh Intent đến engine phân tích |
 | **Bàn phím** | `Esc` | Đóng bảng History hoặc Modal mở rộng |
 | **Header** | Nhấp Logo `SOKA` | Về đầu trang hoặc chuyển về Landing Page |
-| **Header** | Nhấp `Connect Wallet` | Mở popup kết nối ví Web3 Sui / Mezo |
+| **Header** | Nhấp `Connect Wallet` | Mở popup RainbowKit kết nối ví EVM (Mezo Testnet 31611) |
 | **Header** | Nhấp Địa chỉ ví | Mở menu sao chép địa chỉ / ngắt kết nối |
-| **Action Bar** | Nhấp `Borrow` | Khởi chạy wizard 4 bước vay MUSD thế chấp bằng BTC |
-| **Action Bar** | Nhấp `Vault` | Mở giao diện gửi/rút tiền tiết kiệm tối ưu APY |
+| **Action Bar** | Nhấp `Borrow` | Mở báo giá vay read-only (estimate, không execution) |
+| **Action Bar** | Nhấp `Vault` | Mở venues là live pools (không APY/lock period) |
 | **Action Bar** | Nhấp `Pool` | Mở bảng danh mục bể thanh khoản và thêm LP |
 | **Action Bar** | Nhấp `History` | Mở drawer lịch sử giao dịch bên phải |
 | **Result Card** | Nhấp `Details` | Thu gọn / Mở rộng đồ thị Route và radar an ninh |
@@ -231,5 +230,5 @@ Nằm cố định ở chân Chatbox, thiết kế mờ ảo chống che khuất
 
 Giao diện **SOKA** đã giải quyết triệt để rào cản kỹ thuật phức tạp của DeFi thông qua mô hình tương tác hướng ý định (Intent-Driven UI):
 1. **Thân thiện & Tự nhiên:** Người dùng không cần phải tự mình tìm kiếm từng pool, tính toán từng bước swap hay lo sợ bị trượt giá; tất cả được điều khiển qua ngôn ngữ tự nhiên.
-2. **Minh bạch & An toàn:** Mọi quyết định hoán đổi đều được bảo vệ bởi hệ thống Guardian Radar 7 lớp, yêu cầu xác thực rủi ro rõ ràng trước khi ký giao dịch.
+2. **Minh bạch & An toàn:** Mọi quyết định hoán đổi đều được bảo vệ bởi hệ thống Guardian Radar 9 checks, yêu cầu xác thực rủi ro rõ ràng trước khi ký giao dịch; intent ngoài năng lực bị từ chối kèm advise thay vì quote giả.
 3. **Thẩm mỹ Hiện đại:** Thiết kế 3D Floating Glass đồng bộ theo concept màu hồng đất SOKA tinh tế, tạo nên cảm giác nhẹ nhàng, chuyên nghiệp và đáng tin cậy.

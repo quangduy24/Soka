@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CoinChartModal } from './CoinChartModal';
+import { TIMING } from '../../config';
+import { STORAGE_KEYS } from '../../storageKeys';
 
 /**
- * MarketSidebar — playful neo-brutal market widgets for Adidahood.
- * Data: CoinMarketCap proxied through /api/market/* (backend keeps the key),
- * filtered to the Robinhood Chain (Arbitrum L2) ecosystem. Falls back to the
- * built-in demo feed when the API is unavailable.
+ * MarketSidebar — market widgets (hidden until VITE_ENABLE_MARKET=true).
+ * Data: CoinMarketCap proxied through /api/market/* (backend keeps the key).
+ * No demo data: lists start empty and render empty-states when the API is
+ * unavailable. Currently unmounted app-wide; kept for a future market tab.
  */
 
-const HIDDEN_KEY = 'adidahood:hidden-market-coins';
+const HIDDEN_KEY = STORAGE_KEYS.hiddenMarketCoins;
 
 function loadHidden(): Set<string> {
   try {
@@ -34,26 +36,12 @@ export interface MarketToken {
   logo?: string;
 }
 
-/* ── Built-in demo fallback (used only when /api/market fails) ── */
+/* ── No demo data: lists start empty and fill only from /api/market.
+   The existing empty-states ("No movers right now", …) render instead. ── */
 const FALLBACK_MARKET = {
-  movers: [
-    { sym: 'ADH', name: 'Adidahood', price: '$0.0842', chg: '+4.2%', up: true, spark: [3, 3.4, 3.2, 4, 4.4, 4.1, 4.8, 5.2], color: '#CCFF00' },
-    { sym: 'HOOD', name: 'Hood Dog', price: '$0.0012', chg: '+22.1%', up: true, spark: [2, 3, 4, 3.6, 5, 5.6, 6.2, 7], color: '#7DDCFF' },
-    { sym: 'ARB', name: 'Arbitrum', price: '$0.62', chg: '+1.8%', up: true, spark: [4, 4.2, 4, 4.4, 4.3, 4.6, 4.5, 4.7], color: '#FFC900' },
-    { sym: 'STOCK', name: 'Stock Token', price: '$3.10', chg: '-1.9%', up: false, spark: [6, 5.6, 5.8, 5.2, 5, 4.6, 4.4, 4.2], color: '#FF90E8' },
-  ] as MarketToken[],
-  trending: [
-    { sym: 'HOOD', name: 'Hood Dog', price: '$0.0012', chg: '+22.1%', up: true, spark: [2, 3, 4, 3.6, 5, 5.6, 6.2, 7], color: '#7DDCFF' },
-    { sym: 'MOMO', name: 'Momo', price: '$0.0008', chg: '+64.0%', up: true, spark: [1, 2, 2.4, 4, 5, 6, 6.4, 7], color: '#FF90E8' },
-    { sym: 'ROBIN', name: 'Robin', price: '$0.042', chg: '+12.4%', up: true, spark: [3, 3.6, 4.2, 4, 4.8, 5, 5.4, 6], color: '#FFC900' },
-    { sym: 'BIRD', name: 'Bluebird', price: '$0.0021', chg: '-3.3%', up: false, spark: [5, 5.2, 4.8, 4.6, 4.2, 4, 3.8, 3.6], color: '#CCFF00' },
-  ] as MarketToken[],
-  gems: [
-    { sym: 'GEM1', name: 'Gold Nugget', age: '2h ago', price: '$0.00004', mc: '$1.2M', color: '#FFC900' },
-    { sym: 'RWA', name: 'RWA Bond', age: '5h ago', price: '$1.02', mc: '$8.4M', color: '#CCFF00' },
-    { sym: 'TICK', name: 'Ticker', age: '9h ago', price: '$0.003', mc: '$3.1M', color: '#7DDCFF' },
-    { sym: 'PAGE', name: 'Page One', age: '1d ago', price: '$0.0009', mc: '$890K', color: '#FF90E8' },
-  ] as MarketToken[],
+  movers: [] as MarketToken[],
+  trending: [] as MarketToken[],
+  gems: [] as MarketToken[],
 };
 
 /* ── Palette for letter avatars (stable per symbol) ──────────── */
@@ -188,7 +176,7 @@ type GemDto = { sym: string; name: string; price: string; age: string; mc?: stri
 
 /** Market widgets are hidden until a real /api/market backend exists. */
 export const MARKET_ENABLED =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_MARKET === 'true') || false;
+  import.meta.env.VITE_ENABLE_MARKET === 'true' || false;
 
 export const MarketSidebar: React.FC<{ onPick: (sym: string) => void }> = ({ onPick }) => {
   const [movers, setMovers] = useState<MarketToken[]>(FALLBACK_MARKET.movers);
@@ -209,7 +197,7 @@ export const MarketSidebar: React.FC<{ onPick: (sym: string) => void }> = ({ onP
       if (g.length) setGems(g.map((x) => toRow({ ...x, up: true, chg: undefined }, '+0.0%')).filter((r): r is MarketToken => !!r));
       setLive(true);
     } catch {
-      // API unavailable — keep the demo fallback rows.
+      // API unavailable — lists stay empty (empty-states render instead).
       setLive(false);
     }
   }, []);
@@ -217,7 +205,7 @@ export const MarketSidebar: React.FC<{ onPick: (sym: string) => void }> = ({ onP
   useEffect(() => {
     if (!MARKET_ENABLED) return;
     load();
-    const iv = setInterval(load, 60_000); // refresh every minute
+    const iv = setInterval(load, TIMING.marketRefreshMs);
     return () => clearInterval(iv);
   }, [load]);
 

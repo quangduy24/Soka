@@ -2,20 +2,34 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { Terminal, Wallet } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Terminal, Wallet, Fuel } from 'lucide-react';
 import { WalletMenu } from './WalletMenu.js';
+import { mezoApi } from '../../services/mezoApi';
+import { TIMING } from '../../config';
 
 interface ProHeaderProps {
   onOpenWalletModal?: () => void;
+  /** Optional override; otherwise read live from GET /api/gas-price. */
   gasPrice?: string;
 }
 
-export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPrice = '0.0001 BTC' }) => {
+export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPrice }) => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { openConnectModal } = useConnectModal();
   const location = useLocation();
   const isApp = location.pathname.includes('/app');
+
+  const gasQuery = useQuery({
+    queryKey: ['soka-gas-price'],
+    queryFn: () => mezoApi.getGasPrice(),
+    enabled: isApp && gasPrice === undefined,
+    staleTime: TIMING.marketRefreshMs,
+    retry: 1,
+  });
+  const liveGas = gasQuery.data?.gasPriceGwei;
+  const gasLabel = gasPrice ?? (liveGas != null ? `${liveGas.toFixed(2)} Gwei` : '—');
 
   const handleConnect = () => {
     if (onOpenWalletModal) onOpenWalletModal();
@@ -60,6 +74,10 @@ export const ProHeader: React.FC<ProHeaderProps> = ({ onOpenWalletModal, gasPric
         {/* Action Controls */}
         {isApp && (
           <div className="flex items-center gap-3">
+            <span title={gasQuery.data?.elevated ? "Network gas is elevated" : "Live Mezo Testnet gas price"} className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[#DF7AA7]/30 bg-white/85 px-2.5 py-1.5 font-mono text-[11px] font-bold text-[#2C1924]">
+              <Fuel className="w-3.5 h-3.5 text-[#DF7AA7]" />
+              {gasLabel}
+            </span>
             {isConnected && address ? (
               <WalletMenu walletAddress={address} onDisconnect={() => disconnect()} />
             ) : (

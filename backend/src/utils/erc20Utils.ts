@@ -31,6 +31,17 @@ export async function getBalanceOf(
 }
 
 /**
+ * Fetch ERC-20 total supply (for concentration metrics).
+ */
+export async function getTotalSupply(tokenAddress: Address): Promise<bigint> {
+  return readContract<bigint>({
+    address: tokenAddress,
+    abi: erc20Abi,
+    functionName: 'totalSupply',
+  });
+}
+
+/**
  * Fetch ERC-20 token allowance.
  */
 export async function getAllowance(

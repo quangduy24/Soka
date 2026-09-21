@@ -9,6 +9,7 @@ import {
   MEZO_SWAP_ROUTER,
   MEZO_SWAP_FACTORY,
   RISK_THRESHOLDS,
+  EVM_ADDRESS_LENGTH,
 } from '../../config/index.js';
 import { getPublicClient } from '../../utils/mezoClient.js';
 import { logger } from '../../utils/logger.js';
@@ -90,31 +91,65 @@ export async function checkPoolSafety(
     });
   }
 
-  // Check 3: Pool Contract Verification on Mezo Factory
+  // Check 3: Pool Contract Verification on Mezo Factory (fail-closed:
+  // an unreadable factory means unverified, never assumed safe).
+  // Every hop is verified, not just the first — multi-hop routes can mix
+  // pools. Pool age is intentionally NOT checked: factory pairs expose no
+  // creation timestamp on-chain, so any age value would be fabricated.
   try {
-    const poolAddr = route[0]?.poolAddress;
-    if (poolAddr && poolAddr.startsWith('0x') && poolAddr.length === 42) {
-      const client = getPublicClient();
-      const checksummedPool = getAddress(poolAddr);
-      const isVerifiedPair = (await client.readContract({
-        address: MEZO_SWAP_FACTORY,
-        abi: factoryAbi,
-        functionName: 'isPool',
-        args: [checksummedPool],
-      } as any).catch(() => true)) as boolean;
-
+    const client = getPublicClient();
+    const poolAddrs = (route || [])
+      .map((n) => n?.poolAddress)
+      .filter(
+        (a): a is string =>
+          typeof a === 'string' && a.startsWith('0x') && a.length === EVM_ADDRESS_LENGTH
+      );
+    const unique = [...new Set(poolAddrs.map((a) => a.toLowerCase()))];
+    if (unique.length === 0) {
       checks.push({
         name: 'Factory Pair Verification',
         category: 'Pool Safety',
-        status: isVerifiedPair ? 'SAFE' : 'NEUTRAL',
-        message: isVerifiedPair
-          ? 'Liquidity pair is officially registered in Mezo Swap Factory'
-          : 'Pair verified via Mezo Router candidate routing',
+        status: 'WARNING',
+        message: 'Route carries no pool addresses — nothing to verify against the factory',
         references: refs,
       });
+      return checks;
     }
+    const results = await Promise.all(
+      unique.map(async (poolAddr) => {
+        try {
+          const verified = (await client.readContract({
+            address: MEZO_SWAP_FACTORY,
+            abi: factoryAbi,
+            functionName: 'isPool',
+            args: [getAddress(poolAddr)],
+          } as any)) as boolean;
+          return { poolAddr, verified: verified === true };
+        } catch {
+          return { poolAddr, verified: false };
+        }
+      })
+    );
+    const unverified = results.filter((r) => !r.verified);
+    checks.push({
+      name: 'Factory Pair Verification',
+      category: 'Pool Safety',
+      status: unverified.length === 0 ? 'SAFE' : 'WARNING',
+      message:
+        unverified.length === 0
+          ? `All ${results.length} route pool(s) officially registered in Mezo Swap Factory`
+          : `${unverified.length}/${results.length} route pool(s) not verifiable in the factory — treat as unverified`,
+      references: refs,
+    });
   } catch (err) {
-    logger.warn(`Could not verify pair on Mezo Factory: ${(err as Error).message}`);
+    logger.warn(`Could not verify pairs on Mezo Factory: ${(err as Error).message}`);
+    checks.push({
+      name: 'Factory Pair Verification',
+      category: 'Pool Safety',
+      status: 'WARNING',
+      message: 'Factory verification failed — pairs treated as unverified',
+      references: refs,
+    });
   }
 
   return checks;

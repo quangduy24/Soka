@@ -6,14 +6,26 @@
 
 import { z } from 'zod';
 import type { Address } from 'viem';
+import { DEFAULT_SLIPPAGE_PCT, MAX_SLIPPAGE_PCT, API_PAGINATION } from '../config/index.js';
 
 // ─── Intent Types ──────────────────────────────────────────────
 
 /** Priority modes for swap execution */
 export type PriorityMode = 'SAFE' | 'FAST' | 'MAX_OUTPUT';
 
-/** Supported action types */
-export type ActionType = 'SWAP' | 'TRANSFER' | 'BRIDGE' | 'BRIDGE_OUT' | 'BRIDGE_IN';
+/** Supported action types: executable/advisory flows plus conversational intents */
+export type ActionType =
+  | 'SWAP'
+  | 'TRANSFER'
+  | 'BRIDGE'
+  | 'BRIDGE_OUT'
+  | 'BRIDGE_IN'
+  | 'ASK_PRICE'
+  | 'ASK_POOLS'
+  | 'ASK_RISK'
+  | 'ASK_BRIDGE_STATUS'
+  | 'ASK_GAS'
+  | 'ASK_HELP';
 
 /** User constraint extracted from natural language */
 export interface UserConstraint {
@@ -32,6 +44,10 @@ export interface ParsedIntent {
   destination_token_address: string;
   priority_mode: PriorityMode;
   user_constraints: UserConstraint[];
+  /** TRANSFER / BRIDGE_OUT recipient (EVM hex or BTC script per bridge spec) */
+  recipient?: string;
+  /** BRIDGE_OUT destination chain: 0=Ethereum, 1=Bitcoin */
+  destination_chain?: number;
 }
 
 /** Full parse result returned to frontend */
@@ -95,11 +111,12 @@ export interface PoolDetails {
   address: string;
   baseToken: { address: string; symbol: string; name: string };
   quoteToken: { address: string; symbol: string; name: string };
-  priceUsd: string;
+  /** USD price when resolvable on-chain; null means unknown (never an empty string) */
+  priceUsd: string | null;
   /** TVL in USD, or null when it cannot be valued on-chain */
   liquidity: number | null;
-  /** 24h volume is not observable on-chain; 0 means unknown */
-  volume24h: number;
+  /** 24h volume is not observable on-chain; null means unknown */
+  volume24h: number | null;
   stable: boolean;
   pairCreatedAt?: number;
 }
@@ -110,7 +127,8 @@ export interface RouteResult {
   dex_sequence: string[];
   expected_output: number;
   minimum_output: number;
-  execution_impact: string;
+  /** Price impact as "x.xx%" string, or null when it cannot be computed (never fake it) */
+  execution_impact: string | null;
   route_confidence: number;
   dynamicPoolUsed: boolean;
   poolDetails: PoolDetails | null;
@@ -174,7 +192,7 @@ export interface GuardianRiskResponse {
 
 export interface TxStep {
   index: number;
-  action: 'APPROVE' | 'SWAP' | 'BRIDGE_OUT' | 'ADD_LIQUIDITY' | 'REMOVE_LIQUIDITY';
+  action: 'APPROVE' | 'SWAP' | 'TRANSFER' | 'BRIDGE_OUT' | 'ADD_LIQUIDITY' | 'REMOVE_LIQUIDITY';
   to: string;
   description: string;
   data?: string;
@@ -198,10 +216,12 @@ export interface ExecuteSwapResult {
   transactionData: string;
   /** Legacy alias */
   transactionBytes?: string;
-  /** Simulation result */
+  /** Dry-run result: real eth_simulateV1 when simulated=true, else a conservative estimate */
   simulation: {
     success: boolean;
     gasUsed: string;
+    /** True only when an actual eth_simulateV1/eth_call dry-run executed */
+    simulated: boolean;
     balanceChanges?: any[];
     error?: string;
   };
@@ -211,7 +231,8 @@ export interface ExecuteSwapResult {
     inputToken: string;
     expectedOutput: string;
     outputToken: string;
-    priceImpact: string;
+    /** Null when impact is not computable (e.g. bridge-out) — never faked */
+    priceImpact: string | null;
   };
 }
 
@@ -254,6 +275,8 @@ export const CalculateRouteSchema = z.object({
 export const EvaluateGuardianSchema = z.object({
   sourceSymbol: z.string().min(1),
   destSymbol: z.string().min(1),
+  /** Real trade size — the endpoint previously evaluated a hardcoded amount of 1 */
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
   route: z.array(z.any()).optional(),
   execution_impact: z.union([z.string(), z.number()]).optional(),
 });
@@ -276,8 +299,10 @@ export const ExecuteSwapSchema = z.object({
   sourceAddress: z.string().optional(),
   destAddress: z.string().optional(),
   amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
-  slippage: z.number().min(0).max(50).optional().default(0.5),
+  slippage: z.number().min(0).max(MAX_SLIPPAGE_PCT).optional().default(DEFAULT_SLIPPAGE_PCT),
   routerData: z.any().optional(),
+  /** Explicit user override after reviewing guardian warnings (required when unsafe) */
+  acknowledgeRisk: z.boolean().optional().default(false),
 });
 
 export const RiskSummarySchema = z.object({
@@ -290,8 +315,17 @@ export const RiskSummarySchema = z.object({
 
 export const ProcessIntentSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
+  /** Empty when the wallet is not connected — quote-only mode, no tx for a zero address */
+  senderAddress: z.string().optional().default(''),
+  slippage: z.number().min(0).max(MAX_SLIPPAGE_PCT).optional().default(DEFAULT_SLIPPAGE_PCT),
+});
+
+export const TransferSchema = z.object({
   senderAddress: z.string().min(1, 'Sender address is required'),
-  slippage: z.number().min(0).max(50).optional().default(0.5),
+  tokenSymbol: z.string().min(1).optional(),
+  tokenAddress: z.string().min(1).optional(),
+  amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  recipient: z.string().min(1, 'Recipient address is required'),
 });
 
 export const BridgeOutSchema = z.object({
@@ -308,7 +342,7 @@ export const PricesQuerySchema = z.object({
 });
 
 export const PoolsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(API_PAGINATION.poolsMaxLimit).optional().default(API_PAGINATION.poolsDefaultLimit),
   offset: z.coerce.number().int().min(0).optional().default(0),
   wallet: z.string().min(1).optional(),
 });
@@ -324,6 +358,20 @@ export const BorrowQuoteSchema = z.object({
   debtSymbol: z.string().min(1, 'Debt symbol is required'),
 });
 
+export const BorrowReverseQuoteSchema = z.object({
+  walletAddress: z.string().min(1).optional(),
+  collateralSymbol: z.string().min(1, 'Collateral symbol is required'),
+  desiredDebtAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  debtSymbol: z.string().min(1, 'Debt symbol is required'),
+});
+
+export const BorrowMockExecuteSchema = z.object({
+  senderAddress: z.string().min(1, 'senderAddress is required'),
+  collateralSymbol: z.string().min(1, 'Collateral symbol is required'),
+  collateralAmount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  debtSymbol: z.string().min(1, 'Debt symbol is required'),
+});
+
 export const QuoteLiquiditySchema = z.object({
   tokenA: z.string().min(1, 'tokenA address is required'),
   tokenB: z.string().min(1, 'tokenB address is required'),
@@ -332,14 +380,23 @@ export const QuoteLiquiditySchema = z.object({
   amountBDesired: z.union([z.string(), z.number()]).transform((v) => String(v)),
 });
 
+export const QuotePairedSchema = z.object({
+  tokenA: z.string().min(1, 'tokenA address is required'),
+  tokenB: z.string().min(1, 'tokenB address is required'),
+  stable: z.coerce.boolean().optional().default(false),
+  amountA: z.union([z.string(), z.number()]).transform((v) => String(v)),
+});
+
 export const AddLiquiditySchema = QuoteLiquiditySchema.extend({
   senderAddress: z.string().min(1, 'Sender address is required'),
+  slippagePercent: z.number().min(0).max(MAX_SLIPPAGE_PCT).optional().default(DEFAULT_SLIPPAGE_PCT),
 });
 
 export const RemoveLiquiditySchema = z.object({
   senderAddress: z.string().min(1, 'Sender address is required'),
   poolAddress: z.string().min(1, 'Pool address is required'),
   liquidity: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  slippagePercent: z.number().min(0).max(MAX_SLIPPAGE_PCT).optional().default(DEFAULT_SLIPPAGE_PCT),
 });
 
 export interface ProcessIntentResult {
@@ -352,4 +409,12 @@ export interface ProcessIntentResult {
     checks: RiskCheck[];
   };
   ptb: ExecuteSwapResult; // named ptb for backward compatibility with frontend
+  /** Structured fallback advise — present when the intent needed operator guidance */
+  advise?: {
+    error: 'unclear_intent' | 'unsupported_action' | 'unknown_token' | 'missing_field';
+    message: string;
+    missing: string[];
+    supportedActions: string[];
+    examples: { prompt: string; description: string }[];
+  } | null;
 }
