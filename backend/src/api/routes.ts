@@ -690,39 +690,21 @@ apiRouter.post(
         poolDetails: routeResult.poolDetails,
       });
       const acknowledgeRisk = (req.body as { acknowledgeRisk?: boolean }).acknowledgeRisk === true;
-      if (!assessment.safe && !acknowledgeRisk) {
-        return rejectIntent(
-          res,
-          403,
-          'Guardian blocked this quote: review the warnings and acknowledge the risk to proceed.',
-          buildFallbackAdvise({
-            error: 'unsupported_action',
-            detail: `Guardian scored this route ${assessment.score}/100 (${assessment.riskLevel}). Re-request with acknowledgeRisk=true after reviewing each WARNING/DANGER check.`,
-          }),
-          {
-            intent: { ...intent, trade_amount: finalAmount },
-            route: routeResult,
-            guardian: {
-              safe: assessment.safe,
-              score: assessment.score,
-              riskLevel: assessment.riskLevel,
-              checks: assessment.checks,
-            },
-          }
-        );
-      }
 
-      // Step 5: Build unsigned transaction (quote-only when wallet is disconnected)
-      const txResult = await buildMezoSwapTx({
-        senderAddress: (wallet ?? ZERO_ADDRESS) as Address,
-        sourceTokenAddress: srcToken.address,
-        destTokenAddress: dstToken.address,
-        sourceSymbol: srcToken.symbol,
-        destSymbol: dstToken.symbol,
-        amount: finalAmount,
-        slippagePercent: effectiveSlippage,
-        routerData: routeResult.routerData,
-      });
+      // Step 5: Build unsigned transaction (quote-only when wallet is disconnected or risk not yet acknowledged)
+      let txResult = null;
+      if (wallet && (assessment.safe || acknowledgeRisk)) {
+        txResult = await buildMezoSwapTx({
+          senderAddress: wallet,
+          sourceTokenAddress: srcToken.address,
+          destTokenAddress: dstToken.address,
+          sourceSymbol: srcToken.symbol,
+          destSymbol: dstToken.symbol,
+          amount: finalAmount,
+          slippagePercent: effectiveSlippage,
+          routerData: routeResult.routerData,
+        });
+      }
 
       res.json({
         intent: { ...intent, trade_amount: finalAmount },
@@ -733,11 +715,19 @@ apiRouter.post(
           riskLevel: assessment.riskLevel,
           checks: assessment.checks,
         },
-        advise: wallet ? null : buildFallbackAdvise({
-          error: 'missing_field',
-          detail: 'Quote preview only — connect a wallet to sign this swap.',
-          missing: ['senderAddress'],
-        }),
+        requiresAcknowledgement: !assessment.safe && !acknowledgeRisk,
+        advise: !assessment.safe
+          ? buildFallbackAdvise({
+              error: 'unsupported_action',
+              detail: `Guardian scored this route ${assessment.score}/100 (${assessment.riskLevel}). Review the warning indicators before signing.`,
+            })
+          : wallet
+          ? null
+          : buildFallbackAdvise({
+              error: 'missing_field',
+              detail: 'Quote preview only — connect a wallet to sign this swap.',
+              missing: ['senderAddress'],
+            }),
         ptb: txResult,
       });
     } catch (err) {

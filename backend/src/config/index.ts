@@ -63,6 +63,11 @@ export const RISK_THRESHOLDS = {
     recommendSplit: parseFloat(process.env.RISK_PRICE_IMPACT_SPLIT || '3.0'),
     reject: parseFloat(process.env.RISK_PRICE_IMPACT_REJECT || '5.0'),
   },
+  /** Oracle price deviation thresholds (%) */
+  oracleDeviation: {
+    warn: parseNumberEnv('RISK_ORACLE_DEV_WARN', 5.0),
+    reject: parseNumberEnv('RISK_ORACLE_DEV_REJECT', 15.0),
+  },
   /** Minimum pool liquidity in USD */
   minLiquidity: {
     stablePair: parseFloat(process.env.RISK_MIN_LIQUIDITY_STABLE || '50000'),

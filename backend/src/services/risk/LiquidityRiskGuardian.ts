@@ -493,7 +493,7 @@ export class LiquidityRiskGuardian {
         };
       }
       const deviation = (Math.abs(expectedOutput * priceOut.priceUsd - inUsd) / inUsd) * INTENT_CONFIG.scoreScale;
-      const { warn, reject } = RISK_THRESHOLDS.priceImpact;
+      const { warn, reject } = (RISK_THRESHOLDS as any).oracleDeviation ?? { warn: 5.0, reject: 15.0 };
       if (deviation >= reject) {
         return {
           name: 'Oracle Deviation',

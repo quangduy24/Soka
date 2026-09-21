@@ -318,6 +318,7 @@ export const ProcessIntentSchema = z.object({
   /** Empty when the wallet is not connected — quote-only mode, no tx for a zero address */
   senderAddress: z.string().optional().default(''),
   slippage: z.number().min(0).max(MAX_SLIPPAGE_PCT).optional().default(DEFAULT_SLIPPAGE_PCT),
+  acknowledgeRisk: z.boolean().optional().default(false),
 });
 
 export const TransferSchema = z.object({

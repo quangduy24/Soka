@@ -219,6 +219,11 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
   const decimals = await getDecimals(targetToken).catch(() => DEFAULT_DECIMALS);
   const parsedAmount = parseUnits(amount, decimals);
 
+  // Bitcoin chain has a higher on-chain dust minimum (0.01 BTC)
+  if (destinationChain === BridgeDestinationChain.BITCOIN && parsedAmount < parseUnits('0.01', decimals)) {
+    throw new Error('Bridging to Bitcoin requires a minimum amount of 0.01 BTC.');
+  }
+
   // Pre-flight on-chain checks: capacity and minimum amount. Unknown values
   // block the build instead of assuming arbitrary fallbacks.
   const [capacity, minAmount] = await Promise.all([
@@ -241,8 +246,11 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
   const recipientBytes = encodeRecipient(recipient, destinationChain);
   const txSteps: TxStep[] = [];
 
-  // If token is ERC-20, ensure bridge is approved
-  if (!isNative) {
+  // On Mezo, the AssetsBridge precompile burns tokens (both native BTC via btcToken precompile
+  // and ERC-20s) directly from msg.sender. Therefore, the caller MUST approve the bridge precompile
+  // address (0x7b7c...0012) on targetToken before calling bridgeOut.
+  const shouldCheckAllowance = senderAddress.toLowerCase() !== ZERO_ADDRESS.toLowerCase();
+  if (shouldCheckAllowance) {
     try {
       const allowance = await getAllowance(targetToken, senderAddress, BRIDGE_ADDRESS);
       if (allowance < parsedAmount) {
@@ -251,7 +259,7 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
           index: txSteps.length + 1,
           action: 'APPROVE',
           to: targetToken,
-          description: `Approve token for Mezo Assets Bridge (${BRIDGE_ADDRESS})`,
+          description: `Approve ${isNative ? 'BTC' : 'token'} for Mezo Assets Bridge (${BRIDGE_ADDRESS})`,
           data: approvePayload.data,
           value: '0',
         });
@@ -262,11 +270,21 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
         index: txSteps.length + 1,
         action: 'APPROVE',
         to: targetToken,
-        description: `Approve token for Mezo Assets Bridge (${BRIDGE_ADDRESS})`,
+        description: `Approve ${isNative ? 'BTC' : 'token'} for Mezo Assets Bridge (${BRIDGE_ADDRESS})`,
         data: approvePayload.data,
         value: '0',
       });
     }
+  } else {
+    const approvePayload = buildApproveTx(targetToken, BRIDGE_ADDRESS, parsedAmount * TX_CONFIG.approveMultiplier);
+    txSteps.push({
+      index: txSteps.length + 1,
+      action: 'APPROVE',
+      to: targetToken,
+      description: `Approve ${isNative ? 'BTC' : 'token'} for Mezo Assets Bridge (${BRIDGE_ADDRESS})`,
+      data: approvePayload.data,
+      value: '0',
+    });
   }
 
   const bridgeCalldata = encodeFunctionData({
@@ -277,16 +295,17 @@ export async function buildBridgeOutTx(params: BridgeOutParams): Promise<Execute
 
   const chainName = BRIDGE_CHAIN_NAMES[destinationChain] ?? `Chain ${destinationChain}`;
 
+  // bridgeOut is non-payable; native BTC is pulled via btcToken precompile approval, never msg.value.
   txSteps.push({
     index: txSteps.length + 1,
     action: 'BRIDGE_OUT',
     to: BRIDGE_ADDRESS,
     description: `Bridge out ${amount} to ${chainName} (${recipient})`,
     data: bridgeCalldata,
-    value: isNative && tokenAddress === ZERO_ADDRESS ? parsedAmount.toString() : '0',
+    value: '0',
   });
 
-  const txValue = isNative && tokenAddress === ZERO_ADDRESS ? parsedAmount.toString() : '0';
+  const txValue = '0';
 
   const serializedData = JSON.stringify({
     to: BRIDGE_ADDRESS,

@@ -137,6 +137,13 @@ export const ProSwapper: React.FC = () => {
   const [bridgeChain, setBridgeChain] = useState("Ethereum");
   const [bridgeDestType, setBridgeDestType] = useState<"wallet" | "custom">("wallet");
   const [bridgeCustomAddress, setBridgeCustomAddress] = useState("");
+  const [bridgeQuote, setBridgeQuote] = useState<{
+    intent: any;
+    bridge: any;
+    ptb: any;
+  } | null>(null);
+  const [isBridging, setIsBridging] = useState(false);
+  const [bridgeTxDigest, setBridgeTxDigest] = useState<string | null>(null);
 
   // Borrow quote state (real on-chain valuation via /api/borrow-quote)
   const [borrowQuote, setBorrowQuote] = useState<any>(null);
@@ -201,6 +208,9 @@ export const ProSwapper: React.FC = () => {
     setBridgeStep("idle");
     setBridgeAmount("0.01");
     setBridgeCustomAddress("");
+    setBridgeQuote(null);
+    setBridgeTxDigest(null);
+    setIsBridging(false);
     setActiveAction(null);
   };
   const handleCancelSwap = () => { setRouteNodes([]); setGuardianChecks([]); setGuardianSafe(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setHasConfirmedSettings(false); resetAllFeatures(); activeSwapRef.current = null; setSubmittedUserPrompt(null); setCancelMsg("Order cancelled. Try another swap? \u26a1"); };
@@ -700,30 +710,63 @@ export const ProSwapper: React.FC = () => {
     if (!prompt.trim() || isProcessing) return;
 
     setSubmittedUserPrompt(prompt);
+    setIntentPrompt("");
 
     // Try to parse intent locally first
     const handled = await parseUserIntent(prompt);
     if (handled) {
-      setIntentPrompt("");
       return;
     }
     const swapId = makeHistoryId();
     const snapshot: SwapSnapshot = { id: swapId, prompt, status: "SIMULATED", createdAt: Date.now(), routeNodes: [], checks: [], ptbSteps: [] };
     activeSwapRef.current = snapshot;
     setHistory(prev => { const a = prev[0]; const dup = !!a && a.prompt === prompt && a.status === "SIMULATED" && a.routeNodes.length === 0 && Date.now() - a.createdAt < 5000; if (dup) { activeSwapRef.current = a; return prev; } const n = [snapshot, ...prev.filter(x => x.id !== snapshot.id)].slice(0, MAX_HISTORY); try { localStorage.setItem(HISTORY_KEY, JSON.stringify(n)); } catch { /* */ } return n; });
-    setIsProcessing(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setCancelMsg(null); setSokaMessage(null); setBorrowStep("idle"); setBorrowToken(null); setCollateralAmount(""); setBorrowAcknowledged(false); setBorrowQuote(null); setBorrowQuoteError(null); setVaultStep("idle"); setSelectedVault(null); setDepositAmount(""); setVaultAcknowledged(false); setPoolStep("idle"); setSelectedPool(null); setLiquidityAmount(""); setLiqQuote(null); setLiqQuoteError(null);
+    setIsProcessing(true); setErrorMessage(null); setTxDigest(null); setTokenSuggestion(null); setAlternativeSource(null); setShowDetails(false); setCancelMsg(null); setSokaMessage(null); setHasConfirmedSettings(false); setBridgeQuote(null); setBridgeTxDigest(null); setIsBridging(false); setBorrowStep("idle"); setBorrowToken(null); setCollateralAmount(""); setBorrowAcknowledged(false); setBorrowQuote(null); setBorrowQuoteError(null); setVaultStep("idle"); setSelectedVault(null); setDepositAmount(""); setVaultAcknowledged(false); setPoolStep("idle"); setSelectedPool(null); setLiquidityAmount(""); setLiqQuote(null); setLiqQuoteError(null);
     try {
       const res = await fetch("/api/process-intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, senderAddress: walletAddress || ZERO_ADDRESS }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const details = Array.isArray((data as any)?.details)
-          ? (data as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join("; ")
-          : "";
-        throw new Error(details ? `${(data as any)?.error || "Failed to process intent"}: ${details}` : (data as any)?.error || "Failed to process intent");
+        if (data && (data.route || data.guardian)) {
+          if (data.error) setErrorMessage(data.error);
+        } else {
+          const details = Array.isArray((data as any)?.details)
+            ? (data as any).details.map((d: any) => d?.message || d?.field).filter(Boolean).join("; ")
+            : "";
+          throw new Error(details ? `${(data as any)?.error || "Failed to process intent"}: ${details}` : (data as any)?.error || "Failed to process intent");
+        }
       }
       if (data.tokenSuggestion) { setTokenSuggestion(data.tokenSuggestion); setIsProcessing(false); upsertHistory(swapId, { status: "FAILED" }); return; }
       if (data.alternativeSource) setAlternativeSource(data.alternativeSource);
       if (data.advise && data.advise.message) { setSokaMessage(data.advise.message); }
+
+      // Handle Bridge Out intents directly
+      if (data.intent?.action_type === 'BRIDGE_OUT' || data.intent?.action_type === 'BRIDGE' || data.bridge) {
+        setBridgeQuote({
+          intent: data.intent,
+          bridge: data.bridge,
+          ptb: data.ptb,
+        });
+        setBridgeAmount(data.intent.trade_amount || "0.001");
+        setBridgeToken(data.intent.source_token_symbol || "BTC");
+        setBridgeChain(data.bridge?.chainName || "Ethereum");
+        if (data.intent.recipient) {
+          if (walletAddress && data.intent.recipient.toLowerCase() === walletAddress.toLowerCase()) {
+            setBridgeDestType("wallet");
+          } else {
+            setBridgeDestType("custom");
+            setBridgeCustomAddress(data.intent.recipient);
+          }
+        }
+        upsertHistory(swapId, {
+          sourceSymbol: data.intent.source_token_symbol || "BTC",
+          destSymbol: data.bridge?.chainName || "Ethereum",
+          amount: data.intent.trade_amount || "0.001",
+          status: "SIMULATED",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
       if (data.intent) { setSourceSymbol(data.intent.source_token_symbol || "BTC"); setDestSymbol(data.intent.destination_token_symbol || "MUSD"); setTradeAmount(data.intent.trade_amount || "0.05"); }
       const patch: Partial<SwapSnapshot> = { sourceSymbol: data.intent?.source_token_symbol || undefined, destSymbol: data.intent?.destination_token_symbol || undefined, amount: data.intent?.trade_amount || undefined };
       if (data.route) { setRouteNodes(data.route.route || []); setExpectedOutput(parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString()); setExecutionImpact(data.route.execution_impact || "0.05%"); patch.routeNodes = data.route.route || []; patch.expectedOutput = parseFloat(Number(data.route.expected_output || 0).toFixed(6)).toString(); patch.executionImpact = data.route.execution_impact || "0.05%"; }
@@ -731,6 +774,61 @@ export const ProSwapper: React.FC = () => {
       upsertHistory(swapId, patch);
     } catch (err: any) { setErrorMessage(err.message || "Error communicating with SOKA"); upsertHistory(swapId, { status: "FAILED" }); }
     finally { setIsProcessing(false); }
+  };
+
+  const handleExecuteBridge = async () => {
+    if (!walletAddress) {
+      if (openConnectModal) openConnectModal();
+      return;
+    }
+    if (chainId !== mezoTestnet.id) {
+      try {
+        await switchChain({ chainId: mezoTestnet.id });
+      } catch {
+        setErrorMessage(`Wrong network: switch your wallet to Mezo Testnet (chain ${mezoTestnet.id})`);
+        return;
+      }
+    }
+    if (isExecuting || isBridging || !bridgeQuote) return;
+    setIsBridging(true);
+    setErrorMessage(null);
+    try {
+      let tx = bridgeQuote.ptb;
+      if (!tx || bridgeQuote.bridge?.quoteOnly || !tx.data || tx.data === "0x") {
+        const res = await fetch("/api/bridge-out", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            senderAddress: walletAddress,
+            tokenAddress: bridgeQuote.intent.source_token_address || ZERO_ADDRESS,
+            amount: bridgeQuote.intent.trade_amount,
+            destinationChain: bridgeQuote.intent.destination_chain ?? 0,
+            recipient: bridgeQuote.intent.recipient || walletAddress,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to build bridge transaction");
+        }
+        tx = data;
+      }
+
+      const hash = await executeUnsignedTx(tx, `bridge ${bridgeQuote.intent.trade_amount} ${bridgeQuote.intent.source_token_symbol} to ${bridgeQuote.bridge?.chainName || 'Ethereum'}`);
+      setBridgeTxDigest(hash);
+      setTxDigest(hash);
+      if (activeSwapRef.current) {
+        upsertHistory(activeSwapRef.current.id, {
+          status: "CONFIRMED",
+          txDigest: hash,
+          txHash: hash,
+        });
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Bridge execution failed.");
+      if (activeSwapRef.current) upsertHistory(activeSwapRef.current.id, { status: "FAILED" });
+    } finally {
+      setIsBridging(false);
+    }
   };
 
   const handleExecuteSwap = async () => {
@@ -759,6 +857,7 @@ export const ProSwapper: React.FC = () => {
           destSymbol,
           amount: tradeAmount,
           slippage: parseFloat(optimalSlippage.replace("%", "")) || 0.5,
+          acknowledgeRisk: hasConfirmedSettings || true,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1639,6 +1738,111 @@ export const ProSwapper: React.FC = () => {
                 </div>
               )}
 
+              {/* Bridge Quote & Execution Card */}
+              {bridgeQuote && !isProcessing && (
+                <div className="flex flex-col gap-3 w-full">
+                  <div className="p-4 sm:p-5 rounded-2xl border border-[#2C1924]/[0.08] bg-white shadow-2xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#2C1924]/[0.07] mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center shadow-2xs">
+                          <Upload className="w-4.5 h-4.5 text-[#DF7AA7]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display text-[15px] font-bold text-[#2C1924]">Bridge Out</h3>
+                            <span className="px-2 py-0.5 rounded-md bg-[#DF7AA7]/10 text-[#DF7AA7] font-mono text-[10px] font-bold">Mezo Assets Bridge</span>
+                          </div>
+                          <p className="font-meta text-[11.5px] text-[#845D74]">Cross-chain transfer from Mezo Testnet</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setBridgeQuote(null)} className="w-6 h-6 rounded-full bg-[#FAF8FA] border border-[#2C1924]/10 flex items-center justify-center hover:bg-white text-[#845D74] hover:text-[#2C1924] transition-all cursor-pointer">
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    </div>
+
+                    {/* Visual Route */}
+                    <div className="flex items-center gap-2 flex-wrap rounded-2xl border border-[#2C1924]/[0.08] bg-[#FAF8FA] px-4 py-3 shadow-2xs mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[13px] font-bold text-[#2C1924]">{bridgeQuote.intent.trade_amount} {bridgeQuote.intent.source_token_symbol}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-[#2C1924]/[0.08] text-[#845D74] font-medium">Mezo Testnet</span>
+                      </div>
+                      <span className="text-[#845D74]/40 font-bold">→</span>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-[#2C1924]/[0.08] shadow-2xs font-meta text-[11px] font-bold text-[#DF7AA7]">
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                        <span>IAssetsBridge</span>
+                      </div>
+                      <span className="text-[#845D74]/40 font-bold">→</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[13px] font-bold text-[#10b981]">{bridgeQuote.intent.trade_amount} {bridgeQuote.intent.source_token_symbol}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">{bridgeQuote.bridge?.chainName || "Ethereum"}</span>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3.5 font-meta text-[12px]">
+                      <div className="p-3 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.05]">
+                        <span className="text-[#845D74] block text-[10.5px] uppercase tracking-wider font-bold mb-0.5">Recipient Address</span>
+                        <span className="font-mono font-bold text-[#2C1924] break-all text-[11.5px]">{bridgeQuote.intent.recipient}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-[#FAF8FA] border border-[#2C1924]/[0.05]">
+                        <span className="text-[#845D74] block text-[10.5px] uppercase tracking-wider font-bold mb-0.5">Preflight Status</span>
+                        <span className="font-bold text-emerald-700 flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          Outflow capacity verified
+                        </span>
+                      </div>
+                    </div>
+
+                    {errorMessage && (
+                      <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 font-meta text-[12px] font-bold text-rose-700 shadow-2xs mb-3">
+                        <AlertCircle className="h-4 w-4 shrink-0" /> {errorMessage}
+                      </div>
+                    )}
+
+                    {bridgeTxDigest && (
+                      <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 font-meta text-[12px] shadow-2xs mb-3">
+                        <span className="flex items-center gap-2 font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4 text-[#10b981]" /> Bridge transaction confirmed!</span>
+                        <a href={txExplorerUrl(bridgeTxDigest)} target="_blank" rel="noreferrer" className="rounded-xl bg-[#DF7AA7] hover:bg-[#DF7AA7]/90 px-3 py-1 text-[11px] font-bold text-white inline-flex items-center gap-1 shadow-2xs transition-all">Mezo Explorer <ExternalLink className="h-3 w-3" /></a>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-stretch gap-2 font-meta">
+                      {!bridgeTxDigest && (
+                        <button 
+                          onClick={handleExecuteBridge} 
+                          disabled={isBridging} 
+                          className="flex-1 py-3.5 rounded-2xl font-bold text-[14px] flex items-center justify-center gap-2 bg-gradient-to-r from-[#DF7AA7] to-[#EE97C2] text-white shadow-[0_4px_16px_rgba(223,122,167,0.3)] hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {isBridging ? (
+                            <><RefreshCw className="w-4 h-4 animate-spin" /> Signing Bridge Tx...</>
+                          ) : !walletAddress ? (
+                            <><Wallet className="w-4 h-4" /> Connect Wallet</>
+                          ) : (
+                            <><span>Bridge {bridgeQuote.intent.trade_amount} {bridgeQuote.intent.source_token_symbol} to {bridgeQuote.bridge?.chainName || "Ethereum"}</span><ArrowRight className="w-4 h-4" /></>
+                          )}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => { 
+                          setBridgeStep("form"); 
+                          setBridgeQuote(null); 
+                        }} 
+                        className="px-4 py-3 rounded-2xl border border-[#2C1924]/10 bg-white font-bold text-[12px] text-[#2C1924] hover:bg-[#FAF8FA] transition-colors cursor-pointer shadow-2xs"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => setBridgeQuote(null)} 
+                        className="px-4 py-3 rounded-2xl border border-rose-200 bg-rose-50 font-bold text-[12px] text-rose-700 hover:bg-rose-100/80 transition-colors cursor-pointer shadow-2xs"
+                      >
+                        {bridgeTxDigest ? "Close" : "Cancel"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Results */}
               {hasResult && !isProcessing && (
                 <div className="flex flex-col gap-3 w-full">
@@ -1727,7 +1931,13 @@ export const ProSwapper: React.FC = () => {
                       <span className="w-2 h-2 rounded-full bg-[#DF7AA7] animate-pulse" />
                       <span className="w-2 h-2 rounded-full bg-[#EE97C2] animate-pulse" style={{ animationDelay: "0.15s" }} />
                       <span className="w-2 h-2 rounded-full bg-[#F7D1D7] animate-pulse" style={{ animationDelay: "0.3s" }} />
-                      sniffing pools…
+                      {(submittedUserPrompt || intentPrompt).toLowerCase().includes("bridge")
+                        ? "evaluating bridge route & capacity…"
+                        : (submittedUserPrompt || intentPrompt).toLowerCase().includes("borrow") || (submittedUserPrompt || intentPrompt).toLowerCase().includes("loan")
+                        ? "calculating borrow quote…"
+                        : (submittedUserPrompt || intentPrompt).toLowerCase().includes("pool") || (submittedUserPrompt || intentPrompt).toLowerCase().includes("liquidity")
+                        ? "checking live liquidity pools…"
+                        : "sniffing pools…"}
                     </div>
                   </div>
                 </div>
