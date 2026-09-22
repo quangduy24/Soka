@@ -6,7 +6,7 @@
 [![AI Engine](https://img.shields.io/badge/AI_Engine-OpenRouter_%2B_Deterministic-6366F1?style=for-the-badge)](https://openrouter.ai/)
 [![Status](https://img.shields.io/badge/Status-Beta_v2.0-8A2BE2?style=for-the-badge)](#)
 
-**SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine on **Mezo Testnet** (Bitcoin L2 EVM, chain `31611`). Users express what they want in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"*, *"Trade ALL BTC for MUSD"*, or *"Bridge 0.1 wBTC to Ethereum 0x…"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, dispatches it to a dedicated executor (Swap, Bridge-Out, Transfer, Liquidity, or a live-data answer), searches optimal liquidity paths across Mezo Pools, runs every route through a **9-check On-Chain Risk Guardian**, and builds an unsigned EVM transaction ready for wallet signature — with zero manual slippage math, no token address hunting, and honest rejections (structured advise, never fabricated quotes) for anything outside system capabilities.
+**SOKA** is an AI-orchestrated intent execution protocol and liquidity routing engine on **Mezo Testnet** (Bitcoin L2 EVM, chain `31611`). Users express what they want in natural language (e.g. *"Swap 0.05 BTC for the safest route into MUSD"*, *"Trade 100 MUSD for BTC with the lowest slippage"*, *"Trade ALL BTC for MUSD"*, or *"Bridge 0.1 wBTC to Ethereum 0x…"*). SOKA's **Multi-Tier Intent Engine** parses the intent into a structured on-chain order, dispatches it to a dedicated executor (Swap, Bridge-Out, Transfer, Liquidity, or a live-data answer), searches optimal liquidity paths across Mezo Pools, runs every route through a **9-check On-Chain Risk Guardian**, and builds an unsigned EVM transaction ready for wallet signature — with zero manual slippage math, no token address hunting, and honest rejections (structured advise, never fabricated quotes) for anything outside system capabilities.
 
 ---
 
@@ -56,7 +56,7 @@ flowchart TD
 
 1. **Multi-Tier Intent Parsing (LLM + Rule Fallback):**
    - Natural language is analyzed to extract quantitative fields (`trade_amount`, `source_token_symbol`, `destination_token_symbol`, `recipient`, `destination_chain`) and qualitative constraints (`SAFE`, `FAST`, `MAX_OUTPUT`, slippage tolerance, deadline, min output).
-   - Supports shorthand values (`ALL`, `MAX`, percentages like `50%`, word amounts like `half` / `nửa`), multi-word coin names, and full contract addresses.
+   - Supports shorthand values (`ALL`, `MAX`, percentages like `50%`, word amounts like `"half"`), multi-word coin names, and full contract addresses.
    - Chatter with no actionable content is rejected before any LLM call, so a hallucinating model can never turn *"hello there"* into a swap.
 
 2. **Intent Dispatch & Token Resolution:**
@@ -107,7 +107,7 @@ The same registry is exposed at `GET /api/capabilities` and powers frontend menu
 
 ### Example Prompts Understood:
 - *"Swap 0.05 BTC to MUSD, safest route"* → Amount: `0.05`, Source: `BTC`, Dest: `MUSD`, Priority: `SAFE`
-- *"Đổi 100 MUSD sang BTC trượt giá thấp nhất"* → Amount: `100`, Source: `MUSD`, Dest: `BTC`, Priority: `MAX_OUTPUT`
+- *"Trade 100 MUSD for BTC with the lowest slippage"* → Amount: `100`, Source: `MUSD`, Dest: `BTC`, Priority: `MAX_OUTPUT`
 - *"Trade ALL BTC for MUSD with 0.5% slippage"* → Amount: `ALL`, Source: `BTC`, Dest: `MUSD`, Constraint: `slippage: 0.5%`
 - *"Sell half of my mUSDC into BTC"* → Amount: `50%`, Source: `mUSDC`, Dest: `BTC`
 - *"Bridge 0.1 wBTC to Ethereum 0x…"* → Action: `BRIDGE_OUT`, chain: Ethereum
